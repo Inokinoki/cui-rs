@@ -188,6 +188,17 @@ If you amalgamate a local upstream checkout instead (`./vendor.sh
 <checkout>`, for hacking on upstream), `build.rs` compiles it with a
 digest-mismatch warning as long as the version matches the pin.
 
+**Support window.** Binding 0.1.x supports CUI **1.4** only — declared in
+`UPSTREAM.toml` (`supported = [...]`) and enforced by `build.rs`. 0.2.0 will
+widen the window to recent releases, and the plumbing is already in place:
+`cui-sys` reports the compiled version through Cargo's `links` metadata
+channel, `cui/build.rs` turns it into `cui_ge_*` capability cfgs (so
+version-specific APIs can be `#[cfg(cui_ge_1_5)]`-gated), and every pinned
+release carries a generated C ABI probe (struct sizes, field offsets, enum
+values) in `cui-sys/layout/` that the layout tests check the Rust FFI
+against. The same probe verifies upstream's field-append discipline, which
+is what makes a moving support window safe.
+
 **At runtime**, `cui::CUI_VERSION` (re-exported from `cui-sys`, where
 `build.rs` extracts it from `c/cui.h` at compile time) always tells you which
 CUI is inside your binary — e.g. for a diagnostic line or an `about` box.

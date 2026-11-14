@@ -1043,69 +1043,138 @@ extern crate std;
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
     use super::*;
     use core::mem::{offset_of, size_of};
+    use std::format;
+    use std::string::{String, ToString};
 
-    /// Guard for the build.rs extraction: the constant must match the
-    /// version pinned in UPSTREAM.toml, which the verified header carries.
-    #[test]
-    fn version_constant_matches_pin() {
-        let pin = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/UPSTREAM.toml")).unwrap();
-        let pinned = pin
-            .lines()
-            .find_map(|l| l.trim().strip_prefix("version = "))
-            .map(|rest| rest.trim().trim_matches('"'))
-            .unwrap();
-        assert_eq!(CUI_VERSION_STRING, pinned);
-        assert_eq!(CUI_VERSION_STRING.split('.').count(), 3);
+    /// The generated C ABI facts for the compiled version (probe/layout_probe.c
+    /// via vendor.sh). Missing tables or entries mean vendor.sh needs a re-run.
+    fn layout_table() -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>> {
+        use std::collections::BTreeMap;
+        let path = format!("{}/layout/{}.toml", env!("CARGO_MANIFEST_DIR"), CUI_VERSION_STRING);
+        let src = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!("no layout probe table for CUI {CUI_VERSION_STRING} ({e}); run ./vendor.sh")
+        });
+        let mut table: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
+        let mut section = String::new();
+        for line in src.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if line.starts_with('[') && line.ends_with(']') {
+                section = line[1..line.len() - 1].to_string();
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else {
+                panic!("bad line in {path}: {line}")
+            };
+            let key = key.trim().trim_matches('"').to_string();
+            if key == "version" {
+                continue; // recorded in the filename; not a number
+            }
+            let value: u64 = value
+                .trim()
+                .parse()
+                .unwrap_or_else(|_| panic!("bad number in {path}: {line}"));
+            table.entry(section.clone()).or_default().insert(key, value);
+        }
+        table
     }
 
-    /// Sizes verified against the C compiler (x86_64-linux, `sizeof` of the
-    /// amalgamated cui.h). Any drift between our #[repr(C)] structs and the
-    /// C headers fails this test.
+    fn check(table: &std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>>, section: &str, key: &str, actual: u64) {
+        let expected = table
+            .get(section)
+            .and_then(|s| s.get(key))
+            .unwrap_or_else(|| {
+                panic!("layout table for CUI {CUI_VERSION_STRING} lacks [{section}] {key}; regenerate with ./vendor.sh")
+            });
+        assert_eq!(actual, *expected, "[{section}] {key}: Rust FFI vs C ABI (CUI {CUI_VERSION_STRING})");
+    }
+
+    /// The Rust FFI structs must equal the C compiler's sizes for the exact
+    /// release we compile against; any drift fails here.
     #[test]
     fn struct_layouts_match_c() {
-        assert_eq!(size_of::<cui_color>(), 4);
-        assert_eq!(size_of::<cui_size>(), 8);
-        assert_eq!(size_of::<cui_vec2>(), 8);
-        assert_eq!(size_of::<cui_rect>(), 16);
-        assert_eq!(size_of::<cui_box>(), 152);
-        assert_eq!(size_of::<cui_button_opts>(), 72);
-        assert_eq!(size_of::<cui_input_opts>(), 88);
-        assert_eq!(size_of::<cui_app_desc>(), 56);
-        assert_eq!(size_of::<cui_series>(), 24);
-        assert_eq!(size_of::<cui_table_column>(), 24);
-        assert_eq!(size_of::<cui_chart_opts>(), 72);
-        assert_eq!(size_of::<cui_card_opts>(), 72);
-        assert_eq!(size_of::<cui_scroll_opts>(), 56);
-        assert_eq!(size_of::<cui_text_opts>(), 40);
-        assert_eq!(size_of::<cui_check_opts>(), 24);
-        assert_eq!(size_of::<cui_slider_opts>(), 40);
-        assert_eq!(size_of::<cui_number_opts>(), 48);
-        assert_eq!(size_of::<cui_select_opts>(), 48);
-        assert_eq!(size_of::<cui_tabs_opts>(), 24);
-        assert_eq!(size_of::<cui_nav_opts>(), 40);
-        assert_eq!(size_of::<cui_dialog_opts>(), 24);
-        assert_eq!(size_of::<cui_toast_opts>(), 40);
-        assert_eq!(size_of::<cui_badge_opts>(), 32);
-        assert_eq!(size_of::<cui_empty_opts>(), 32);
-        assert_eq!(size_of::<cui_metric_opts>(), 56);
-        assert_eq!(size_of::<cui_table_opts>(), 32);
-        assert_eq!(size_of::<cui_table_sort>(), 8);
-        assert_eq!(size_of::<cui_segmented_opts>(), 24);
-        assert_eq!(size_of::<cui_chip_opts>(), 24);
-        assert_eq!(size_of::<cui_sheet_opts>(), 24);
-        assert_eq!(size_of::<cui_progress_opts>(), 40);
-        assert_eq!(size_of::<cui_chart_annotation>(), 48);
+        let table = layout_table();
+        for (name, size) in [
+            ("cui_color", size_of::<cui_color>()),
+            ("cui_size", size_of::<cui_size>()),
+            ("cui_vec2", size_of::<cui_vec2>()),
+            ("cui_rect", size_of::<cui_rect>()),
+            ("cui_box", size_of::<cui_box>()),
+            ("cui_button_opts", size_of::<cui_button_opts>()),
+            ("cui_input_opts", size_of::<cui_input_opts>()),
+            ("cui_app_desc", size_of::<cui_app_desc>()),
+            ("cui_series", size_of::<cui_series>()),
+            ("cui_table_column", size_of::<cui_table_column>()),
+            ("cui_chart_opts", size_of::<cui_chart_opts>()),
+            ("cui_card_opts", size_of::<cui_card_opts>()),
+            ("cui_scroll_opts", size_of::<cui_scroll_opts>()),
+            ("cui_text_opts", size_of::<cui_text_opts>()),
+            ("cui_check_opts", size_of::<cui_check_opts>()),
+            ("cui_slider_opts", size_of::<cui_slider_opts>()),
+            ("cui_number_opts", size_of::<cui_number_opts>()),
+            ("cui_select_opts", size_of::<cui_select_opts>()),
+            ("cui_tabs_opts", size_of::<cui_tabs_opts>()),
+            ("cui_nav_opts", size_of::<cui_nav_opts>()),
+            ("cui_dialog_opts", size_of::<cui_dialog_opts>()),
+            ("cui_toast_opts", size_of::<cui_toast_opts>()),
+            ("cui_badge_opts", size_of::<cui_badge_opts>()),
+            ("cui_empty_opts", size_of::<cui_empty_opts>()),
+            ("cui_metric_opts", size_of::<cui_metric_opts>()),
+            ("cui_table_opts", size_of::<cui_table_opts>()),
+            ("cui_table_sort", size_of::<cui_table_sort>()),
+            ("cui_segmented_opts", size_of::<cui_segmented_opts>()),
+            ("cui_chip_opts", size_of::<cui_chip_opts>()),
+            ("cui_sheet_opts", size_of::<cui_sheet_opts>()),
+            ("cui_progress_opts", size_of::<cui_progress_opts>()),
+            ("cui_chart_annotation", size_of::<cui_chart_annotation>()),
+        ] {
+            check(&table, "size", name, size as u64);
+        }
     }
 
+    /// Field offsets pin the field order too — an inserted C field moves
+    /// everything after it and fails here even when sizes happen to match.
     #[test]
     fn field_offsets_match_c() {
-        // cui_box: after the 4-byte pad and the id pointer, dir starts at 12.
-        assert_eq!(offset_of!(cui_box, dir), 16);
-        assert_eq!(offset_of!(cui_box, gap), 80);
-        assert_eq!(offset_of!(cui_button_opts, tooltip), 40);
-        assert_eq!(offset_of!(cui_button_opts, color), 64);
-        assert_eq!(offset_of!(cui_app_desc, renderer), 28);
+        let table = layout_table();
+        check(&table, "offset", "cui_box.dir", offset_of!(cui_box, dir) as u64);
+        check(&table, "offset", "cui_box.gap", offset_of!(cui_box, gap) as u64);
+        check(&table, "offset", "cui_box.bg", offset_of!(cui_box, bg) as u64);
+        check(&table, "offset", "cui_button_opts.tooltip", offset_of!(cui_button_opts, tooltip) as u64);
+        check(&table, "offset", "cui_button_opts.color", offset_of!(cui_button_opts, color) as u64);
+        check(&table, "offset", "cui_input_opts.size", offset_of!(cui_input_opts, size) as u64);
+        check(&table, "offset", "cui_input_opts.placeholder", offset_of!(cui_input_opts, placeholder) as u64);
+        check(&table, "offset", "cui_app_desc.renderer", offset_of!(cui_app_desc, renderer) as u64);
+        check(&table, "offset", "cui_series.values", offset_of!(cui_series, values) as u64);
+        check(&table, "offset", "cui_chart_opts.labels", offset_of!(cui_chart_opts, labels) as u64);
+    }
+
+    /// C enum discriminants must match what the transmute-based to_ffi
+    /// relies on (the round-trip test in the `cui` crate checks the other
+    /// direction: our values against these).
+    #[test]
+    fn enum_values_match_c() {
+        let table = layout_table();
+        check(&table, "enum", "CUI_GRID", cui_dir::CUI_GRID as i32 as u64);
+        check(&table, "enum", "CUI_ALIGN_STRETCH", cui_align::CUI_ALIGN_STRETCH as i32 as u64);
+        check(&table, "enum", "CUI_JUSTIFY_BETWEEN", cui_justify::CUI_JUSTIFY_BETWEEN as i32 as u64);
+        check(&table, "enum", "CUI_ELEVATION_FLOATING", cui_elevation::CUI_ELEVATION_FLOATING as i32 as u64);
+        check(&table, "enum", "CUI_DIRECTION_AUTO", cui_direction::CUI_DIRECTION_AUTO as i32 as u64);
+        check(&table, "enum", "CUI_THEME_DARK", cui_theme_mode::CUI_THEME_DARK as i32 as u64);
+        check(&table, "enum", "CUI_ACCENT_ROSE", cui_accent::CUI_ACCENT_ROSE as i32 as u64);
+        check(&table, "enum", "CUI_BUTTON_LINK", cui_button_variant::CUI_BUTTON_LINK as i32 as u64);
+        check(&table, "enum", "CUI_SIZE_LG", cui_control_size::CUI_SIZE_LG as i32 as u64);
+        check(&table, "enum", "CUI_TEXT_END", cui_text_align::CUI_TEXT_END as i32 as u64);
+        check(&table, "enum", "CUI_TONE_ACCENT", cui_tone::CUI_TONE_ACCENT as i32 as u64);
+        check(&table, "enum", "CUI_SIDE_TOP", cui_side::CUI_SIDE_TOP as i32 as u64);
+        check(&table, "enum", "CUI_MOUSE_MIDDLE", cui_mouse_button::CUI_MOUSE_MIDDLE as i32 as u64);
+        check(&table, "enum", "CUI_RENDERER_SOFTWARE", cui_renderer_kind::CUI_RENDERER_SOFTWARE as i32 as u64);
+        check(&table, "enum", "CUI_KEY_9", cui_key::CUI_KEY_9 as i32 as u64);
+        check(&table, "enum", "CUI_KEY_F12", cui_key::CUI_KEY_F12 as i32 as u64);
     }
 }

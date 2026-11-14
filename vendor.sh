@@ -51,6 +51,16 @@ sha256_cui_c = "$sha_c"
 EOF
 }
 
+run_probe() {
+    # Record the C ABI of what is in cui-sys/c/ as a TOML table; the layout
+    # tests in cui-sys check the Rust FFI structs against it.
+    v=$(sed -n 's/^#define CUI_VERSION_STRING "\(.*\)"/\1/p' "$upstream_dir/cui.h" | head -1)
+    mkdir -p cui-sys/layout
+    cc -std=c99 -I "$upstream_dir" cui-sys/probe/layout_probe.c -o "$out/probe"
+    "$out/probe" > "cui-sys/layout/$v.toml"
+    echo "layout probe table written: cui-sys/layout/$v.toml"
+}
+
 fetch_into() {
     # $1 = destination dir, uses the pin already in UPSTREAM.toml
     tag=$(toml_field tag)
@@ -88,10 +98,14 @@ case "${1:-}" in
         "$(sha256sum "$out/cui.c" | cut -d' ' -f1)"
     mkdir -p "$upstream_dir"
     cp "$out/cui.h" "$out/cui.c" "$upstream_dir/"
+    run_probe
     echo "pinned $tag (cui $version) in cui-sys/UPSTREAM.toml; offline cache refreshed"
     ;;
 --fetch)
+    out=$(mktemp -d)
+    trap 'rm -rf "$out"' EXIT
     fetch_into "$upstream_dir"
+    run_probe
     echo "offline cache refreshed from the pinned release ($(toml_field version))"
     ;;
 "")
@@ -111,6 +125,7 @@ case "${1:-}" in
     fi
     mkdir -p "$upstream_dir"
     cp "$out/cui.h" "$out/cui.c" "$upstream_dir/"
+    run_probe
     python3 - "$upstream" <<'EOF'
 import re, sys, pathlib
 

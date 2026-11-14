@@ -1077,3 +1077,15 @@ impl Drop for ScopeGuard {
         unsafe { (self.end)(self.ctx) }
     }
 }
+
+#[cfg(test)]
+mod capability_cfg_tests {
+    /// The DEP_CUI_* → cfg pipe works end to end: with the 1.4 pin, the 1.4
+    /// gate is set and gates further up the ladder are not.
+    #[cfg(cui_ge_1_4)]
+    #[test]
+    fn capability_cfg_flows() {
+        assert!(cfg!(cui_ge_1_4));
+        assert!(!cfg!(cui_ge_1_9));
+    }
+}

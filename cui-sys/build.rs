@@ -50,12 +50,26 @@ impl Pin {
     }
 }
 
+/// The versions this binding release declares compatibility with, e.g.
+/// `supported = ["1.4.0"]` in UPSTREAM.toml.
+fn supported_list(src: &str) -> Vec<String> {
+    src.lines()
+        .find_map(|l| {
+            let l = l.trim();
+            let rest = l.strip_prefix("supported")?.trim_start().strip_prefix('=')?.trim();
+            rest.strip_prefix('[')?.strip_suffix(']').map(|inner| {
+                inner.split(',').map(|s| s.trim().trim_matches('"').to_string()).collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let pin = Pin::parse(
-        &fs::read_to_string(manifest.join("UPSTREAM.toml"))
-            .expect("UPSTREAM.toml is missing; it pins the upstream release"),
-    );
+    let pin_src = fs::read_to_string(manifest.join("UPSTREAM.toml"))
+        .expect("UPSTREAM.toml is missing; it pins the upstream release");
+    let supported = supported_list(&pin_src);
+    let pin = Pin::parse(&pin_src);
 
     // The committed copies in cui-sys/c/ take precedence. They must match the
     // pin: identical digests are the normal case (they ARE the release
@@ -89,6 +103,17 @@ fn main() {
     };
 
     let version = header_version(&fs::read_to_string(dir.join(HEADER)).unwrap());
+    if !supported.contains(&version) {
+        panic!(
+            "this binding release declares support for CUI {supported:?}, but the sources \
+             to compile are CUI {version}.\n\
+             Build against a supported release (see UPSTREAM.toml), or move to a binding \
+             release that supports it — the window widens over time (see README)."
+        );
+    }
+    // Sent to dependents' build scripts as DEP_CUI_* via the `links = "cui"`
+    // channel; the safe crate turns it into `cui_ge_*` capability cfgs.
+    println!("cargo:metadata=version={version}");
     println!("cargo:rustc-env=CUI_VERSION_STRING={version}");
 
     let mut b = cc::Build::new();

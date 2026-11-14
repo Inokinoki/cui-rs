@@ -15,6 +15,12 @@
 # local upstream tree into cui-sys/c/ for upstream hacking.
 
 version = "1.4.0"
+
+# The versions this binding release declares compatibility with. 0.1.x
+# supports CUI 1.4 only; 0.2.0 will widen the window to recent releases
+# (feature-selected sources — see README). build.rs refuses to compile a
+# version outside this window.
+supported = ["1.4.0"]
 tag = "v1.4.0"
 base_url = "https://github.com/yappologistic/CUI/releases/download"
 sha256_cui_h = "3d75b32abe5495997ca10a57ddfe1e0f2cd46ca04520806e92528eb87347aa97"

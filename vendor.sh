@@ -1,24 +1,116 @@
 #!/bin/sh
-# Regenerates the vendored C sources and the icon constants from an upstream
-# CUI checkout, and records exactly what was vendored in cui-sys/VENDORED.md.
-# Run from the repository root:
+# Manage the upstream CUI sources this crate builds against. Run from the
+# repository root:
 #
-#     ./vendor.sh [path-to-CUI-checkout]
+#   ./vendor.sh --pin <tag>          Pin a release: download its amalgamated
+#                                    assets, verify the version, compute the
+#                                    SHA-256 digests, rewrite UPSTREAM.toml and
+#                                    refresh the offline cache in cui-sys/c/.
+#   ./vendor.sh --fetch              Re-download the pinned release into the
+#                                    offline cache (cui-sys/c/), verifying the
+#                                    recorded digests. For building offline.
+#   ./vendor.sh <checkout-path>      Amalgamate a local upstream checkout into
+#                                    the offline cache instead (for hacking on
+#                                    upstream; the version must match the pin).
 #
-# The default checkout path is ../CUI-clone. Requires python3. Vendor from a
-# tagged upstream commit when possible. After running, commit the updated
-# cui-sys/c/, cui-sys/VENDORED.md and cui/src/icons.rs together.
+# The offline cache is git-ignored; committed builds normally fetch from the
+# release per UPSTREAM.toml inside build.rs. Requires curl and python3.
 set -e
 
-upstream="${1:-../CUI-clone}"
-out="$(mktemp -d)"
-trap 'rm -rf "$out"' EXIT
+repo=https://github.com/yappologistic/CUI
+upstream_dir=cui-sys/c
 
-# --- generate ---------------------------------------------------------------
-python3 "$upstream/tools/amalgamate.py" "$out" >/dev/null
-cp "$out/cui.h" "$out/cui.c" cui-sys/c/
+toml_field() {
+    sed -n "s/^$1 *= *\"\(.*\)\"/\1/p" cui-sys/UPSTREAM.toml | head -1
+}
 
-python3 - "$upstream" <<'EOF'
+write_pin() {
+    version=$1 tag=$2 sha_h=$3 sha_c=$4
+    cat > cui-sys/UPSTREAM.toml <<EOF
+# The upstream CUI release that this crate builds against.
+#
+# build.rs downloads the pre-amalgamated release assets for \`tag\` (no python
+# needed at build time), verifies both SHA-256 digests and the
+# CUI_VERSION_STRING define embedded in the header, caches them under
+# target/, and compiles the single cui.c.
+#
+# Without network access, pre-populate the offline cache with
+# \`./vendor.sh --fetch\` (writes the same verified files into cui-sys/c/,
+# which build.rs then uses as-is), or amalgamate a local upstream checkout
+# with \`./vendor.sh <path-to-checkout>\`.
+#
+# Update the pin with \`./vendor.sh --pin <tag>\` — which computes the digests
+# from the release assets — never by hand.
+
+version = "$version"
+tag = "$tag"
+base_url = "$repo/releases/download"
+sha256_cui_h = "$sha_h"
+sha256_cui_c = "$sha_c"
+EOF
+}
+
+fetch_into() {
+    # $1 = destination dir, uses the pin already in UPSTREAM.toml
+    tag=$(toml_field tag)
+    base=$(toml_field base_url)
+    want_h=$(toml_field sha256_cui_h)
+    want_c=$(toml_field sha256_cui_c)
+    mkdir -p "$1"
+    curl --fail --location --proto '=https' --silent --show-error \
+        -o "$1/cui.h" "$base/$tag/cui.h"
+    curl --fail --location --proto '=https' --silent --show-error \
+        -o "$1/cui.c" "$base/$tag/cui.c"
+    got_h=$(sha256sum "$1/cui.h" | cut -d' ' -f1)
+    got_c=$(sha256sum "$1/cui.c" | cut -d' ' -f1)
+    [ "$got_h" = "$want_h" ] || { echo "error: cui.h digest mismatch (expected $want_h, got $got_h)" >&2; exit 1; }
+    [ "$got_c" = "$want_c" ] || { echo "error: cui.c digest mismatch (expected $want_c, got $got_c)" >&2; exit 1; }
+}
+
+case "${1:-}" in
+--pin)
+    tag=${2:?usage: ./vendor.sh --pin <tag>}
+    case "$tag" in v*) ;; *) echo "error: tag should look like v1.4.0" >&2; exit 1 ;; esac
+    version=${tag#v}
+    out=$(mktemp -d)
+    trap 'rm -rf "$out"' EXIT
+    curl --fail --location --proto '=https' --silent --show-error \
+        -o "$out/cui.h"  "$repo/releases/download/$tag/cui.h"
+    curl --fail --location --proto '=https' --silent --show-error \
+        -o "$out/cui.c"  "$repo/releases/download/$tag/cui.c"
+    header_version=$(sed -n 's/^#define CUI_VERSION_STRING "\(.*\)"/\1/p' "$out/cui.h" | head -1)
+    [ "$header_version" = "$version" ] || {
+        echo "error: the $tag assets carry CUI $header_version, not $version" >&2; exit 1;
+    }
+    write_pin "$version" "$tag" \
+        "$(sha256sum "$out/cui.h" | cut -d' ' -f1)" \
+        "$(sha256sum "$out/cui.c" | cut -d' ' -f1)"
+    mkdir -p "$upstream_dir"
+    cp "$out/cui.h" "$out/cui.c" "$upstream_dir/"
+    echo "pinned $tag (cui $version) in cui-sys/UPSTREAM.toml; offline cache refreshed"
+    ;;
+--fetch)
+    fetch_into "$upstream_dir"
+    echo "offline cache refreshed from the pinned release ($(toml_field version))"
+    ;;
+"")
+    sed -n '2,12p' "$0"
+    exit 1
+    ;;
+*)
+    upstream=$1
+    out=$(mktemp -d)
+    trap 'rm -rf "$out"' EXIT
+    python3 "$upstream/tools/amalgamate.py" "$out" >/dev/null
+    header_version=$(sed -n 's/^#define CUI_VERSION_STRING "\(.*\)"/\1/p' "$out/cui.h" | head -1)
+    pinned=$(toml_field version)
+    if [ "$header_version" != "$pinned" ]; then
+        echo "warning: the checkout amalgamates to CUI $header_version but the pin is $pinned;" \
+             "build.rs will refuse this cache until the pin matches" >&2
+    fi
+    mkdir -p "$upstream_dir"
+    cp "$out/cui.h" "$out/cui.c" "$upstream_dir/"
+    python3 - "$upstream" <<'EOF'
 import re, sys, pathlib
 
 header = pathlib.Path(sys.argv[1], "include/cui/cui_icons.h").read_text()
@@ -30,60 +122,15 @@ lines = [
     "#![allow(missing_docs)] // generated constants, named after their C macros",
     "",
 ]
+count = 0
 for name, hexes in pat.findall(header):
     ch = bytes(int(h, 16) for h in hexes.split("\\x")[1:]).decode("utf-8")
     lines.append(f'pub const ICON_{name}: &str = "{ch}";')
+    count += 1
 lines.append("")
 pathlib.Path("cui/src/icons.rs").write_text("\n".join(lines))
-print(f"{len(pat.findall(header))} icons generated")
+print(f"{count} icons generated")
 EOF
-
-# --- record and verify the upstream version ---------------------------------
-# The version of record is the CUI_VERSION_STRING define inside the generated
-# header, so what we record cannot drift from what we compile.
-header_version=$(sed -n 's/^#define CUI_VERSION_STRING "\(.*\)"/\1/p' cui-sys/c/cui.h | head -1)
-[ -n "$header_version" ] || { echo "error: CUI_VERSION_STRING not found in generated cui.h" >&2; exit 1; }
-
-cmake_version=$(grep -A3 '^project(cui' "$upstream/CMakeLists.txt" | sed -n 's/.*VERSION \([0-9.]*\).*/\1/p' | head -1)
-if [ -n "$cmake_version" ] && [ "$cmake_version" != "$header_version" ]; then
-    echo "error: CMakeLists says $cmake_version but the header says $header_version" >&2
-    exit 1
-fi
-
-if git -C "$upstream" rev-parse HEAD >/dev/null 2>&1; then
-    commit=$(git -C "$upstream" rev-parse --short HEAD)
-    ref=$(git -C "$upstream" describe --tags --always --dirty)
-    dirty=$(git -C "$upstream" status --porcelain --untracked-files=no | wc -l | tr -d ' ')
-    [ "$dirty" = "0" ] || echo "warning: upstream checkout has $dirty uncommitted change(s)" >&2
-    source_line="- Commit: \`$commit\` (describe: \`$ref\`$( [ "$dirty" = "0" ] || echo ', dirty tree'))"
-else
-    commit="unknown"
-    source_line="- Commit: unknown (not a git checkout)"
-fi
-date_line=$(date +%F)
-
-cat > cui-sys/VENDORED.md <<EOF
-# Vendored CUI sources
-
-\`c/cui.h\` and \`c/cui.c\` are generated by upstream \`tools/amalgamate.py\`
-and must not be edited here. This file records what they were generated from.
-
-- Upstream: <https://github.com/yappologistic/CUI>
-- Upstream version: **$header_version**
-$source_line
-- Vendored on: $date_line
-
-Check the version at runtime with \`cui_sys::CUI_VERSION_STRING\` (extracted
-from the header when \`cui-sys\` is built, so it always matches the compiled
-C code).
-
-To refresh, vendor from a tagged upstream commit when possible:
-
-    ./vendor.sh path/to/CUI-checkout
-
-then commit \`cui-sys/c/\`, this file and \`cui/src/icons.rs\` together, and
-note the upstream version bump in the changelog of both crates if the major
-or minor version moved.
-EOF
-
-echo "vendored CUI $header_version ($commit) into cui-sys/c/, recorded in cui-sys/VENDORED.md"
+    echo "offline cache built from the local checkout ($upstream); digest checks in build.rs are skipped for it"
+    ;;
+esac

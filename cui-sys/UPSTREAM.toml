@@ -1,0 +1,20 @@
+# The upstream CUI release that this crate builds against.
+#
+# build.rs downloads the pre-amalgamated release assets for `tag` (no python
+# needed at build time), verifies both SHA-256 digests and the
+# CUI_VERSION_STRING define embedded in the header, caches them under
+# target/, and compiles the single cui.c.
+#
+# Without network access, pre-populate the offline cache with
+# `./vendor.sh --fetch` (writes the same verified files into cui-sys/c/,
+# which build.rs then uses as-is), or amalgamate a local upstream checkout
+# with `./vendor.sh <path-to-checkout>`.
+#
+# Update the pin with `./vendor.sh --pin <tag>` — which computes the digests
+# from the release assets — never by hand.
+
+version = "1.4.0"
+tag = "v1.4.0"
+base_url = "https://github.com/yappologistic/CUI/releases/download"
+sha256_cui_h = "3d75b32abe5495997ca10a57ddfe1e0f2cd46ca04520806e92528eb87347aa97"
+sha256_cui_c = "7b1da50a0903d33a560af1111d5dda958c7b27935a0f5acd26accf074ba8367c"

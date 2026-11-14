@@ -1,5 +1,7 @@
-//! Raw FFI bindings to CUI 1.4.0, generated from the official amalgamation
-//! (`c/cui.h` + `c/cui.c`, produced by upstream `tools/amalgamate.py`).
+//! Raw FFI bindings to CUI. The C sources are the upstream release assets
+//! pinned in `UPSTREAM.toml`, downloaded and SHA-256-verified at build time
+//! (see `build.rs` and `vendor.sh`); the pin records the exact version this
+//! binding was written against.
 //!
 //! Only the `*_ex` functions and plain structs are declared here — the C
 //! named-argument macros are sugar over these. For the safe, idiomatic API
@@ -21,10 +23,10 @@ pub type cui_id = u32;
 pub type cui_texture = usize;
 pub type cui_font = c_int;
 
-/// The upstream CUI version the vendored sources were generated from,
-/// e.g. `"1.4.0"`. Extracted from `c/cui.h` at build time, so it always
-/// describes the C code that was actually compiled. See `VENDORED.md`
-/// for the full provenance (upstream commit, vendoring date).
+/// The upstream CUI version the compiled C code was generated from,
+/// e.g. `"1.4.0"`. Extracted from the release-asset header at build time,
+/// so it always describes the C code that was actually compiled. The
+/// digest-verified pin lives in `UPSTREAM.toml`.
 pub const CUI_VERSION_STRING: &str = env!("CUI_VERSION_STRING");
 
 /* ==== Basic types (cui.h) ==== */
@@ -1045,18 +1047,18 @@ mod tests {
     use super::*;
     use core::mem::{offset_of, size_of};
 
-    /// Guard for the build.rs extraction: the constant must be a release
-    /// version string taken from the header we compile.
+    /// Guard for the build.rs extraction: the constant must match the
+    /// version pinned in UPSTREAM.toml, which the verified header carries.
     #[test]
-    fn version_constant_matches_header() {
-        let header = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/c/cui.h")).unwrap();
-        let from_header = header
+    fn version_constant_matches_pin() {
+        let pin = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/UPSTREAM.toml")).unwrap();
+        let pinned = pin
             .lines()
-            .find_map(|l| l.strip_prefix("#define CUI_VERSION_STRING "))
+            .find_map(|l| l.trim().strip_prefix("version = "))
             .map(|rest| rest.trim().trim_matches('"'))
             .unwrap();
-        assert_eq!(CUI_VERSION_STRING, from_header);
-        assert!(CUI_VERSION_STRING.split('.').count() == 3);
+        assert_eq!(CUI_VERSION_STRING, pinned);
+        assert_eq!(CUI_VERSION_STRING.split('.').count(), 3);
     }
 
     /// Sizes verified against the C compiler (x86_64-linux, `sizeof` of the

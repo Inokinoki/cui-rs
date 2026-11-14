@@ -1,7 +1,6 @@
-//! Raw FFI bindings to CUI. The C sources are the upstream release assets
-//! pinned in `UPSTREAM.toml`, downloaded and SHA-256-verified at build time
-//! (see `build.rs` and `vendor.sh`); the pin records the exact version this
-//! binding was written against.
+//! Raw FFI bindings to CUI. The C sources are the amalgamated release
+//! assets of the upstream version pinned in `UPSTREAM.toml`, committed in
+//! `c/` and digest-verified at build time (see `build.rs` and `vendor.sh`).
 //!
 //! Only the `*_ex` functions and plain structs are declared here — the C
 //! named-argument macros are sugar over these. For the safe, idiomatic API

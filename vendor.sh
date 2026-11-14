@@ -13,8 +13,9 @@
 #                                    the offline cache instead (for hacking on
 #                                    upstream; the version must match the pin).
 #
-# The offline cache is git-ignored; committed builds normally fetch from the
-# release per UPSTREAM.toml inside build.rs. Requires curl and python3.
+# The files it writes into cui-sys/c/ are committed for the default,
+# network-less build; build.rs verifies them against the digests recorded in
+# UPSTREAM.toml. Requires curl and python3.
 set -e
 
 repo=https://github.com/yappologistic/CUI
@@ -131,6 +132,6 @@ lines.append("")
 pathlib.Path("cui/src/icons.rs").write_text("\n".join(lines))
 print(f"{count} icons generated")
 EOF
-    echo "offline cache built from the local checkout ($upstream); digest checks in build.rs are skipped for it"
+    echo "cui-sys/c/ rebuilt from the local checkout ($upstream); build.rs compiles it with a digest-mismatch warning"
     ;;
 esac

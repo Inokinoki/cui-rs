@@ -164,20 +164,20 @@ vendor.sh  pins/fetches the upstream release (--pin, --fetch) or amalgamates
 semver for their *binding* API; breaking a Rust signature bumps `cui`'s minor
 version, and neither is tied to upstream's release numbers.
 
-**The C sources are not committed; they are pinned and fetched.**
+**The pinned C sources are committed, digest-checked at every build.**
 `cui-sys/UPSTREAM.toml` records the upstream release (version, tag and the
-SHA-256 of its amalgamated release assets). At build time, `build.rs`
-downloads those two assets from the release, verifies both digests **and**
-the `CUI_VERSION_STRING` define inside the header, caches them under
-`target/`, and compiles. Nothing compiles unless it matches the pin byte for
-byte, and `cargo clean` simply re-fetches.
+SHA-256 of its amalgamated release assets), and `cui-sys/c/` holds exactly
+those assets. At build time `build.rs` verifies both digests **and** the
+`CUI_VERSION_STRING` define inside the header, then compiles — no network
+access, and compatible with crates.io, whose guidelines forbid build scripts
+from touching the network. `./vendor.sh --fetch` restores the cache after a
+pin change without a local checkout, and `cui-sys` uses Cargo's
+`links = "cui"`, which guarantees at most one copy of the C library in any
+dependency graph.
 
-The first build needs network access (curl). To build offline — or to
-package the crate for crates.io, whose guidelines forbid build scripts from
-touching the network — run `./vendor.sh --fetch` once: it stores the same
-digest-verified files in `cui-sys/c/` (git-ignored), which `build.rs` then
-prefers over downloading. `cui-sys` uses Cargo's `links = "cui"`, which
-guarantees at most one copy of the C library in any dependency graph.
+If you amalgamate a local upstream checkout instead (`./vendor.sh
+<checkout>`, for hacking on upstream), `build.rs` compiles it with a
+digest-mismatch warning as long as the version matches the pin.
 
 **At runtime**, `cui::CUI_VERSION` (re-exported from `cui-sys`, where
 `build.rs` extracts it from `c/cui.h` at compile time) always tells you which
@@ -193,8 +193,7 @@ layer — the layout tests in `cui-sys` fail loudly if the C ABI moved.
 ## Building and testing
 
 ```sh
-cargo build --examples       # needs libx11-dev on Linux; first build fetches
-                             # the pinned CUI release (curl), or run ./vendor.sh --fetch
+cargo build --examples       # needs libx11-dev on Linux; no network needed
 cargo test                   # layout tests against C sizes, doctests
 cargo run -p cui --example hello
 cargo run -p cui --example todo

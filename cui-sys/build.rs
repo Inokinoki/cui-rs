@@ -1,17 +1,16 @@
 //! Compiles CUI for the `cui-sys` crate.
 //!
-//! The C sources are not committed to this repository. `UPSTREAM.toml` pins
-//! an upstream release (version, tag and the SHA-256 of its release
-//! assets); this script downloads the pre-amalgamated `cui.h`/`cui.c` from
-//! that release, verifies the digests and the version embedded in the
-//! header, caches them under `OUT_DIR`, and compiles the single `cui.c`
-//! with the `cc` crate.
+//! `UPSTREAM.toml` pins an upstream release: its version, tag and the
+//! SHA-256 of the amalgamated `cui.h`/`cui.c` release assets, which are
+//! committed in `cui-sys/c/`. This script verifies the digests (and the
+//! version embedded in the header) and compiles the single `cui.c` with the
+//! `cc` crate — fully offline, and compatible with crates.io, whose
+//! guidelines forbid build scripts from touching the network.
 //!
-//! Without network access, pre-populate the offline cache with
-//! `./vendor.sh --fetch` (the same verified files, stored in `cui-sys/c/`,
-//! git-ignored) or amalgamate a local upstream checkout with
-//! `./vendor.sh <path>` — an existing `cui-sys/c/` always takes precedence
-//! and is compiled as-is.
+//! If `cui-sys/c/` is missing (or emptied), the same assets are downloaded
+//! from the pinned release into `OUT_DIR` and verified the same way.
+//! `cui-sys/c/` holding locally amalgamated sources (same version, different
+//! bytes — see `vendor.sh <checkout>`) is compiled with a warning.
 
 use sha2::{Digest, Sha256};
 use std::env;
@@ -58,17 +57,31 @@ fn main() {
             .expect("UPSTREAM.toml is missing; it pins the upstream release"),
     );
 
-    // An offline cache in cui-sys/c/ (see vendor.sh) takes precedence and is
-    // trusted as-is: it exists precisely to build without network access.
+    // The committed copies in cui-sys/c/ take precedence. They must match the
+    // pin: identical digests are the normal case (they ARE the release
+    // assets); same version but different bytes means a locally amalgamated
+    // checkout (vendor.sh <checkout>) — allowed with a warning; a different
+    // version is refused.
     let local_cache = manifest.join("c");
     let dir = if local_cache.join(SOURCE).is_file() && local_cache.join(HEADER).is_file() {
-        let version = header_version(&fs::read_to_string(local_cache.join(HEADER)).unwrap());
+        let header = fs::read_to_string(local_cache.join(HEADER)).unwrap();
+        let version = header_version(&header);
         if version != pin.version {
             panic!(
                 "cui-sys/c/ holds CUI {version} but UPSTREAM.toml pins {}.\n\
                  Re-run `./vendor.sh --pin {}` or `./vendor.sh --fetch`, or remove cui-sys/c/.",
                 pin.version, pin.tag
             );
+        }
+        for (name, expected) in [(HEADER, &pin.sha256_h), (SOURCE, &pin.sha256_c)] {
+            let bytes = fs::read(local_cache.join(name)).unwrap();
+            let got = hex_sha256(&bytes);
+            if got != *expected {
+                println!(
+                    "cargo:warning=cui-sys/c/{name} does not match the digests pinned in \
+                     UPSTREAM.toml (locally amalgamated sources?): compiling it anyway"
+                );
+            }
         }
         local_cache
     } else {
@@ -125,6 +138,7 @@ fn main() {
 
     b.compile("cui");
     println!("cargo:rerun-if-changed=UPSTREAM.toml");
+    println!("cargo:rerun-if-changed=c");
     println!("cargo:rerun-if-changed=build.rs");
 }
 

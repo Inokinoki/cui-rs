@@ -1,17 +1,18 @@
 # The upstream CUI release that this crate builds against.
 #
-# build.rs downloads the pre-amalgamated release assets for `tag` (no python
-# needed at build time), verifies both SHA-256 digests and the
-# CUI_VERSION_STRING define embedded in the header, caches them under
-# target/, and compiles the single cui.c.
+# The amalgamated release assets for this exact release are committed in
+# cui-sys/c/; build.rs verifies both SHA-256 digests (and the
+# CUI_VERSION_STRING define inside the header) and compiles from there —
+# no network access, and crates.io-compatible.
 #
-# Without network access, pre-populate the offline cache with
-# `./vendor.sh --fetch` (writes the same verified files into cui-sys/c/,
-# which build.rs then uses as-is), or amalgamate a local upstream checkout
-# with `./vendor.sh <path-to-checkout>`.
+# If cui-sys/c/ is missing, build.rs downloads the same assets from the
+# release and verifies them the same way (needs curl).
 #
-# Update the pin with `./vendor.sh --pin <tag>` — which computes the digests
-# from the release assets — never by hand.
+# `./vendor.sh --pin <tag>` moves the pin to another release: it downloads
+# that release's assets, checks the embedded version, computes the digests,
+# rewrites this file and refreshes cui-sys/c/. `./vendor.sh --fetch`
+# re-downloads the pinned release; `./vendor.sh <checkout>` amalgamates a
+# local upstream tree into cui-sys/c/ for upstream hacking.
 
 version = "1.4.0"
 tag = "v1.4.0"

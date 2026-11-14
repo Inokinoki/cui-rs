@@ -253,11 +253,6 @@ impl App {
         Vec2 { x: v.x, y: v.y }
     }
 
-    /// Starts or stops following the OS light/dark setting.
-    pub fn follow_system_theme(&mut self, follow: bool) {
-        unsafe { ffi::cui_app_follow_system_theme(self.ptr, follow) }
-    }
-
     /// True when the software renderer is drawing (no usable OpenGL, or it was asked for).
     pub fn is_software(&mut self) -> bool {
         unsafe { ffi::cui_app_is_software(self.ptr) }
@@ -970,24 +965,6 @@ impl<'a> Ui<'a> {
     /// True when the mouse is over a component that uses it (C's `cui_wants_mouse`).
     pub fn wants_mouse(&mut self) -> bool {
         unsafe { ffi::cui_wants_mouse(self.ctx) }
-    }
-
-    /// Writes to the system clipboard (C's `cui_set_clipboard_text`).
-    pub fn set_clipboard(&mut self, text: impl AsRef<str>) {
-        unsafe { ffi::cui_set_clipboard_text(self.ctx, self.cs(&text)) }
-    }
-
-    /// Reads the system clipboard (C's `cui_get_clipboard_text`). A copy is
-    /// returned, since CUI only keeps the text until the next call.
-    pub fn clipboard(&mut self) -> String {
-        unsafe {
-            let p = ffi::cui_get_clipboard_text(self.ctx);
-            if p.is_null() {
-                String::new()
-            } else {
-                core::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
-            }
-        }
     }
 
     // ---------------------------------------------------------------- theme

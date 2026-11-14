@@ -762,8 +762,6 @@ extern "C" {
     pub fn cui_mouse_clicked(ui: *mut cui_ctx, b: cui_mouse_button) -> bool;
     pub fn cui_wants_keyboard(ui: *mut cui_ctx) -> bool;
     pub fn cui_wants_mouse(ui: *mut cui_ctx) -> bool;
-    pub fn cui_set_clipboard_text(ui: *mut cui_ctx, text: *const c_char);
-    pub fn cui_get_clipboard_text(ui: *mut cui_ctx) -> *const c_char;
     pub fn cui_dropped_file_count(ui: *mut cui_ctx) -> c_int;
     pub fn cui_dropped_file(ui: *mut cui_ctx, index: c_int) -> *const c_char;
 }
@@ -1030,7 +1028,6 @@ extern "C" {
     pub fn cui_app_set_title(app: *mut cui_app, title: *const c_char);
     pub fn cui_app_set_size(app: *mut cui_app, width: c_int, height: c_int);
     pub fn cui_app_size(app: *mut cui_app) -> cui_vec2;
-    pub fn cui_app_follow_system_theme(app: *mut cui_app, follow: bool);
     pub fn cui_app_is_software(app: *mut cui_app) -> bool;
     pub fn cui_app_native_window(app: *mut cui_app) -> *mut c_void;
     pub fn cui_app_backend(app: *mut cui_app) -> *const c_char;

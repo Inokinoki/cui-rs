@@ -383,6 +383,7 @@ impl Mods {
     #[cfg(not(target_os = "macos"))]
     pub const PRIMARY: Mods = Mods::CTRL;
     #[cfg(target_os = "macos")]
+    /// The platform's primary shortcut modifier: Command on macOS, Ctrl elsewhere.
     pub const PRIMARY: Mods = Mods::SUPER;
 
     /// True when every flag in `other` is also set here.

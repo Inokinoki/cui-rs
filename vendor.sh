@@ -53,10 +53,13 @@ EOF
 
 run_probe() {
     # Record the C ABI of what is in cui-sys/c/ as a TOML table; the layout
-    # tests in cui-sys check the Rust FFI structs against it.
+    # tests in cui-sys check the Rust FFI structs against it. gen_probe.c
+    # (generated alongside gen.rs) covers the generated structs too.
     v=$(sed -n 's/^#define CUI_VERSION_STRING "\(.*\)"/\1/p' "$upstream_dir/cui.h" | head -1)
     mkdir -p cui-sys/layout
-    cc -std=c99 -I "$upstream_dir" cui-sys/probe/layout_probe.c -o "$out/probe"
+    cat cui-sys/probe/layout_probe.c cui-sys/probe/gen_probe.c > "$out/probe_all.c"
+    echo 'int main(void) { base_probe(); gen_probe_all(); return 0; }' >> "$out/probe_all.c"
+    cc -std=c99 -I "$upstream_dir" "$out/probe_all.c" -o "$out/probe"
     "$out/probe" > "cui-sys/layout/$v.toml"
     echo "layout probe table written: cui-sys/layout/$v.toml"
 }

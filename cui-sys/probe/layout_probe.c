@@ -11,7 +11,7 @@
 #define OFF(T, F) printf("\"%s.%s\" = %zu\n", #T, #F, offsetof(T, F))
 #define EN(V)     printf("%s = %d\n", #V, (int)(V))
 
-int main(void) {
+void base_probe(void) {
     printf("version = \"%s\"\n\n", CUI_VERSION_STRING);
 
     puts("[size]");
@@ -54,5 +54,4 @@ int main(void) {
     EN(CUI_MOUSE_MIDDLE); EN(CUI_RENDERER_SOFTWARE);
     EN(CUI_KEY_9); EN(CUI_KEY_F12);
     EN(CUI_AXIS_HOURS); EN(CUI_TASK_DONE);
-    return 0;
 }

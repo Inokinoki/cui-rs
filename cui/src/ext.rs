@@ -3,12 +3,12 @@
 //! surface. Doc comments carry the C name, so the upstream docs translate.
 
 use crate::arena::Arena;
-use crate::opts::{cstr, Sheet};
+use crate::opts::{cstr, Series, Sheet};
 use crate::Ui;
 use crate::opts2::*;
 use crate::types::*;
 use cui_sys as ffi;
-use core::ffi::c_char;
+use core::ffi::{c_char, c_void};
 
 impl<'a> crate::Ui<'a> {
     // ---------------------------------------------------------------- menus
@@ -415,4 +415,419 @@ pub fn file_dialog(o: &FileDialog) -> Option<String> {
     }
     let end = buf.iter().position(|&b| b == 0).unwrap_or(0);
     Some(String::from_utf8_lossy(&buf[..end]).into_owned())
+}
+
+
+// ---- hand-bound second-wave functions (complex signatures) ----
+
+impl<'a> Ui<'a> {
+    /// Blame view (C's `cui_blame`). `lines` are the source lines,
+    /// `line_commit[i]` the commit index for each line (-1 none).
+    pub fn blame(
+        &mut self,
+        id: impl AsRef<str>,
+        lines: &[&str],
+        line_commit: &[i32],
+        commits: &[ffi::cui_blame_commit],
+        o: &ffi::cui_blame_opts,
+    ) -> ffi::cui_blame_result {
+        assert!(!lines.is_empty());
+        let ids = self.arena.cstr_array(lines);
+        let res = unsafe {
+            ffi::cui_blame_ex(
+                self.ctx,
+                self.cs(&id),
+                ids as *mut c_char,
+                line_commit.as_ptr(),
+                line_commit.len() as i32,
+                if commits.is_empty() { core::ptr::null() } else { commits.as_ptr() },
+                commits.len() as i32,
+                o,
+            )
+        };
+        res
+    }
+
+    /// Inline data-grid edit box (C's `cui_data_grid_edit`). Edits `value`.
+    pub fn data_grid_edit(&mut self, value: &mut String) -> bool {
+        if value.capacity() == 0 {
+            value.reserve(127);
+        }
+        value.push('\0');
+        let ok = unsafe {
+            ffi::cui_data_grid_edit(self.ctx, value.as_mut_ptr() as *mut c_char, value.capacity())
+        };
+        self.sync_string(value);
+        ok
+    }
+
+    /// Feature flags panel (C's `cui_feature_flags`). `flags` are read and
+    /// written; `envs` are extra environment override names.
+    pub fn feature_flags(
+        &mut self,
+        id: impl AsRef<str>,
+        flags: &mut [ffi::cui_feature_flag],
+        envs: &[&str],
+        o: &ffi::cui_feature_flags_opts,
+    ) -> ffi::cui_feature_flags_result {
+        let env_ids = if envs.is_empty() { core::ptr::null() } else { self.arena.cstr_array(envs) };
+        unsafe {
+            ffi::cui_feature_flags_ex(
+                self.ctx,
+                self.cs(&id),
+                flags.as_mut_ptr(),
+                flags.len() as i32,
+                env_ids as *mut c_char,
+                envs.len() as i32,
+                o,
+            )
+        }
+    }
+
+    /// File browser panel (C's `cui_file_browser`). Writes the chosen path.
+    pub fn file_browser(&mut self, id: impl AsRef<str>, path: &mut String, o: &ffi::cui_file_browser_opts) -> ffi::cui_file_browser_result {
+        if path.capacity() == 0 {
+            path.reserve(1023);
+        }
+        path.push('\0');
+        let res = unsafe {
+            ffi::cui_file_browser_ex(self.ctx, self.cs(&id), path.as_mut_ptr() as *mut c_char, path.capacity(), o)
+        };
+        self.sync_string(path);
+        res
+    }
+
+    /// An open/save dialog drawn by CUI (C's `cui_file_picker`). Shown while
+    /// `open`; writes the chosen path into `out`.
+    pub fn file_picker(&mut self, id: impl AsRef<str>, open: &mut bool, out: &mut String, o: &ffi::cui_file_picker_opts) -> bool {
+        if out.capacity() == 0 {
+            out.reserve(1023);
+        }
+        out.push('\0');
+        let ok = unsafe {
+            ffi::cui_file_picker_ex(self.ctx, self.cs(&id), open, out.as_mut_ptr() as *mut c_char, out.capacity(), o)
+        };
+        self.sync_string(out);
+        ok
+    }
+
+    /// A row of filter fields (C's `cui_filter_bar`). Writes the search text.
+    pub fn filter_bar(
+        &mut self,
+        id: impl AsRef<str>,
+        fields: &[ffi::cui_filter_field],
+        selected: &mut u32,
+        search: &mut String,
+    ) -> bool {
+        assert!(!fields.is_empty());
+        if search.capacity() == 0 {
+            search.reserve(63);
+        }
+        search.push('\0');
+        let ok = unsafe {
+            ffi::cui_filter_bar(
+                self.ctx,
+                self.cs(&id),
+                fields.as_ptr(),
+                fields.len() as i32,
+                selected,
+                search.as_mut_ptr() as *mut c_char,
+                search.capacity(),
+            )
+        };
+        self.sync_string(search);
+        ok
+    }
+
+    /// Lists a folder (C's `cui_fs_list`). Low-level: the gallery's file
+    /// browser calls it through its own list function.
+    pub fn fs_list(
+        &mut self,
+        user: *mut c_void,
+        path: impl AsRef<str>,
+        out: &mut [ffi::cui_file_entry],
+        names: &mut String,
+        hidden: bool,
+    ) -> i32 {
+        if names.capacity() < 4096 {
+            names.reserve(4096);
+        }
+        names.push('\0');
+        let n = unsafe {
+            ffi::cui_fs_list(
+                user,
+                self.cs(&path),
+                out.as_mut_ptr(),
+                out.len() as i32,
+                names.as_mut_ptr() as *mut c_char,
+                names.capacity(),
+                hidden,
+            )
+        };
+        self.sync_string(names);
+        n
+    }
+
+    /// An inline editable label (C's `cui_inline_edit`). Edits `value`.
+    pub fn inline_edit(&mut self, id: impl AsRef<str>, value: &mut String, o: &ffi::cui_inline_edit_opts) -> i32 {
+        if value.capacity() == 0 {
+            value.reserve(127);
+        }
+        value.push('\0');
+        let r = unsafe { ffi::cui_inline_edit_ex(self.ctx, self.cs(&id), value.as_mut_ptr() as *mut c_char, value.capacity(), o) };
+        self.sync_string(value);
+        r
+    }
+
+    /// Multi select (C's `cui_multi_select`). `selected` is one flag per item.
+    pub fn multi_select(&mut self, id: impl AsRef<str>, items: &[&str], selected: &mut [bool], o: &ffi::cui_multi_select_opts) -> bool {
+        assert!(!items.is_empty() && selected.len() >= items.len());
+        let ids = self.arena.cstr_array(items);
+        unsafe {
+            ffi::cui_multi_select_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, selected.as_mut_ptr(), o)
+        }
+    }
+
+    /// Pipeline chart (C's `cui_pipeline`).
+    pub fn pipeline(
+        &mut self,
+        id: impl AsRef<str>,
+        stages: &[&str],
+        jobs: &[ffi::cui_pipeline_job],
+        o: &ffi::cui_pipeline_opts,
+    ) -> ffi::cui_pipeline_result {
+        assert!(!stages.is_empty() && !jobs.is_empty());
+        let ids = self.arena.cstr_array(stages);
+        unsafe {
+            ffi::cui_pipeline_ex(
+                self.ctx,
+                self.cs(&id),
+                ids as *mut c_char,
+                stages.len() as i32,
+                jobs.as_ptr(),
+                jobs.len() as i32,
+                o,
+            )
+        }
+    }
+
+    /// Renders a query tree to text (C's `cui_query_text`).
+    pub fn query_text(&mut self, fields: &[ffi::cui_query_field], nodes: &[ffi::cui_query_node], out: &mut String) -> usize {
+        assert!(!nodes.is_empty());
+        if out.capacity() == 0 {
+            out.reserve(1023);
+        }
+        out.push('\0');
+        let n = unsafe {
+            ffi::cui_query_text(
+                if fields.is_empty() { core::ptr::null() } else { fields.as_ptr() },
+                fields.len() as i32,
+                nodes.as_ptr(),
+                nodes.len() as i32,
+                out.as_mut_ptr() as *mut c_char,
+                out.capacity(),
+            )
+        };
+        self.sync_string(out);
+        n
+    }
+
+    /// Radar chart (C's `cui_radar_chart`). One `axes` label per spoke.
+    pub fn radar_chart(
+        &mut self,
+        id: impl AsRef<str>,
+        series: &[Series],
+        axes: &[&str],
+        o: &ffi::cui_radar_opts,
+    ) -> i32 {
+        assert!(!series.is_empty() && !axes.is_empty());
+        let ids = self.arena.cstr_array(axes);
+        let flat: Vec<ffi::cui_series> = series.iter().map(|s| s.flatten(self.arena)).collect();
+        unsafe {
+            ffi::cui_radar_chart_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, ids as *mut c_char, axes.len() as i32, o)
+        }
+    }
+
+    /// Regex tester (C's `cui_regex_tester`). Both `pattern` and `text` are
+    /// editable buffers.
+    pub fn regex_tester(
+        &mut self,
+        id: impl AsRef<str>,
+        pattern: &mut String,
+        text: &mut String,
+        o: &ffi::cui_regex_tester_opts,
+    ) -> ffi::cui_regex_tester_result {
+        for s in [&mut *pattern, &mut *text] {
+            if s.capacity() == 0 {
+                s.reserve(255);
+            }
+            s.push('\0');
+        }
+        let r = unsafe {
+            ffi::cui_regex_tester_ex(
+                self.ctx,
+                self.cs(&id),
+                pattern.as_mut_ptr() as *mut c_char,
+                pattern.capacity(),
+                text.as_mut_ptr() as *mut c_char,
+                text.capacity(),
+                o,
+            )
+        };
+        self.sync_string(pattern);
+        self.sync_string(text);
+        r
+    }
+
+    /// A request builder bar (C's `cui_request_bar`). Writes the URL.
+    pub fn request_bar(
+        &mut self,
+        id: impl AsRef<str>,
+        method: &mut i32,
+        url: &mut String,
+        o: &ffi::cui_request_bar_opts,
+    ) -> ffi::cui_request_bar_result {
+        if url.capacity() == 0 {
+            url.reserve(511);
+        }
+        url.push('\0');
+        let r = unsafe {
+            ffi::cui_request_bar_ex(self.ctx, self.cs(&id), method, url.as_mut_ptr() as *mut c_char, url.capacity(), o)
+        };
+        self.sync_string(url);
+        r
+    }
+
+    /// Sankey diagram (C's `cui_sankey`).
+    pub fn sankey(&mut self, id: impl AsRef<str>, nodes: &[&str], links: &[ffi::cui_sankey_link], o: &ffi::cui_sankey_opts) -> i32 {
+        assert!(!nodes.is_empty() && !links.is_empty());
+        let ids = self.arena.cstr_array(nodes);
+        unsafe {
+            ffi::cui_sankey_ex(self.ctx, self.cs(&id), ids as *mut c_char, nodes.len() as i32, links.as_ptr(), links.len() as i32, o)
+        }
+    }
+
+    /// Schedule picker (C's `cui_schedule_picker`). Writes the cron text.
+    pub fn schedule_picker(&mut self, id: impl AsRef<str>, cron: &mut String, o: &ffi::cui_schedule_opts) -> ffi::cui_schedule_result {
+        if cron.capacity() == 0 {
+            cron.reserve(127);
+        }
+        cron.push('\0');
+        let r = unsafe { ffi::cui_schedule_picker_ex(self.ctx, self.cs(&id), cron.as_mut_ptr() as *mut c_char, cron.capacity(), o) };
+        self.sync_string(cron);
+        r
+    }
+
+    /// A button with a dropdown of extra actions (C's `cui_split_button`).
+    /// Returns the chosen item's index or -1.
+    pub fn split_button(&mut self, label: impl AsRef<str>, items: &[&str], o: &ffi::cui_split_button_opts) -> i32 {
+        assert!(!items.is_empty());
+        let ids = self.arena.cstr_array(items);
+        unsafe { ffi::cui_split_button_ex(self.ctx, self.cs(&label), ids as *mut c_char, items.len() as i32, o) }
+    }
+
+    /// Process steps (C's `cui_stepper`).
+    pub fn stepper(&mut self, steps: &[&str], current: i32) {
+        assert!(!steps.is_empty());
+        let ids = self.arena.cstr_array(steps);
+        unsafe { ffi::cui_stepper(self.ctx, ids as *mut c_char, steps.len() as i32, current) }
+    }
+
+    /// Tag input (C's `cui_tag_input`). Tags are comma separated in `value`.
+    pub fn tag_input(&mut self, id: impl AsRef<str>, value: &mut String, o: &ffi::cui_tag_opts) -> bool {
+        if value.capacity() == 0 {
+            value.reserve(255);
+        }
+        value.push('\0');
+        let ok = unsafe { ffi::cui_tag_input_ex(self.ctx, self.cs(&id), value.as_mut_ptr() as *mut c_char, value.capacity(), o) };
+        self.sync_string(value);
+        ok
+    }
+
+    /// Terminal emulator state (C's `cui_terminal_init`). `text` is the
+    /// scrollback buffer, `lines` the row cache.
+    pub fn terminal_init(
+        &mut self,
+        t: &mut ffi::cui_terminal_buffer,
+        text: &mut String,
+        lines: &mut [ffi::cui_terminal_line],
+    ) {
+        if text.capacity() == 0 {
+            text.reserve(8191);
+        }
+        text.push('\0');
+        unsafe {
+            ffi::cui_terminal_init(t, text.as_mut_ptr() as *mut c_char, text.capacity(), lines.as_mut_ptr(), lines.len() as i32)
+        }
+        self.sync_string(text);
+    }
+
+    /// A row of toggles (C's `cui_toggle_group`). One flag per label.
+    pub fn toggle_group(&mut self, id: impl AsRef<str>, labels: &[&str], values: &mut [bool], o: &ffi::cui_toggle_group_opts) -> bool {
+        assert!(!labels.is_empty() && values.len() >= labels.len());
+        let ids = self.arena.cstr_array(labels);
+        unsafe {
+            ffi::cui_toggle_group_ex(self.ctx, self.cs(&id), ids as *mut c_char, labels.len() as i32, values.as_mut_ptr(), o)
+        }
+    }
+
+    /// Writes URL params for the web build; a no-op natively
+    /// (C's `cui_url_set_params`).
+    pub fn url_set_params(&mut self, url: &mut String, pairs: &[ffi::cui_kv_pair]) -> bool {
+        assert!(!pairs.is_empty());
+        if url.capacity() == 0 {
+            url.reserve(511);
+        }
+        url.push('\0');
+        let ok = unsafe {
+            ffi::cui_url_set_params(url.as_mut_ptr() as *mut c_char, url.capacity(), pairs.as_ptr(), pairs.len() as i32)
+        };
+        self.sync_string(url);
+        ok
+    }
+
+    /// A wheel picker (C's `cui_wheel_picker`). Writes the chosen index.
+    pub fn wheel_picker(&mut self, id: impl AsRef<str>, items: &[&str], index: &mut i32, o: &ffi::cui_wheel_opts) -> bool {
+        assert!(!items.is_empty());
+        let ids = self.arena.cstr_array(items);
+        unsafe { ffi::cui_wheel_picker_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, index, o) }
+    }
+
+    /// Words fade and rise into place one after another (C's `cui_word_rotate`).
+    pub fn word_rotate(&mut self, id: impl AsRef<str>, words: &[&str], interval: f32, o: &crate::TextFx) {
+        assert!(!words.is_empty());
+        let ids = self.arena.cstr_array(words);
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids as *mut c_char, words.len() as i32, interval, &fo) }
+    }
+
+    /// Re-derives a String from the buffer CUI edited (NUL-terminated).
+    fn sync_string(&mut self, value: &mut String) {
+        let cap = value.capacity();
+        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
+        let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
+        value.clear();
+        match core::str::from_utf8(&bytes[..len]) {
+            Ok(s) => value.push_str(s),
+            Err(_) => {
+                let s = String::from_utf8_lossy(&bytes[..len]);
+                value.push_str(&s);
+            }
+        }
+    }
+}
+
+/// The date `days` days after the epoch CUI uses (C's `cui_date_from_days`).
+pub fn date_from_days(days: i32) -> Date {
+    Date::from_ffi(unsafe { ffi::cui_date_from_days(days) })
+}
+
+/// Days since the CUI epoch (C's `cui_date_to_days`).
+pub fn date_to_days(d: Date) -> i32 {
+    unsafe { ffi::cui_date_to_days(d.to_ffi()) }
+}
+
+/// Today according to the system clock (C's `cui_date_today`).
+pub fn date_today() -> Date {
+    Date::from_ffi(unsafe { ffi::cui_date_today() })
 }

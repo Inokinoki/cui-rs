@@ -1546,6 +1546,20 @@ extern "C" {
     pub fn cui_app_file_dialog(app: *mut cui_app, opts: *const cui_file_dialog_opts, out: *mut c_char, cap: usize) -> bool;
 }
 
+pub type cui_file_list_fn = Option<extern "C" fn(user: *mut c_void, path: *const c_char, out: *mut cui_file_entry, cap: i32, names: *mut c_char, names_cap: usize, hidden: bool) -> i32>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_file_entry {
+    pub name: *const c_char,
+    pub kind: c_int,
+    pub size: u64,
+    pub mtime: f64,
+}
+
+mod gen;
+pub use gen::*;
+
 #[cfg(test)]
 extern crate std;
 

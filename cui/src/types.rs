@@ -498,3 +498,24 @@ mod tests {
 }
 
 
+
+/// A calendar date (C's `cui_date`). `month` is 1..12.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(C)]
+pub struct Date {
+    /// Calendar year.
+    pub year: i32,
+    /// Month 1..12.
+    pub month: i32,
+    /// Day of month 1..31.
+    pub day: i32,
+}
+
+impl Date {
+    pub(crate) fn to_ffi(self) -> ffi::cui_date {
+        ffi::cui_date { year: self.year, month: self.month, day: self.day }
+    }
+    pub(crate) fn from_ffi(d: ffi::cui_date) -> Date {
+        Date { year: d.year, month: d.month, day: d.day }
+    }
+}

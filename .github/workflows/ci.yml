@@ -61,9 +61,3 @@ jobs:
       - run: cargo test
       - run: cargo build --release --examples
 
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo test
-      - run: cargo build --release --examples

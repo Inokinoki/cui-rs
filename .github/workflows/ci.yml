@@ -51,9 +51,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cargo build --lib -p cui-sys --no-default-features --features default-fonts,stb-image
-      - run: cargo test -p cui-sys --no-default-features --features default-fonts,stb-image
-      - run: cargo build --lib -p cui --no-default-features --features default-fonts,stb-image
+      # --no-default-features applies workspace-wide: cui-sys compiles with
+      # CUI_NO_APP (no Cocoa backend, no Xcode SDK header conflict) and the
+      # crates build as rlibs without linking the window symbols.
+      - run: cargo build --lib -p cui -p cui-sys --no-default-features
+      - run: cargo test -p cui-sys --no-default-features
 
   windows:
     runs-on: windows-2022

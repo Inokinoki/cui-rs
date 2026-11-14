@@ -586,6 +586,7 @@ def main():
             call = []
             skip_next = False
             dropped_len = ""
+            buffer_names = []
             for i, p in enumerate(split_params(params)):
                 parsed = parse_param(p)
                 if parsed is None:
@@ -597,6 +598,7 @@ def main():
                     pname = pname + "_"
                 if buffer_at is not None and i == buffer_at:
                     sig.append(f"{pname}: &mut String")
+                    buffer_names.append(pname)
                     call.append(f"{pname}.as_mut_ptr() as *mut c_char")
                     continue
                 if (buffer_at is not None and i == buffer_at + 1
@@ -654,14 +656,18 @@ def main():
             safe.append(f"    pub fn {mname}(&self{joiner}{', '.join(sig)}){ret_rust} {{")
             body_call = f"ffi::{fn}(self.ctx{', ' if call else ''}{', '.join(call)}){ret_call}"
             if buffer_at is not None:
-                # C wrote into the String's buffer: re-derive its contents
-                bufname = split_params(params)[buffer_at].split("*")[-1].strip()
+                # C reads the buffer with strlen and writes it back bounded by
+                # its capacity: NUL-terminate and zero the tail first, then
+                # re-derive the String's contents after the call
+                prep = "; ".join(f"crate::begin_c_string({b}, 63)" for b in buffer_names)
                 if ret.strip() == "void":
+                    safe.append(f"        {prep};")
                     safe.append(f"        unsafe {{ {body_call} }};")
-                    safe.append(f"        crate::ext::sync_buffer({bufname});")
+                    safe.append("        crate::ext::sync_buffer(" + buffer_names[-1] + ");")
                 else:
+                    safe.append(f"        {prep};")
                     safe.append(f"        let r = unsafe {{ {body_call} }};")
-                    safe.append(f"        crate::ext::sync_buffer({bufname});")
+                    safe.append(f"        crate::ext::sync_buffer({buffer_names[-1]});")
                     safe.append("        r")
             else:
                 safe.append(f"        unsafe {{ {body_call} }}")

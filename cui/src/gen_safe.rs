@@ -733,6 +733,7 @@ impl<'a> Ui<'a> {
 
     /// muted text after the value, before the - and + buttons, e.g. "kg"
     pub fn otp_input(&self, id: impl AsRef<str>, code: &mut String, length: i32) -> bool {
+        crate::begin_c_string(code, 63);
         let r = unsafe { ffi::cui_otp_input(self.ctx, self.arena.cstr(id.as_ref()), code.as_mut_ptr() as *mut c_char, length) };
         crate::ext::sync_buffer(code);
         r

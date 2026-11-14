@@ -872,18 +872,8 @@ pub fn date_today() -> Date {
 /// re-validated). Used by the generated layer after a call that writes
 /// into a caller-owned buffer.
 pub(crate) fn sync_buffer(value: &mut String) {
-    let cap = value.capacity();
-    if cap == 0 {
-        return;
+    if value.capacity() == 0 {
+        return; // the caller never sized a buffer for CUI to write into
     }
-    let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
-    let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
-    value.clear();
-    match core::str::from_utf8(&bytes[..len]) {
-        Ok(s) => value.push_str(s),
-        Err(_) => {
-            let s = String::from_utf8_lossy(&bytes[..len]);
-            value.push_str(&s);
-        }
-    }
+    crate::sync_c_string(value)
 }

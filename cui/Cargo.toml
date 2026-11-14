@@ -9,5 +9,16 @@ repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+default = ["app", "default-fonts", "stb-image"]
+# The window/event layer (cui_app_*). Off = CUI_NO_APP: bring your own window.
+app = ["cui-sys/app"]
+# Embed the Inter / Geist / Lucide fonts (about 180 KB).
+default-fonts = ["cui-sys/default-fonts"]
+# PNG and JPEG image loading via stb_image.
+stb-image = ["cui-sys/stb-image"]
+# Arabic-script shaping and bidi.
+text-shaping = ["cui-sys/text-shaping"]
+
 [dependencies]
-cui-sys = { path = "../cui-sys", version = "0.1.0" }
+cui-sys = { path = "../cui-sys", version = "0.1.0", default-features = false }

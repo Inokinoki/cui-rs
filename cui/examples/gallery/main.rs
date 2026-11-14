@@ -476,10 +476,17 @@ fn frame(ui: &mut cui::Ui, g: &mut Gallery) {
 fn main() {
     // `CUI_GALLERY_SHOT=path:page` renders that page and writes a PNG — the
     // smoke test uses it to screenshot every page without a display grab.
+    let pages = PAGE_COUNT + more::PAGES.len();
     let shot = std::env::var("CUI_GALLERY_SHOT").ok().and_then(|v| {
         let (p, page) = v.split_once(':')?;
         Some((p.to_string(), page.parse::<usize>().ok()?))
     });
+    if let Some((_, page)) = shot {
+        if page >= pages {
+            eprintln!("CUI_GALLERY_SHOT: page {page} is out of range (0..{pages})");
+            std::process::exit(2);
+        }
+    }
 
     let mut g = Gallery::new();
     if let Some((_, page)) = shot {
@@ -548,7 +555,9 @@ fn save_png(path: &str, rgba: &[u8], w: u32, h: u32) {
             raw.extend_from_slice(&[px[2], px[1], px[0], 255]);
         }
     }
-    // zlib wrapper around stored (uncompressed) deflate blocks: simple, valid
+    // zlib wrapper around stored (uncompressed) deflate blocks. The stream
+    // trailer is Adler-32 (big-endian), NOT the CRC-32 used for the chunk
+    // framing above — decoders reject the file otherwise.
     let mut idat = vec![0x78, 0x01];
     let mut parts = raw.chunks(65535).peekable();
     while let Some(part) = parts.next() {
@@ -558,15 +567,17 @@ fn save_png(path: &str, rgba: &[u8], w: u32, h: u32) {
         idat.extend_from_slice(&(!n).to_le_bytes());
         idat.extend_from_slice(part);
     }
-    let mut crc = 0xFFFF_FFFFu32;
-    for b in &raw {
-        crc ^= *b as u32;
-        for _ in 0..8 {
-            let mask = (crc & 1).wrapping_neg();
-            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+    let (mut a, mut b) = (1u32, 0u32);
+    for block in raw.chunks(5552) {
+        // 5552 is the largest run proven to keep the 32-bit sums exact
+        for byte in block {
+            a += *byte as u32;
+            b += a;
         }
+        a %= 65521;
+        b %= 65521;
     }
-    idat.extend_from_slice(&(crc ^ 0xFFFF_FFFF).to_be_bytes());
+    idat.extend_from_slice(&((b << 16) | a).to_be_bytes());
     chunk(*b"IDAT", &idat, &mut out);
     chunk(*b"IEND", &[], &mut out);
 }

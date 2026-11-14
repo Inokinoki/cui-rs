@@ -4,9 +4,9 @@
 
 use crate::arena::Arena;
 use crate::opts::{cstr, Series, Sheet};
-use crate::Ui;
 use crate::opts2::*;
 use crate::types::*;
+use crate::{begin_c_string, sync_c_string, Ui};
 use cui_sys as ffi;
 use core::ffi::{c_char, c_void};
 
@@ -296,22 +296,10 @@ impl<'a> crate::Ui<'a> {
 
     fn composer_impl(&mut self, id: &str, value: &mut String, opts: &ffi::cui_composer_opts) -> ComposerFlags {
         let idp = self.arena.cstr(id);
-        if value.capacity() == 0 {
-            value.reserve(1023);
-        }
-        value.push('\0');
+        begin_c_string(value, 1023);
         let cap = value.capacity();
         let flags = unsafe { ffi::cui_chat_composer_ex(self.ctx, idp, value.as_mut_ptr() as *mut c_char, cap, opts) };
-        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
-        let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
-        value.clear();
-        match core::str::from_utf8(&bytes[..len]) {
-            Ok(s) => value.push_str(s),
-            Err(_) => {
-                let s = String::from_utf8_lossy(&bytes[..len]);
-                value.push_str(&s);
-            }
-        }
+        sync_c_string(value);
         ComposerFlags::from_bits(flags)
     }
 
@@ -449,14 +437,11 @@ impl<'a> Ui<'a> {
 
     /// Inline data-grid edit box (C's `cui_data_grid_edit`). Edits `value`.
     pub fn data_grid_edit(&mut self, value: &mut String) -> bool {
-        if value.capacity() == 0 {
-            value.reserve(127);
-        }
-        value.push('\0');
+        begin_c_string(value, 127);
         let ok = unsafe {
             ffi::cui_data_grid_edit(self.ctx, value.as_mut_ptr() as *mut c_char, value.capacity())
         };
-        self.sync_string(value);
+        sync_c_string(value);
         ok
     }
 
@@ -485,28 +470,22 @@ impl<'a> Ui<'a> {
 
     /// File browser panel (C's `cui_file_browser`). Writes the chosen path.
     pub fn file_browser(&mut self, id: impl AsRef<str>, path: &mut String, o: &ffi::cui_file_browser_opts) -> ffi::cui_file_browser_result {
-        if path.capacity() == 0 {
-            path.reserve(1023);
-        }
-        path.push('\0');
+        begin_c_string(path, 1023);
         let res = unsafe {
             ffi::cui_file_browser_ex(self.ctx, self.cs(&id), path.as_mut_ptr() as *mut c_char, path.capacity(), o)
         };
-        self.sync_string(path);
+        sync_c_string(path);
         res
     }
 
     /// An open/save dialog drawn by CUI (C's `cui_file_picker`). Shown while
     /// `open`; writes the chosen path into `out`.
     pub fn file_picker(&mut self, id: impl AsRef<str>, open: &mut bool, out: &mut String, o: &ffi::cui_file_picker_opts) -> bool {
-        if out.capacity() == 0 {
-            out.reserve(1023);
-        }
-        out.push('\0');
+        begin_c_string(out, 1023);
         let ok = unsafe {
             ffi::cui_file_picker_ex(self.ctx, self.cs(&id), open, out.as_mut_ptr() as *mut c_char, out.capacity(), o)
         };
-        self.sync_string(out);
+        sync_c_string(out);
         ok
     }
 
@@ -525,10 +504,7 @@ impl<'a> Ui<'a> {
         search: &mut String,
     ) -> bool {
         assert!(!fields.is_empty());
-        if search.capacity() == 0 {
-            search.reserve(63);
-        }
-        search.push('\0');
+        begin_c_string(search, 63);
         let ok = unsafe {
             ffi::cui_filter_bar(
                 self.ctx,
@@ -540,7 +516,7 @@ impl<'a> Ui<'a> {
                 search.capacity(),
             )
         };
-        self.sync_string(search);
+        sync_c_string(search);
         ok
     }
 
@@ -561,7 +537,7 @@ impl<'a> Ui<'a> {
         if names.capacity() < 4096 {
             names.reserve(4096);
         }
-        names.push('\0');
+        begin_c_string(names, 4096);
         let n = unsafe {
             ffi::cui_fs_list(
                 user,
@@ -573,18 +549,15 @@ impl<'a> Ui<'a> {
                 hidden,
             )
         };
-        self.sync_string(names);
+        sync_c_string(names);
         n
     }
 
     /// An inline editable label (C's `cui_inline_edit`). Edits `value`.
     pub fn inline_edit(&mut self, id: impl AsRef<str>, value: &mut String, o: &ffi::cui_inline_edit_opts) -> i32 {
-        if value.capacity() == 0 {
-            value.reserve(127);
-        }
-        value.push('\0');
+        begin_c_string(value, 127);
         let r = unsafe { ffi::cui_inline_edit_ex(self.ctx, self.cs(&id), value.as_mut_ptr() as *mut c_char, value.capacity(), o) };
-        self.sync_string(value);
+        sync_c_string(value);
         r
     }
 
@@ -623,10 +596,7 @@ impl<'a> Ui<'a> {
     /// Renders a query tree to text (C's `cui_query_text`).
     pub fn query_text(&mut self, fields: &[ffi::cui_query_field], nodes: &[ffi::cui_query_node], out: &mut String) -> usize {
         assert!(!nodes.is_empty());
-        if out.capacity() == 0 {
-            out.reserve(1023);
-        }
-        out.push('\0');
+        begin_c_string(out, 1023);
         let n = unsafe {
             ffi::cui_query_text(
                 if fields.is_empty() { core::ptr::null() } else { fields.as_ptr() },
@@ -637,7 +607,7 @@ impl<'a> Ui<'a> {
                 out.capacity(),
             )
         };
-        self.sync_string(out);
+        sync_c_string(out);
         n
     }
 
@@ -667,10 +637,7 @@ impl<'a> Ui<'a> {
         o: &ffi::cui_regex_tester_opts,
     ) -> ffi::cui_regex_tester_result {
         for s in [&mut *pattern, &mut *text] {
-            if s.capacity() == 0 {
-                s.reserve(255);
-            }
-            s.push('\0');
+            begin_c_string(s, 255);
         }
         let r = unsafe {
             ffi::cui_regex_tester_ex(
@@ -683,8 +650,8 @@ impl<'a> Ui<'a> {
                 o,
             )
         };
-        self.sync_string(pattern);
-        self.sync_string(text);
+        sync_c_string(pattern);
+        sync_c_string(text);
         r
     }
 
@@ -696,14 +663,11 @@ impl<'a> Ui<'a> {
         url: &mut String,
         o: &ffi::cui_request_bar_opts,
     ) -> ffi::cui_request_bar_result {
-        if url.capacity() == 0 {
-            url.reserve(511);
-        }
-        url.push('\0');
+        begin_c_string(url, 511);
         let r = unsafe {
             ffi::cui_request_bar_ex(self.ctx, self.cs(&id), method, url.as_mut_ptr() as *mut c_char, url.capacity(), o)
         };
-        self.sync_string(url);
+        sync_c_string(url);
         r
     }
 
@@ -718,12 +682,9 @@ impl<'a> Ui<'a> {
 
     /// Schedule picker (C's `cui_schedule_picker`). Writes the cron text.
     pub fn schedule_picker(&mut self, id: impl AsRef<str>, cron: &mut String, o: &ffi::cui_schedule_opts) -> ffi::cui_schedule_result {
-        if cron.capacity() == 0 {
-            cron.reserve(127);
-        }
-        cron.push('\0');
+        begin_c_string(cron, 127);
         let r = unsafe { ffi::cui_schedule_picker_ex(self.ctx, self.cs(&id), cron.as_mut_ptr() as *mut c_char, cron.capacity(), o) };
-        self.sync_string(cron);
+        sync_c_string(cron);
         r
     }
 
@@ -744,12 +705,9 @@ impl<'a> Ui<'a> {
 
     /// Tag input (C's `cui_tag_input`). Tags are comma separated in `value`.
     pub fn tag_input(&mut self, id: impl AsRef<str>, value: &mut String, o: &ffi::cui_tag_opts) -> bool {
-        if value.capacity() == 0 {
-            value.reserve(255);
-        }
-        value.push('\0');
+        begin_c_string(value, 255);
         let ok = unsafe { ffi::cui_tag_input_ex(self.ctx, self.cs(&id), value.as_mut_ptr() as *mut c_char, value.capacity(), o) };
-        self.sync_string(value);
+        sync_c_string(value);
         ok
     }
 
@@ -761,14 +719,11 @@ impl<'a> Ui<'a> {
         text: &mut String,
         lines: &mut [ffi::cui_terminal_line],
     ) {
-        if text.capacity() == 0 {
-            text.reserve(8191);
-        }
-        text.push('\0');
+        begin_c_string(text, 8191);
         unsafe {
             ffi::cui_terminal_init(t, text.as_mut_ptr() as *mut c_char, text.capacity(), lines.as_mut_ptr(), lines.len() as i32)
         }
-        self.sync_string(text);
+        sync_c_string(text);
     }
 
     /// A row of toggles (C's `cui_toggle_group`). One flag per label.
@@ -784,14 +739,11 @@ impl<'a> Ui<'a> {
     /// (C's `cui_url_set_params`).
     pub fn url_set_params(&mut self, url: &mut String, pairs: &[ffi::cui_kv_pair]) -> bool {
         assert!(!pairs.is_empty());
-        if url.capacity() == 0 {
-            url.reserve(511);
-        }
-        url.push('\0');
+        begin_c_string(url, 511);
         let ok = unsafe {
             ffi::cui_url_set_params(url.as_mut_ptr() as *mut c_char, url.capacity(), pairs.as_ptr(), pairs.len() as i32)
         };
-        self.sync_string(url);
+        sync_c_string(url);
         ok
     }
 
@@ -855,21 +807,6 @@ impl<'a> Ui<'a> {
         let ids = self.arena.cstr_array(words);
         let fo = o.flatten(self.arena);
         unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids as *mut c_char, words.len() as i32, interval, &fo) }
-    }
-
-    /// Re-derives a String from the buffer CUI edited (NUL-terminated).
-    fn sync_string(&mut self, value: &mut String) {
-        let cap = value.capacity();
-        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
-        let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
-        value.clear();
-        match core::str::from_utf8(&bytes[..len]) {
-            Ok(s) => value.push_str(s),
-            Err(_) => {
-                let s = String::from_utf8_lossy(&bytes[..len]);
-                value.push_str(&s);
-            }
-        }
     }
 }
 

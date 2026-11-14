@@ -156,8 +156,11 @@ plus SDL2/GLFW builds upstream. This crate compiles and links:
 - **Linux (tested)**: needs `libx11-dev` (and a GL or Mesa runtime at run
   time; CUI falls back to its software renderer without a GPU).
 - **Windows**: links user32/gdi32/opengl32/... automatically.
-- **macOS**: compiles the amalgamation as Objective-C and links the Cocoa
-  frameworks (config mirrors upstream CI; untested here).
+- **macOS (tested)**: compiles the amalgamation as Objective-C and links the
+  Cocoa frameworks. The amalgamation defines `_POSIX_C_SOURCE` mid-file, so
+  `cui-sys/build.rs` defines `_DARWIN_C_SOURCE` as well — without it the SDK's
+  `netinet/ip.h` cannot see the BSD types (`u_char`, `u_int`) that the
+  `Cocoa → PrintCore → CUPS` include chain pulls in.
 
 Features map to the C macros: `default-fonts` (Inter/Geist/Lucide embedded),
 `stb-image` (PNG/JPEG loading), `app` (window layer; off = bring your own

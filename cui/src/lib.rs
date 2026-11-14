@@ -79,6 +79,52 @@ use core::ffi::{c_char, c_void};
 use core::marker::PhantomData;
 use core::ptr;
 
+/// Prepares `value`'s buffer for an in-place edit by CUI.
+///
+/// CUI reads the current text with `strlen` and writes a NUL-terminated
+/// string back, bounded by the buffer's capacity. The buffer is filled with
+/// NULs first, so the read-back never has to look at uninitialized bytes.
+/// `reserve` is the capacity a fresh string gets.
+pub(crate) fn begin_c_string(value: &mut String, reserve: usize) {
+    if value.capacity() == 0 {
+        value.reserve(reserve);
+    }
+    let cap = value.capacity();
+    // NUL-terminate the text and fill the rest of the buffer.
+    unsafe { value.as_mut_vec().resize(cap, 0) };
+}
+
+/// Reads back the NUL-terminated text CUI wrote into `value`'s buffer.
+///
+/// The text lives in `value`'s own allocation, so it must not be copied onto
+/// itself: `String::push_str` asks `ptr::copy_nonoverlapping` to copy a
+/// range onto itself, which is undefined behaviour. The bytes are already
+/// where they belong, so the valid-UTF-8 case only adopts the new length.
+pub(crate) fn sync_c_string(value: &mut String) {
+    let cap = value.capacity();
+    let len = {
+        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
+        bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1))
+    };
+    let valid = {
+        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), len) };
+        core::str::from_utf8(bytes).is_ok()
+    };
+    if valid {
+        // The bytes are in place already; just adopt the new length.
+        unsafe { value.as_mut_vec().set_len(len) };
+    } else {
+        // A clipboard paste or an IME can hand CUI broken UTF-8: keep what
+        // is valid.
+        let text = {
+            let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), len) };
+            String::from_utf8_lossy(bytes).into_owned()
+        };
+        unsafe { value.as_mut_vec().set_len(0) };
+        value.push_str(&text);
+    }
+}
+
 /// Font roles for [`Text::font`](opts::Text::font) and the font APIs.
 pub mod font {
     use cui_sys as ffi;
@@ -591,24 +637,10 @@ impl<'a> Ui<'a> {
         opts: &ffi::cui_input_opts,
     ) -> InputFlags {
         let idp = self.arena.cstr(id);
-        if value.capacity() == 0 {
-            value.reserve(63);
-        }
-        value.push('\0');
+        begin_c_string(value, 63);
         let cap = value.capacity();
         let flags = unsafe { f(self.ctx, idp, value.as_mut_ptr() as *mut c_char, cap, opts) };
-        // Re-derive the String from CUI's buffer: bytes up to the first NUL.
-        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
-        let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
-        value.clear();
-        match core::str::from_utf8(&bytes[..len]) {
-            Ok(s) => value.push_str(s),
-            // Clipboard paste or IME could hand CUI broken UTF-8; keep what is valid.
-            Err(_) => {
-                let s = String::from_utf8_lossy(&bytes[..len]);
-                value.push_str(&s);
-            }
-        }
+        sync_c_string(value);
         InputFlags::from_bits(flags)
     }
 
@@ -1083,8 +1115,8 @@ impl Drop for ScopeGuard {
 
 #[cfg(test)]
 mod capability_cfg_tests {
-    /// The DEP_CUI_* → cfg pipe works end to end: with the 1.4 pin, the 1.4
-    /// gate is set and gates further up the ladder are not.
+    /// The DEP_CUI_* → cfg pipe works end to end: with the 1.4
+    /// pin, the 1.4 gate is set and gates further up the ladder are not.
     #[cfg(cui_ge_1_4)]
     #[test]
     fn capability_cfg_flows() {
@@ -1095,5 +1127,64 @@ mod capability_cfg_tests {
             assert!(cfg!(cui_ge_1_4));
             assert!(!cfg!(cui_ge_1_9));
         }
+    }
+}
+
+#[cfg(test)]
+mod c_string_tests {
+    use super::{begin_c_string, sync_c_string};
+
+    /// Writes `text` into the buffer the way CUI does: in place, NUL-terminated.
+    fn c_write(buf: *mut u8, text: &[u8]) {
+        unsafe { buf.copy_from_nonoverlapping(text.as_ptr(), text.len()) };
+    }
+
+    #[test]
+    fn reads_back_what_cui_wrote() {
+        let mut value = String::with_capacity(64);
+        value.push_str("old");
+        begin_c_string(&mut value, 64);
+        c_write(value.as_mut_ptr(), b"new\0");
+        sync_c_string(&mut value);
+        assert_eq!(value, "new");
+    }
+
+    #[test]
+    fn an_untouched_field_keeps_its_text() {
+        let mut value = String::with_capacity(64);
+        value.push_str("old");
+        begin_c_string(&mut value, 64);
+        sync_c_string(&mut value);
+        assert_eq!(value, "old");
+    }
+
+    #[test]
+    fn an_empty_field_stays_empty() {
+        let mut value = String::with_capacity(64);
+        begin_c_string(&mut value, 64);
+        sync_c_string(&mut value);
+        assert_eq!(value, "");
+    }
+
+    #[test]
+    fn broken_utf8_keeps_what_is_valid() {
+        let mut value = String::with_capacity(64);
+        begin_c_string(&mut value, 64);
+        c_write(value.as_mut_ptr(), b"a\xffb\0");
+        sync_c_string(&mut value);
+        assert_eq!(value, "a\u{fffd}b");
+    }
+
+    #[test]
+    fn the_buffer_is_terminated_for_cui() {
+        let mut value = String::with_capacity(64);
+        value.push_str("abc");
+        begin_c_string(&mut value, 64);
+        // CUI reads the field with strlen: the text must be NUL-terminated,
+        // and the whole buffer must be initialized.
+        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr(), value.len()) };
+        assert_eq!(bytes.len(), 64);
+        assert_eq!(bytes[3], 0);
+        assert!(bytes[4..].iter().all(|&b| b == 0));
     }
 }

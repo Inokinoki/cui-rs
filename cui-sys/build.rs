@@ -144,6 +144,11 @@ fn main() {
             b.flag("objective-c");
             b.flag("-fobjc-arc");
             b.define("GL_SILENCE_DEPRECATION", None);
+            // The amalgamation defines _POSIX_C_SOURCE mid-file (cui_files.c),
+            // which makes <sys/types.h> skip the BSD types (u_char, u_int).
+            // Cocoa -> PrintCore -> CUPS -> netinet/ip.h needs them, so ask
+            // for the full Darwin namespace explicitly.
+            b.define("_DARWIN_C_SOURCE", None);
             for fw in ["Cocoa", "QuartzCore", "OpenGL"] {
                 println!("cargo:rustc-link-lib=framework={fw}");
             }

@@ -42,18 +42,19 @@ jobs:
           path: /tmp/cui-smoke/*.png
           if-no-files-found: ignore
 
-  # The windowed macOS build (the Objective-C backend inside the
-  # amalgamation) currently conflicts with Xcode 26 SDK headers
-  # (netinet/ip.h via Cocoa); upstream compiles the macOS backend with CMake,
-  # not the amalgamation. Until that is sorted, macOS CI verifies the
-  # library without the window layer.
+  # The windowed macOS build compiles the amalgamation as Objective-C. It
+  # needs the full Darwin namespace: the amalgamation defines _POSIX_C_SOURCE
+  # mid-file, which hides the BSD types (u_char, u_int) that the SDK's
+  # netinet/ip.h needs on the Cocoa -> PrintCore -> CUPS include path.
+  # cui-sys/build.rs defines _DARWIN_C_SOURCE for exactly that reason.
   macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      # --no-default-features applies workspace-wide: cui-sys compiles with
-      # CUI_NO_APP (no Cocoa backend, no Xcode SDK header conflict) and the
-      # crates build as rlibs without linking the window symbols.
+      # The window layer included: the examples link Cocoa and open a window.
+      - run: cargo build --release --examples
+      - run: cargo test
+      # ... and without it: the bring-your-own-window path.
       - run: cargo build --lib -p cui -p cui-sys --no-default-features
       - run: cargo test -p cui-sys --no-default-features
 

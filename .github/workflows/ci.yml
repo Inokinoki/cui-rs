@@ -23,9 +23,21 @@ jobs:
           cargo build -p cui-sys --no-default-features --features stb-image,text-shaping
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Doc links
+        run: cargo doc --no-deps -p cui-rs -p cui-sys -- -D warnings
       - run: cargo build --release --examples
       - name: Smoke test every example under Xvfb
         run: xvfb-run -a -s "-screen 0 1280x800x24" scripts/smoke.sh target/release/examples
+      - name: Screenshot every gallery page and validate the PNGs
+        run: |
+          mkdir -p /tmp/cui-gallery
+          pages=27  # 9 base pages + 18 extended pages; shot mode takes a 0-based index
+          for p in $(seq 0 $((pages - 1))); do
+            xvfb-run -a -s "-screen 0 1280x800x24" \
+              env CUI_GALLERY_SHOT=/tmp/cui-gallery/page-$p.png:$p \
+              timeout 120 ./target/release/examples/gallery
+          done
+          python3 scripts/check_png.py /tmp/cui-gallery/page-*.png
       - name: Convert smoke screenshots
         if: success() || failure()
         run: |
@@ -39,7 +51,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smoke-screenshots
-          path: /tmp/cui-smoke/*.png
+          path: |
+            /tmp/cui-smoke/*.png
+            /tmp/cui-gallery/*.png
           if-no-files-found: ignore
 
   # The windowed macOS build compiles the amalgamation as Objective-C. It
@@ -55,7 +69,7 @@ jobs:
       - run: cargo build --release --examples
       - run: cargo test
       # ... and without it: the bring-your-own-window path.
-      - run: cargo build --lib -p cui -p cui-sys --no-default-features
+      - run: cargo build --lib -p cui-rs -p cui-sys --no-default-features
       - run: cargo test -p cui-sys --no-default-features
 
   windows:

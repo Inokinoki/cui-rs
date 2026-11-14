@@ -6,7 +6,7 @@ members = ["cui-sys", "cui"]
 edition = "2021"
 authors = ["Inoki <veyx.shaw@gmail.com>"]
 license = "MIT"
-repository = "https://github.com/yappologistic/CUI"
+repository = "https://github.com/Inokinoki/cui-rs"
 keywords = ["gui", "ui", "immediate-mode", "ffi", "widgets"]
 categories = ["gui"]
 

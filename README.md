@@ -5,8 +5,11 @@ an immediate-mode UI library written in C99 that draws its own components.
 
 ```toml
 [dependencies]
-cui = { path = "path/to/cui-rs/cui" }
+cui-rs = "0.1.3"
 ```
+
+The package is `cui-rs` (crates.io's `cui` is taken); the library keeps
+the name `cui`, so the code below is `use cui::…` unchanged.
 
 ```rust
 use cui::{App, AppDesc, Button, ButtonVariant, Column, Row, Size};
@@ -121,7 +124,7 @@ callable Rust binding.** Across two layers:
   discipline C's `char buf[96]` gives; container scopes are closures with
   panic-safe begin/end guards.
 - **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 319
-  extern functions + 233 structs, 276 safe methods): the full second-wave
+  extern functions + 233 structs, 242 safe methods): the full second-wave
   gallery surface — kanban, dock, terminal, data grid (with editing),
   carousel, card stacks, code blocks, JSON viewer, blame, coverage, API
   explorer, feature flags, test explorer, stack traces, trace viewer,
@@ -188,21 +191,35 @@ and writes a PNG, which the smoke test uses to eyeball every page.
 
 ```
 cui-sys/           raw FFI + the vendored C amalgamation (cui.h, cui.c), built by cc
-  src/gen.rs       generated FFI for the second-wave gallery surface
+  src/gen.rs       generated FFI: structs, enum constants, extern decls
+  tests/link.rs    generated: forces every extern symbol to resolve at link
+  tests/layout.rs  generated: checks every size/offset against the C probe
+  layout/          the C ABI facts per pinned release (written by vendor.sh)
+  probe/           the C probe that prints them
 cui/               the safe API (App, Ui, options structs, icons)
   src/gen_safe.rs  generated safe methods for the generated FFI
-  examples/        11 ported C examples
+  examples/        12 ported C examples (the 11 base ones + the gallery)
 scripts/
   gen_ffi.py       header-to-Rust generator (extends the manifest, re-run)
+  check_png.py     PNG decoder check CI runs over the gallery screenshots
   smoke.sh         Xvfb smoke test for every example
 vendor.sh          pins/fetches the upstream release (--pin, --fetch) or
                    amalgamates a local checkout into the offline cache
+```
 
 ## Versioning
 
-**The Rust crates version independently.** `cui` and `cui-sys` follow normal
-semver for their *binding* API; breaking a Rust signature bumps `cui`'s minor
-version.
+**The Rust crates version independently.** `cui-rs` and `cui-sys` follow
+normal semver for their *binding* API; breaking a Rust signature bumps
+`cui-rs`'s minor version. One exception: fixing a signature that could not
+have had a working caller (a generated form that passed a single reference
+where C indexes a buffer — undefined behaviour by construction) lands in a
+patch release and is called out in the changelog.
+
+The crates.io package is named `cui-rs` — crates.io's `cui` name has
+belonged to an unrelated, yanked 2017 crate since before this binding
+existed. The library name stays `cui`, so `use cui::…` reads the same as
+the C API.
 
 **The support window.** Binding 0.1.x targets CUI 1.4 only (declared in
 `UPSTREAM.toml` and enforced by `build.rs`). The plumbing for multi-version
@@ -210,11 +227,11 @@ support is in place: capability cfgs (`cui_ge_1_5` etc.), a C ABI probe per
 pinned release, and per-version layout tables that the tests check against.
 
 **The bound upstream release rides in the build metadata.** Both crates are
-versioned `0.1.2+cui1.4.0`: the `+cui…` suffix — the same convention as
+versioned `0.1.3+cui1.4.0`: the `+cui…` suffix — the same convention as
 `zstd-sys 2.0.9+zstd.1.5.5` or `libgit2-sys 0.16.2+1.7.2` — states which
 upstream release the binding targets. It shows up in `cargo pkgid`, crates.io
 and docs.rs without affecting dependency resolution. When the pin moves to a
-new upstream release, the crates re-release as e.g. `0.1.1+cui1.5.0`: one
+new upstream release, the crates re-release as e.g. `0.1.4+cui1.5.0`: one
 binding release per upstream release, so a crate version always names the
 exact CUI it was written for.
 
@@ -260,8 +277,8 @@ layer — the layout tests in `cui-sys` fail loudly if the C ABI moved.
 ```sh
 cargo build --examples       # needs libx11-dev on Linux; no network needed
 cargo test                   # layout tests against C sizes, doctests
-cargo run -p cui --example hello
-cargo run -p cui --example todo
+cargo run -p cui-rs --example hello
+cargo run -p cui-rs --example todo
 ```
 
 Updating the pinned upstream release: `./vendor.sh --pin <tag>`.

@@ -1,13 +1,16 @@
 [package]
-name = "cui"
+name = "cui-rs"
 description = "Safe, idiomatic Rust bindings for the CUI immediate-mode UI library"
-version = "0.1.2+cui1.4.0"
+version = "0.1.3+cui1.4.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
+
+[lib]
+name = "cui"
 
 [features]
 default = ["app", "default-fonts", "stb-image"]
@@ -21,4 +24,4 @@ stb-image = ["cui-sys/stb-image"]
 text-shaping = ["cui-sys/text-shaping"]
 
 [dependencies]
-cui-sys = { path = "../cui-sys", version = "0.1.0", default-features = false }
+cui-sys = { path = "../cui-sys", version = "0.1.3", default-features = false }

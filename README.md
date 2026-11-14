@@ -106,43 +106,41 @@ confirmation dialog and saving to `todo.txt`. The C docs
 ([docs/tutorial.md](https://github.com/yappologistic/CUI/blob/master/docs/tutorial.md))
 can be followed along in Rust with only syntax changes.
 
-## What is bound (v0.1)
+## What is bound
 
-- **App layer**: window lifecycle, `run`, quit, title/size, backend queries,
-  software-renderer detection, screenshot buffer, native file dialogs.
-- **Layout**: `column` / `row` / `box_` / `card` / `scroll` / `split`,
-  spacer, gap, separator; the full container field set (pad/gap/align/
-  justify/bg/border/radius/elevation/scroll/clip/opacity/direction/grid).
-- **Text**: `text`, heading, label, secondary, muted, code, kbd, link, icon.
-- **Buttons**: button, icon button (all variants, sizes, icons, tooltips).
-- **Selection**: checkbox, switch, radio, radio group, slider, chip, segmented.
-- **Input**: input, textarea, search (with all `Input` options), number, select.
-- **Navigation**: tabs, nav item, nav section, breadcrumb, pagination.
-- **Overlays**: dialog (+ footer), menu, context menu, user menu, sheet,
-  toast (+ handles), tooltip, command palette.
-- **Display**: badge, avatar, avatar group, list item, empty state, metric,
-  progress, progress ring, timeline items, copy button, number roll,
-  typewriter.
-- **Charts**: line, bar, donut, sparkline (series, labels, annotations) and
-  the instrument family: dot-matrix chart, event track, readouts and the
-  dot-matrix display.
-- **Canvas**: `canvas` with paint closures over a `CanvasUi` draw surface
-  (rects, gradients, borders, circles, arcs, lines, polygons, text, icons,
-  clipping), plus per-widget persistent `state`.
-- **Conversation**: chat messages, composer, reasoning, tool calls, agent
-  plan/status, sources, citations, response actions, prompt suggestions,
-  model picker, context meter.
-- **Table**: begin/row/cell/end with sorting through `TableSort`.
-- **Identity**: push/pop id scopes, rects, hover/disabled queries.
-- **Input queries**: keys, shortcuts, mouse, clipboard, dropped files.
-- **Theme**: light/dark, accents, color resolution, font scale, reduced motion.
+**Every `cui_` call in the v1.4.0 examples and component gallery (268 unique
+calls) has a callable Rust binding.** 362 extern functions and 234 `#[repr(C)]`
+structs across two layers:
 
-Not bound yet: the rest of the gallery surface (code editor, markdown,
-terminal, docking, data grid editing, calendar/date pickers, emoji and color
-pickers, nodes, diff, hex viewer, photo/creative tools), the renderer SPI for
-bringing your own window, and text shaping. Adding a component is mechanical —
-one `extern "C"` line in `cui-sys`, one options struct, one safe method — see
-the git history for the pattern.
+- **Hand-written safe layer** (~200 methods on `Ui`): the components covered
+  by the 11 ported examples — app lifecycle, layout, text, buttons, selection,
+  input, navigation, overlays, display, charts, canvas painting, conversation,
+  table, identity, input queries, theme, and native file dialogs. String
+  parameters go through a per-frame arena; text fields edit `&mut String`
+  in place; container scopes are closures with panic-safe begin/end guards.
+- **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 179
+  functions + 177 structs): the full second-wave gallery surface — kanban,
+  dock, terminal, data grid (with editing), carousel, card stacks, code
+  blocks, JSON viewer, blame, coverage, API explorer, feature flags,
+  test explorer, stack traces, trace viewer, network waterfall, dependency
+  graph, commit graph, pipeline, problems, key-value editor, query builder,
+  schedule picker, keymap, file browser, file picker, dropzone, emoji picker,
+  color picker, date/time/range pickers, image viewer/comparer/cropper,
+  signature pad, presence, reactions, ticker, now playing, waveform, tab bar,
+  waterfall, waffle, funnel, sankey, treemap, radar, candlestick, gauge,
+  activity rings, bar list, knob, level meter, fader, scrub, money input,
+  inline edit, shortcut recorder, url params, feature flags, theme switcher,
+  spinner, loader, gradient text, spotlight, expandable text/cards, hover
+  card, banner, alert, checklist, countdown, meter, reactions, split button,
+  status button, swipe actions, speed dial, avatar upload, word rotate,
+  shimmer text, text reveal, typing indicator, voice orb, week/month/range
+  calendars, gantt, heatmap, calendar heatmap, filter bar, keymap, url
+  params, and more.
+
+The renderer SPI (bring your own window) and text shaping are declared in
+the FFI but not yet wrapped. Adding a component is mechanical — extend
+`scripts/ffi-manifest.txt`, re-run `scripts/gen_ffi.py` — see the git
+history for the pattern.
 
 ## Platform notes
 
@@ -161,29 +159,39 @@ window), `text-shaping` (Arabic shaping + bidi).
 
 ## Examples
 
-Every non-gallery example from upstream has a Rust twin in
+11 of the 12 upstream examples have Rust twins in
 [`cui/examples/`](cui/examples): `hello`, `todo`, `settings`, `notes`,
 `dashboard`, `mail`, `finance`, `music`, `tracker`, `assistant` and
 `caffeine` — line-for-line ports of the C originals, each verified by the CI
 smoke test (every example runs for a few seconds under Xvfb; a crash or an
 early exit fails the build, and screenshots are uploaded as artifacts).
-The component gallery is the next port.
+The component gallery (the 12th example, ~3,000 lines) is the last piece:
+its bindings are complete, the example port is in progress.
 
 ## Repository layout
 
 ```
-cui-sys/   raw FFI + the vendored C amalgamation (cui.h, cui.c), built by cc
-cui/       the safe API (App, Ui, options structs, icons)
-cui/examples/  hello.rs, todo.rs — ports of the C examples
-vendor.sh  pins/fetches the upstream release (--pin, --fetch) or amalgamates
-           a local checkout into the offline cache
-```
+cui-sys/           raw FFI + the vendored C amalgamation (cui.h, cui.c), built by cc
+  src/gen.rs       generated FFI for the second-wave gallery surface
+cui/               the safe API (App, Ui, options structs, icons)
+  src/gen_safe.rs  generated safe methods for the generated FFI
+  examples/        11 ported C examples
+scripts/
+  gen_ffi.py       header-to-Rust generator (extends the manifest, re-run)
+  smoke.sh         Xvfb smoke test for every example
+vendor.sh          pins/fetches the upstream release (--pin, --fetch) or
+                   amalgamates a local checkout into the offline cache
 
 ## Versioning
 
 **The Rust crates version independently.** `cui` and `cui-sys` follow normal
 semver for their *binding* API; breaking a Rust signature bumps `cui`'s minor
 version.
+
+**The support window.** Binding 0.1.x targets CUI 1.4 only (declared in
+`UPSTREAM.toml` and enforced by `build.rs`). The plumbing for multi-version
+support is in place: capability cfgs (`cui_ge_1_5` etc.), a C ABI probe per
+pinned release, and per-version layout tables that the tests check against.
 
 **The bound upstream release rides in the build metadata.** Both crates are
 versioned `0.1.0+cui1.4.0`: the `+cui…` suffix — the same convention as

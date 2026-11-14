@@ -24,7 +24,7 @@ jobs:
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Doc links
-        run: cargo doc --no-deps -p cui-rs -p cui-sys -- -D warnings
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p cui-rs -p cui-sys
       - run: cargo build --release --examples
       - name: Smoke test every example under Xvfb
         run: xvfb-run -a -s "-screen 0 1280x800x24" scripts/smoke.sh target/release/examples

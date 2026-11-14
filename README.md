@@ -116,7 +116,9 @@ callable Rust binding.** Across two layers:
   text, buttons, selection, input, navigation, overlays, display, charts,
   canvas painting, conversation, table, identity, input queries, theme, and
   native file dialogs. String parameters go through a per-frame arena; text
-  fields edit `&mut String` in place; container scopes are closures with
+  fields edit `&mut String` in place — the buffer is NUL-terminated and
+  zeroed before the call and re-validated as UTF-8 after it, the same
+  discipline C's `char buf[96]` gives; container scopes are closures with
   panic-safe begin/end guards.
 - **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 319
   extern functions + 233 structs, 276 safe methods): the full second-wave
@@ -208,7 +210,7 @@ support is in place: capability cfgs (`cui_ge_1_5` etc.), a C ABI probe per
 pinned release, and per-version layout tables that the tests check against.
 
 **The bound upstream release rides in the build metadata.** Both crates are
-versioned `0.1.1+cui1.4.0`: the `+cui…` suffix — the same convention as
+versioned `0.1.2+cui1.4.0`: the `+cui…` suffix — the same convention as
 `zstd-sys 2.0.9+zstd.1.5.5` or `libgit2-sys 0.16.2+1.7.2` — states which
 upstream release the binding targets. It shows up in `cargo pkgid`, crates.io
 and docs.rs without affecting dependency resolution. When the pin moves to a

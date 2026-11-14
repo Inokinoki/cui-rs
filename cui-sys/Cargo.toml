@@ -1,0 +1,23 @@
+[package]
+name = "cui-sys"
+description = "Raw FFI bindings to the CUI immediate-mode UI library (vendored C sources)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+links = "cui"
+build = "build.rs"
+
+[features]
+default = ["app", "default-fonts", "stb-image"]
+# Embed the Inter / Geist / Lucide fonts (about 180 KB). Off = CUI_NO_DEFAULT_FONTS.
+default-fonts = []
+# PNG and JPEG image loading via stb_image. Off = CUI_NO_STB_IMAGE.
+stb-image = []
+# Window/event layer (cui_app_*). Off = CUI_NO_APP: you bring the window.
+app = []
+# Arabic-script shaping and bidi (CUI_TEXT_SHAPING).
+text-shaping = []
+
+[build-dependencies]
+cc = "1"

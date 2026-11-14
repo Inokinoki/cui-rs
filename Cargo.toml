@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["cui-sys", "cui"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/yappologistic/CUI"
+keywords = ["gui", "ui", "immediate-mode", "ffi", "widgets"]
+categories = ["gui"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

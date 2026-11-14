@@ -2,6 +2,7 @@
 name = "cui-sys"
 description = "Raw FFI bindings to the CUI immediate-mode UI library (vendored C sources)"
 version = "0.1.0"
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -1625,11 +1625,11 @@ pub struct cui_pipeline_result {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_platform_iface {
     pub user: *mut c_void,
-    // unparsed: void (*set_clipboard)(void *user, const char *utf8)
-    // unparsed: const char *(*get_clipboard)(void *user)
-    // unparsed: void (*set_cursor)(void *user, cui_cursor cursor)
-    // unparsed: void (*set_text_input_rect)(void *user, cui_rect caret)
-    // unparsed: bool (*draw_emoji)(void *user, const char *utf8, int len, int px, unsigned char *rgba)
+    pub set_clipboard: Option<unsafe extern "C" fn(*mut c_void, *const c_char)>,
+    pub get_clipboard: Option<unsafe extern "C" fn(*mut c_void) -> *const c_char>,
+    pub set_cursor: Option<unsafe extern "C" fn(*mut c_void, c_int)>,
+    pub set_text_input_rect: Option<unsafe extern "C" fn(*mut c_void, cui_rect)>,
+    pub draw_emoji: Option<unsafe extern "C" fn(*mut c_void, *const c_char, i32, i32, *mut u8) -> bool>,
 }
 
 // clip children to the box
@@ -1814,9 +1814,9 @@ pub struct cui_regex_tester_result {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_renderer_iface {
     pub user: *mut c_void,
-    // unparsed: cui_texture (*texture_create)(void *user, int w, int h, cui_texture_format fmt, const void *pixels)
-    // unparsed: void (*texture_update)(void *user, cui_texture tex, int x, int y, int w, int h, const void *pixels, int stride)
-    // unparsed: void (*texture_destroy)(void *user, cui_texture tex)
+    pub texture_create: Option<unsafe extern "C" fn(*mut c_void, i32, i32, c_int, *const c_void) -> usize>,
+    pub texture_update: Option<unsafe extern "C" fn(*mut c_void, usize, i32, i32, i32, i32, *const c_void, i32)>,
+    pub texture_destroy: Option<unsafe extern "C" fn(*mut c_void, usize)>,
 }
 
 // Bar list: ranked horizontal bars. Rows are keyed by label, so when the
@@ -2566,7 +2566,7 @@ pub struct cui_tree_table_opts {
     pub sort: *mut cui_table_sort,
     pub cursor: *mut i32,
     pub guides: bool,
-    // unparsed: const char *(*label)(void *user, int node)
+    pub label: Option<unsafe extern "C" fn(*mut c_void, i32) -> *const c_char>,
     pub user: *mut c_void,
 }
 

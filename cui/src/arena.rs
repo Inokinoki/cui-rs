@@ -13,6 +13,8 @@
 use core::cell::UnsafeCell;
 use core::ffi::c_char;
 
+/// The per-frame string arena behind [`Ui::arena`](crate::Ui::arena): the
+/// pointers it hands out stay valid for exactly one frame.
 pub struct Arena {
     buf: UnsafeCell<Vec<u8>>,
 }

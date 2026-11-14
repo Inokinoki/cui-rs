@@ -799,7 +799,6 @@ impl Progress<'_> {
             label: cstr(a, self.label),
             show_value: self.show_value,
             width: sz(self.width),
-            dither: false,
         }
     }
 }
@@ -994,7 +993,6 @@ impl Chart<'_> {
             max: self.max,
             annotations,
             annotation_count,
-            dither: false,
         }
     }
 }

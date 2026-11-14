@@ -254,7 +254,7 @@ impl TimelineItem<'_> {
 
 // ----------------------------------------------------------------- text, chat
 
-/// Motion options shared by [`Ui::typewriter_with`] and [`Ui::number_roll_with`]
+/// Motion options shared by [`Ui::typewriter`](crate::Ui::typewriter) and [`Ui::number_roll`](crate::Ui::number_roll)
 /// (C's `cui_text_fx_opts`). All respect reduced motion.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TextFx {
@@ -329,7 +329,7 @@ impl ChatMessage<'_> {
 
 // --------------------------------------------------------------- conversation
 
-/// Options for [`Ui::reasoning_with`](crate::Ui::reasoning_with) (C's `cui_reasoning_opts`).
+/// Options for [`Ui::reasoning`](crate::Ui::reasoning) (C's `cui_reasoning_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Reasoning<'a> {
     /// Still thinking: the header shimmers and the body opens; it folds when this turns false.
@@ -351,7 +351,7 @@ impl Reasoning<'_> {
     }
 }
 
-/// Options for [`Ui::tool_call_with`](crate::Ui::tool_call_with) (C's `cui_tool_call_opts`).
+/// Options for [`Ui::tool_call`](crate::Ui::tool_call) (C's `cui_tool_call_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ToolCall<'a> {
     /// The call's state.
@@ -382,7 +382,7 @@ impl ToolCall<'_> {
     }
 }
 
-/// One step of an [`Ui::agent_plan`] (C's `cui_plan_step`).
+/// One step of an [`Ui::agent_plan`](crate::Ui::agent_plan) (C's `cui_plan_step`).
 #[derive(Clone, Copy, Debug)]
 pub struct PlanStep<'a> {
     /// The step's text; shimmers while the step is running.
@@ -403,14 +403,14 @@ impl PlanStep<'_> {
     }
 }
 
-/// Options for [`Ui::agent_plan_with`](crate::Ui::agent_plan_with) (C's `cui_agent_plan_opts`).
+/// Options for [`Ui::agent_plan`](crate::Ui::agent_plan) (C's `cui_agent_plan_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AgentPlan<'a> {
     /// Heading of the plan; default "Plan".
     pub title: Option<&'a str>,
 }
 
-/// Options for [`Ui::agent_status_with`](crate::Ui::agent_status_with) (C's `cui_agent_status_opts`).
+/// Options for [`Ui::agent_status`](crate::Ui::agent_status) (C's `cui_agent_status_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AgentStatus<'a> {
     /// What the agent is doing.
@@ -483,7 +483,7 @@ impl ResponseActionsFlags {
     }
 }
 
-/// Options for [`Ui::response_actions_with`](crate::Ui::response_actions_with)
+/// Options for [`Ui::response_actions`](crate::Ui::response_actions)
 /// (C's `cui_response_actions_opts`).
 #[derive(Debug, Default)]
 pub struct ResponseActions<'a> {
@@ -530,7 +530,7 @@ impl PromptSuggestion<'_> {
     }
 }
 
-/// Options for [`Ui::prompt_suggestions_with`](crate::Ui::prompt_suggestions_with)
+/// Options for [`Ui::prompt_suggestions`](crate::Ui::prompt_suggestions)
 /// (C's `cui_prompt_suggestions_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PromptSuggestions {
@@ -571,7 +571,7 @@ impl ListItem<'_> {
     }
 }
 
-/// One model in a [`Ui::model_picker`] (C's `cui_model`).
+/// One model in a [`Ui::model_picker`](crate::Ui::model_picker) (C's `cui_model`).
 #[derive(Clone, Copy, Debug)]
 pub struct Model<'a> {
     /// Shown on the button and as the row's heading in the list.
@@ -595,7 +595,7 @@ impl Model<'_> {
     }
 }
 
-/// Options for [`Ui::model_picker_with`](crate::Ui::model_picker_with) (C's `cui_model_picker_opts`).
+/// Options for [`Ui::model_picker`](crate::Ui::model_picker) (C's `cui_model_picker_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ModelPicker {
     /// No border or fill on the button until hovered.
@@ -640,7 +640,7 @@ impl ComposerFlags {
     }
 }
 
-/// Options for [`Ui::chat_composer_with`](crate::Ui::chat_composer_with)
+/// Options for [`Ui::chat_composer`](crate::Ui::chat_composer)
 /// (C's `cui_composer_opts`).
 #[derive(Debug, Default)]
 pub struct Composer<'a> {
@@ -699,7 +699,7 @@ impl VizItem<'_> {
     }
 }
 
-/// Options for [`Ui::context_meter_with`](crate::Ui::context_meter_with) (C's `cui_context_opts`).
+/// Options for [`Ui::context_meter`](crate::Ui::context_meter) (C's `cui_context_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ContextMeter<'a> {
     /// What fills the context (label, amount, color), for the breakdown on hover.
@@ -722,7 +722,7 @@ impl ContextMeter<'_> {
 
 // ---------------------------------------------------------------- instruments
 
-/// One series of a [`Ui::dot_chart`] (C's `cui_dot_series`).
+/// One series of a [`Ui::dot_chart`](crate::Ui::dot_chart) (C's `cui_dot_series`).
 #[derive(Clone, Copy, Debug)]
 pub struct DotSeries<'a> {
     /// One value per sample; negative values count as 0.
@@ -743,7 +743,7 @@ impl DotSeries<'_> {
     }
 }
 
-/// Options for [`Ui::dot_chart_with`](crate::Ui::dot_chart_with) (C's `cui_dot_chart_opts`).
+/// Options for [`Ui::dot_chart`](crate::Ui::dot_chart) (C's `cui_dot_chart_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DotChart<'a> {
     /// Width; default fills.
@@ -812,7 +812,7 @@ impl DotChart<'_> {
     }
 }
 
-/// What a [`Ui::dot_chart`] reports this frame (C's `cui_dot_chart_result`).
+/// What a [`Ui::dot_chart`](crate::Ui::dot_chart) reports this frame (C's `cui_dot_chart_result`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DotChartResult {
     /// The sample under the pointer or the keyboard cursor, or -1.
@@ -825,7 +825,7 @@ pub struct DotChartResult {
     pub clicked: bool,
 }
 
-/// Options for [`Ui::event_track_with`](crate::Ui::event_track_with) (C's `cui_event_track_opts`).
+/// Options for [`Ui::event_track`](crate::Ui::event_track)(crate::Ui::event_track) (C's `cui_event_track_opts`).
 #[derive(Debug, Default)]
 pub struct EventTrack<'a> {
     /// Width; default fills.
@@ -848,7 +848,7 @@ pub struct EventTrack<'a> {
     pub no_axis: bool,
 }
 
-/// What an [`Ui::event_track`] did this frame (C's `cui_event_track_result`).
+/// What an [`Ui::event_track`](crate::Ui::event_track) did this frame (C's `cui_event_track_result`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EventTrackResult {
     /// An event was moved, added or removed this frame.
@@ -931,7 +931,7 @@ impl DotDisplay {
     }
 }
 
-/// One command of a [`Ui::command_palette`] (C's `cui_command`).
+/// One command of a [`Ui::command_palette`](crate::Ui::command_palette) (C's `cui_command`).
 #[derive(Clone, Copy, Debug)]
 pub struct Command<'a> {
     /// The command's text in the list; what typing in the palette searches.
@@ -955,7 +955,7 @@ impl Command<'_> {
     }
 }
 
-/// Options for [`Ui::file_dialog`](crate::App::file_dialog) (C's `cui_file_dialog_opts`).
+/// Options for [`file_dialog`](crate::file_dialog) (C's `cui_file_dialog_opts`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FileDialog<'a> {
     /// Which dialog to open.

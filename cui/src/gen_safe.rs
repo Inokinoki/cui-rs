@@ -83,6 +83,8 @@ impl<'a> Ui<'a> {
 
     /// default the width it gets and 360
     pub fn calendar_heatmap(&self, id: impl AsRef<str>, start: ffi::cui_date, values: &[f32], days: i32, opts: &ffi::cui_calendar_heatmap_opts) -> i32 {
+        let need = (days as i64).max(0) as usize;
+        assert!(need <= values.len(), "cui_calendar_heatmap_ex: `values` holds fewer elements than its dimension parameters require");
         unsafe { ffi::cui_calendar_heatmap_ex(self.ctx, self.arena.cstr(id.as_ref()), start, values.as_ptr(), days, opts) }
     }
 
@@ -257,8 +259,8 @@ impl<'a> Ui<'a> {
     }
 
     /// rows take keyboard focus and show the hand cursor (pass the chosen row's state to `cui_table_row`)
-    pub fn diff_view_rows(&self, id: impl AsRef<str>, rows: &mut ffi::cui_diff_row, first: i32, cap: i32) -> i32 {
-        unsafe { ffi::cui_diff_view_rows(self.ctx, self.arena.cstr(id.as_ref()), rows, first, cap) }
+    pub fn diff_view_rows(&self, id: impl AsRef<str>, rows: &mut [ffi::cui_diff_row], first: i32) -> i32 {
+        unsafe { ffi::cui_diff_view_rows(self.ctx, self.arena.cstr(id.as_ref()), rows.as_mut_ptr(), first, rows.len() as c_int) }
     }
 
     /// one icon per menu item, in the order of the items; `NULL` for none
@@ -266,7 +268,7 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_dock_begin(self.ctx, self.arena.cstr(id.as_ref()), opts) }
     }
 
-    /// Toggle group: a row of toggles (bold, italic...). values[i] is toggled
+    /// Toggle group: a row of toggles (bold, italic...). values\[i] is toggled
     pub fn dock_end(&self) {
         unsafe { ffi::cui_dock_end(self.ctx) }
     }
@@ -291,7 +293,7 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_dock_panel_end(self.ctx) }
     }
 
-    /// Toggle group: a row of toggles (bold, italic...). values[i] is toggled
+    /// Toggle group: a row of toggles (bold, italic...). values\[i] is toggled
     pub fn dock_separator(&self) {
         unsafe { ffi::cui_dock_separator(self.ctx) }
     }
@@ -427,8 +429,8 @@ impl<'a> Ui<'a> {
     }
 
     /// the search hit its limit: correct, maybe not the shortest
-    pub fn gradient_editor(&self, id: impl AsRef<str>, stops: &mut ffi::cui_gradient_stop, count: &mut i32, capacity: i32, opts: &ffi::cui_gradient_opts) -> ffi::cui_gradient_result {
-        unsafe { ffi::cui_gradient_editor_ex(self.ctx, self.arena.cstr(id.as_ref()), stops, count, capacity, opts) }
+    pub fn gradient_editor(&self, id: impl AsRef<str>, stops: &mut [ffi::cui_gradient_stop], count: &mut i32, opts: &ffi::cui_gradient_opts) -> ffi::cui_gradient_result {
+        unsafe { ffi::cui_gradient_editor_ex(self.ctx, self.arena.cstr(id.as_ref()), stops.as_mut_ptr(), count, stops.len() as c_int, opts) }
     }
 
     /// Circular progress with the value in the middle.
@@ -443,12 +445,14 @@ impl<'a> Ui<'a> {
 
     /// Image viewer: zoom and pan a picture. The wheel (or a pinch, which comes
     pub fn heatmap(&self, id: impl AsRef<str>, values: &[f32], rows: i32, cols: i32, opts: &ffi::cui_heatmap_opts) -> i32 {
+        let need = ((rows as i64) * (cols as i64)).max(0) as usize;
+        assert!(need <= values.len(), "cui_heatmap_ex: `values` holds fewer elements than its dimension parameters require");
         unsafe { ffi::cui_heatmap_ex(self.ctx, self.arena.cstr(id.as_ref()), values.as_ptr(), rows, cols, opts) }
     }
 
     /// cui_hex_view_ex
-    pub fn hex_view(&self, id: impl AsRef<str>, data: &u8, size: usize, sel: &mut ffi::cui_hex_selection, opts: &ffi::cui_hex_view_opts) -> ffi::cui_hex_result {
-        unsafe { ffi::cui_hex_view_ex(self.ctx, self.arena.cstr(id.as_ref()), data, size, sel, opts) }
+    pub fn hex_view(&self, id: impl AsRef<str>, data: &[u8], sel: &mut ffi::cui_hex_selection, opts: &ffi::cui_hex_view_opts) -> ffi::cui_hex_result {
+        unsafe { ffi::cui_hex_view_ex(self.ctx, self.arena.cstr(id.as_ref()), data.as_ptr(), data.len(), sel, opts) }
     }
 
     /// cui_hex_view_goto
@@ -603,6 +607,8 @@ impl<'a> Ui<'a> {
 
     /// cui_level_meter_ex
     pub fn level_meter(&self, id: impl AsRef<str>, levels: &[f32], channels: i32, opts: &ffi::cui_level_meter_opts) -> bool {
+        let need = (channels as i64).max(0) as usize;
+        assert!(need <= levels.len(), "cui_level_meter_ex: `levels` holds fewer elements than its dimension parameters require");
         unsafe { ffi::cui_level_meter_ex(self.ctx, self.arena.cstr(id.as_ref()), levels.as_ptr(), channels, opts) }
     }
 
@@ -816,6 +822,8 @@ impl<'a> Ui<'a> {
 
     /// ---- Code editor ----
     pub fn prop_vec(&self, label: impl AsRef<str>, value: &mut [f32], components: i32, opts: &ffi::cui_prop_opts) -> bool {
+        let need = (components as i64).max(0) as usize;
+        assert!(need <= value.len(), "cui_prop_vec_ex: `value` holds fewer elements than its dimension parameters require");
         unsafe { ffi::cui_prop_vec_ex(self.ctx, self.arena.cstr(label.as_ref()), value.as_mut_ptr(), components, opts) }
     }
 
@@ -1209,7 +1217,7 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_waffle_ex(self.ctx, self.arena.cstr(id.as_ref()), items.as_ptr(), items.len() as c_int, opts) }
     }
 
-    /// Heatmap: a rows x cols matrix (values[row * cols + col]) on one hue,
+    /// Heatmap: a rows x cols matrix (values\[row * cols + col]) on one hue,
     pub fn waterfall(&self, id: impl AsRef<str>, requests: &[ffi::cui_net_request], opts: &ffi::cui_waterfall_opts) -> ffi::cui_waterfall_result {
         unsafe { ffi::cui_waterfall_ex(self.ctx, self.arena.cstr(id.as_ref()), requests.as_ptr(), requests.len() as c_int, opts) }
     }

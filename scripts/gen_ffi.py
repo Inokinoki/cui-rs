@@ -14,7 +14,11 @@ Outputs:
     cui/src/gen_safe.rs        thin safe methods on Ui (strings via the frame
                                arena, buffers via &mut String, scopes via
                                closures), plus `Ui::cstr` for raw opts structs
-    cui-sys/probe/gen_probe.c  SZ() lines for the generated structs
+    cui-sys/probe/gen_probe.c  SZ()/OFF() lines for every Rust FFI struct
+    cui-sys/tests/link.rs      a typed fn-pointer reference per extern decl;
+                               a symbol the C library does not export fails
+                               the test link (catches rename typos)
+    cui-sys/tests/layout.rs    size_of/offset_of checks against the probe table
 
 After changing the manifest: re-run this script, then ./vendor.sh --fetch
 (regenerates the probe table), then cargo build.
@@ -167,8 +171,146 @@ class Header:
             self.structs[name] = (fields, pos)
 
 
+def doc_first_line(doc, limit=130):
+    """First line of a header comment for a doc line, with `[` escaped so
+    C prose like `values[i]` cannot be parsed as an intra-doc link."""
+    line = doc.splitlines()[0].strip()[:limit] if doc else ""
+    return line.replace("[", "\\[")
+
+
 def snake_to_camel(snake):
     return snake  # methods stay snake_case
+
+
+# Rust keywords the struct emitter suffixes with `_` (kept in sync with the
+# emitters below), plus the `_` -> `_pad` special case.
+RUST_KEYWORDS = ("in", "loop", "type", "fn", "match", "ref", "box", "move",
+                 "impl", "as", "use", "mod", "true", "false")
+
+
+def rust_field_name(cname):
+    if cname == "_":
+        return "_pad"
+    return cname + "_" if cname in RUST_KEYWORDS else cname
+
+
+def mask_rust_noise(text):
+    """Blanks comments and string literals (keeping length and newlines) so
+    delimiter matching and declaration search cannot be confused by prose
+    with unbalanced brackets."""
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        if text.startswith("//", i):
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+            for k in range(i, j):
+                out[k] = " "
+            i = j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            for k in range(i, j):
+                if out[k] != "\n":
+                    out[k] = " "
+            i = j
+        elif text[i] == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            for k in range(i, min(j + 1, n)):
+                if out[k] != "\n":
+                    out[k] = " "
+            i = j + 1
+        else:
+            i += 1
+    return "".join(out)
+
+
+def _match_delimiter(text, open_idx):
+    """Index of the delimiter matching text[open_idx] ('{', '(' or '[')."""
+    depth = 0
+    for k in range(open_idx, len(text)):
+        c = text[k]
+        if c in "{([":
+            depth += 1
+        elif c in "})]":
+            depth -= 1
+            if depth == 0:
+                return k
+    raise SystemExit(f"unbalanced delimiters in the Rust source at offset {open_idx}")
+
+
+def rust_extern_decls(src):
+    """(fn name, [param types], return type or None) for every `pub fn` in an
+    `extern "C"` block. Parameters are split at top-level commas (function-
+    pointer types contain commas of their own) and a param's type is
+    everything after the first `: ` (names cannot contain colons). The block
+    headers are located in the raw source (masking blanks their `"C"`), the
+    bodies are scanned on the masked text so prose cannot confuse it."""
+    text = mask_rust_noise(src)
+    decls = []
+    i = 0
+    while (j := src.find('extern "C"', i)) >= 0:
+        k = j + len('extern "C"')
+        while k < len(src) and src[k].isspace():
+            k += 1
+        if k >= len(src) or src[k] != "{":
+            i = j + 1  # `extern "C" fn` in a type alias, not a block
+            continue
+        brace = k
+        end = _match_delimiter(text, brace)
+        block = text[brace:end]
+        raw_block = src[brace:end]  # same offsets, strings intact
+        m = 0
+        while (mm := re.compile(r"\bpub fn (cui_\w+)\(").search(block, m)):
+            p_close = _match_delimiter(block, mm.end() - 1)
+            # param/return text comes from the raw source: masking blanks
+            # string literals, and `extern "C" fn` params contain one
+            params = raw_block[mm.end():p_close]
+            semi = raw_block.find(";", p_close)
+            rest = raw_block[p_close + 1:(semi if semi >= 0 else len(raw_block))]
+            ret = rest.split("->", 1)[1].strip() if "->" in rest else None
+            types = []
+            for prm in split_params(params):
+                if not prm:
+                    continue
+                types.append(prm.split(": ", 1)[1].strip() if ": " in prm else prm)
+            decls.append((mm.group(1), types, ret))
+            m = p_close
+        i = end
+    return decls
+
+
+def rust_struct_fields(src):
+    """{struct name: [Rust field names in declaration order]} for every
+    `pub struct cui_* { ... }`."""
+    text = mask_rust_noise(src)
+    out = {}
+    for m in re.finditer(r"pub struct (cui_\w+)\s*\{", text):
+        end = _match_delimiter(text, m.end() - 1)
+        out[m.group(1)] = re.findall(r"\bpub (\w+):", text[m.end():end])
+    return out
+
+
+def c_field_names(header, tname):
+    """C field names in declaration order, or None when the struct is not in
+    the header (opaque types) or a field does not parse. Function-pointer
+    fields (`void (*set_cursor)(...)`) fall back to a name-only match."""
+    if tname not in header.structs:
+        return None
+    names = []
+    for f in header.structs[tname][0]:
+        for one in expand_field(f):
+            p = parse_param(one)
+            if p is not None:
+                names.append(p[1])
+                continue
+            m = re.search(r"\(\s*\*\s*(\w+)\s*\)", one)
+            if not m:
+                return None
+            names.append(m.group(1))
+    return names
 
 
 def main():
@@ -272,6 +414,22 @@ def main():
             return ctype
         raise SystemExit(f"unmapped ffi type: {ctype!r} in struct {tname} field {fname}")
 
+    def rust_ctype(ctype):
+        """C type text (possibly a pointer) -> Rust type text."""
+        t = ctype.strip()
+        ptr = ""
+        while t.endswith("*"):
+            ptr += "*"
+            t = t[:-1].strip()
+        const = "const" in t
+        t = re.sub(r"\bconst\b", "", t).strip()
+        rt = ffi_type(t)
+        if not ptr:
+            return rt
+        if rt.startswith("*"):
+            return rt + "*" * (len(ptr) - 1)
+        return ("*const " if const else "*mut ") + rt
+
 
     # A pointer param followed by an adjacent int is an array; if that int is
     # named "count"/"*_count" it is the length and is dropped (slices know it).
@@ -285,6 +443,11 @@ def main():
         if nptr != "value" or ntype not in ("int", "uint", "unsigned", "size_t", "int32_t", "uint32_t"):
             return None
         if nname == "count" or nname.endswith("_count"):
+            return "drop"
+        # byte buffers sized by a size_t named size/len (cui_hex_view_ex);
+        # gated on the element type so void* loaders stay pointer params
+        if (nname in ("size", "len") or nname.endswith("_size") or nname.endswith("_len")) \
+                and ntype == "size_t" and ctype in ("uint8_t", "unsigned char"):
             return "drop"
         # float tables whose dimensions follow (cui_heatmap, cui_level_meter):
         # slice them and keep the dimension params
@@ -337,6 +500,35 @@ def main():
             for f in expand_field(cf):
                 p = parse_param(f)
                 if p is None:
+                    # function-pointer field: `ret (*name)(params)` — emit a
+                    # real Option<unsafe extern "C" fn(..)> so the struct keeps
+                    # C's layout (dropping the field would shift every field
+                    # after it)
+                    fm = re.match(r"(.+?)\s*\(\s*\*\s*(\w+)\s*\)\s*\((.*)\)$", " ".join(f.split()))
+                    if fm:
+                        ftypes = []
+                        ok = True
+                        for prm in split_params(fm.group(3)):
+                            if prm.strip() in ("", "void"):
+                                continue
+                            pp = parse_param(prm)
+                            if pp is None:
+                                ok = False
+                                break
+                            ct, _, pptr = pp
+                            rt_ = ffi_type(ct)
+                            if pptr == "const_ptr" and not rt_.startswith("*"):
+                                rt_ = f"*const {rt_}"
+                            elif pptr == "mut_ptr" and not rt_.startswith("*"):
+                                rt_ = f"*mut {rt_}"
+                            ftypes.append(rt_)
+                        if ok:
+                            fname_f = fm.group(2)
+                            if fname_f in RUST_KEYWORDS:
+                                fname_f += "_"
+                            ret_txt = "" if fm.group(1).strip() == "void" else " -> " + rust_ctype(fm.group(1))
+                            ffi.append(f"    pub {fname_f}: Option<unsafe extern \"C\" fn({', '.join(ftypes)}){ret_txt}>,")
+                            continue
                     ffi.append(f"    // unparsed: {f}")
                     continue
                 ctype, fname, ptr = p
@@ -489,11 +681,12 @@ def main():
             used_fns.update([begin, end])
             ret, params, pos = h.functions[begin]
             doc = doc_before(h.comments, pos)
-            safe.append("    /// " + (doc.splitlines()[0].strip()[:130] if doc else entry))
+            safe.append("    /// " + (doc_first_line(doc) or entry))
             sig = []
             begin_args = []
             skip_next = False
             dropped_len = ""
+            dropped_ctype = "int"
             plist_all = [(parse_param(p) or (None, None, None)) for p in split_params(params)]
             for i, p in enumerate(split_params(params)):
                 parsed = parse_param(p)
@@ -506,12 +699,16 @@ def main():
                     pname = pname + "_"
                 if skip_next:
                     skip_next = False
-                    begin_args.append(f"{dropped_len}.len() as c_int")
+                    if dropped_ctype == "size_t":
+                        begin_args.append(f"{dropped_len}.len()")
+                    else:
+                        begin_args.append(f"{dropped_len}.len() as c_int")
                     continue
                 pair = array_pair_at(plist_all, i)
                 if pair == "drop":
                     skip_next = True
                     dropped_len = pname
+                    dropped_ctype = plist_all[i + 1][0]
                 rt = ffi_type(ctype)
                 if pair is not None:
                     elem = f"ffi::{rt}" if rt.startswith("cui_") or rt.startswith("cui__") else rt
@@ -574,7 +771,7 @@ def main():
             if not (fp and fp[0] == "cui_ctx" and fp[1] == "ui"):
                 continue  # context-free function: hand-bound or free
             doc = doc_before(h.comments, pos)
-            safe.append("    /// " + (doc.splitlines()[0].strip()[:130] if doc else fn))
+            safe.append("    /// " + (doc_first_line(doc) or fn))
             plist = [(parse_param(p) or (None, None, None)) for p in split_params(params)]
             buffer_at = None
             for i in range(len(plist) - 1):
@@ -586,7 +783,26 @@ def main():
             call = []
             skip_next = False
             dropped_len = ""
+            dropped_ctype = "int"
             buffer_names = []
+            prelude = []
+            # A lone mutable buffer whose capacity arrives as a later `cap`
+            # or `capacity` int (cui_diff_view_rows' `rows, first, cap`;
+            # cui_gradient_editor's `stops, count, capacity`): take a slice
+            # and size the call from the slice itself.
+            cap_rule = None
+            scalar = {"int", "uint", "unsigned", "size_t", "int32_t", "uint32_t",
+                      "int64_t", "uint64_t", "float", "double", "bool"}
+            mut_bufs = [k for k, (t, n, p) in enumerate(plist)
+                        if p == "mut_ptr" and t != "char" and t not in scalar
+                        and not (t == "cui_ctx" and n == "ui")]
+            if len(mut_bufs) == 1 and buffer_at is None:
+                for k in range(mut_bufs[0] + 1, len(plist)):
+                    t2, n2, p2 = plist[k]
+                    if p2 == "value" and t2 in ("int", "uint", "unsigned", "int32_t", "uint32_t") \
+                            and n2 in ("cap", "capacity"):
+                        cap_rule = (mut_bufs[0], k)
+                        break
             for i, p in enumerate(split_params(params)):
                 parsed = parse_param(p)
                 if parsed is None:
@@ -606,12 +822,42 @@ def main():
                     continue  # the capacity comes from the String
                 if skip_next:
                     skip_next = False
-                    call.append(f"{dropped_len}.len() as c_int")
+                    if dropped_ctype == "size_t":
+                        call.append(f"{dropped_len}.len()")  # len() is already usize
+                    else:
+                        call.append(f"{dropped_len}.len() as c_int")
+                    continue
+                if cap_rule is not None and i == cap_rule[0]:
+                    rt = ffi_type(ctype)
+                    elem = f"ffi::{rt}" if rt.startswith("cui_") or rt.startswith("cui__") else rt
+                    sig.append(f"{pname}: &mut [{elem}]")
+                    call.append(f"{pname}.as_mut_ptr()")
+                    continue
+                if cap_rule is not None and i == cap_rule[1]:
+                    call.append(f"{plist[cap_rule[0]][1]}.len() as c_int")
                     continue
                 pair = array_pair_at(plist, i)
                 if pair == "drop":
                     skip_next = True
                     dropped_len = pname
+                    dropped_ctype = plist[i + 1][0]
+                if pair == "keep":
+                    # C indexes the slice by the adjacent int dimension(s);
+                    # assert the read extent up front so a short slice panics
+                    # instead of reading past its end
+                    dims = []
+                    j = i + 1
+                    while j < len(plist) and plist[j][2] == "value" and \
+                            plist[j][0] in ("int", "uint", "unsigned", "int32_t", "uint32_t"):
+                        dims.append(plist[j][1])
+                        j += 1
+                    if dims:
+                        if len(dims) == 1:
+                            prod = f"{dims[0]} as i64"
+                        else:
+                            prod = " * ".join(f"({d} as i64)" for d in dims)
+                        prelude.append(f"let need = ({prod}).max(0) as usize;")
+                        prelude.append(f"assert!(need <= {pname}.len(), \"{fn}: `{pname}` holds fewer elements than its dimension parameters require\");")
                 rt = ffi_type(ctype)
                 if pair is not None:
                     elem = f"ffi::{rt}" if rt.startswith("cui_") or rt.startswith("cui__") else rt
@@ -654,6 +900,7 @@ def main():
                     ret_rust = f" -> {rrt}"
             joiner = ", " if sig else ""
             safe.append(f"    pub fn {mname}(&self{joiner}{', '.join(sig)}){ret_rust} {{")
+            safe.extend(f"        {line}" for line in prelude)
             body_call = f"ffi::{fn}(self.ctx{', ' if call else ''}{', '.join(call)}){ret_call}"
             if buffer_at is not None:
                 # C reads the buffer with strlen and writes it back bounded by
@@ -693,16 +940,136 @@ def main():
         + re.sub(r"^(\s*//! .*\n)+", "", body.rstrip()) + "\n}\n"
     )
     OUT_SAFE.write_text(body)
-    OUT_SAFE.write_text(body)
+
+    # ---- layout probe + link/layout tests (cover BOTH Rust FFI files) ----
+    sys_src = (ROOT / "cui-sys/src/lib.rs").read_text()
+    gen_src = OUT_FFI.read_text()
+    structs = {**rust_struct_fields(sys_src), **rust_struct_fields(gen_src)}
+    decls = rust_extern_decls(sys_src) + rust_extern_decls(gen_src)
+    if len(decls) != 500:
+        print(f"warning: parsed {len(decls)} extern decls, expected 500", file=sys.stderr)
 
     probe = ["// Generated by scripts/gen_ffi.py: appended by vendor.sh runs.",
-             "void gen_probe_all(void) {"]
-    for tname in sorted(needed):
+             "// SZ/OFF for every struct the Rust FFI declares, hand-written",
+             "// and generated alike. layout_probe.c's base_probe has already",
+             "// moved to the [enum] section by the time this runs, so the",
+             "// section headers are re-selected here.",
+             "void gen_probe_all(void) {",
+             '    puts("[size]");']
+    offsets = []
+    checks = []
+    for tname in sorted(structs):
+        rfields = structs[tname]
+        cfields = c_field_names(h, tname)
+        if cfields is None:
+            print(f"warning: {tname} not probed (opaque or unparsed in the header)", file=sys.stderr)
+            continue
         probe.append(f"    SZ({tname});")
+        checks.append(f'    check(&t, "size", "{tname}", size_of::<{tname}>() as u64);')
+        if len(cfields) != len(rfields):
+            print(f"warning: {tname}: {len(rfields)} Rust fields vs {len(cfields)} C fields; offsets skipped",
+                  file=sys.stderr)
+            continue
+        for cf, rf in zip(cfields, rfields):
+            offsets.append(f"    OFF({tname}, {cf});")
+            checks.append(f'    check(&t, "offset", "{tname}.{cf}", offset_of!({tname}, {rf}) as u64);')
+    probe.append('    puts("[offset]");')
+    probe.extend(offsets)
     probe.append("}")
     OUT_PROBE.write_text("\n".join(probe) + "\n")
+
+    c_imports = sorted({tok
+                        for _, types, ret in decls
+                        for tok in re.findall(r"\bc_\w+\b", " ".join(types + ([ret] if ret else [])))})
+    link = [
+        "//! Generated by scripts/gen_ffi.py. Every extern declaration in the",
+        "//! crate is turned into a typed function pointer, so linking this",
+        "//! test resolves all of them against the compiled C library: a",
+        "//! declaration whose symbol the vendored CUI does not export (a",
+        "//! rename typo, a drifted header) fails HERE, not in a downstream",
+        "//! user's build.",
+        "#![allow(non_snake_case, clippy::too_many_lines)]",
+        "",
+        f"use core::ffi::{{{', '.join(c_imports)}}};",
+        "use cui_sys::*;",
+        "",
+        "#[test]",
+        "fn every_extern_symbol_resolves() {",
+    ]
+    for name, types, ret in decls:
+        arrow = f" -> {ret}" if ret else ""
+        # cui_app_* is compiled out under CUI_NO_APP (the `app` feature off)
+        if name.startswith("cui_app_"):
+            link.append('    #[cfg(feature = "app")]')
+        link.append(f"    let _: unsafe extern \"C\" fn({', '.join(types)}){arrow} = {name};")
+    link.append("}")
+    (ROOT / "cui-sys/tests").mkdir(exist_ok=True)
+    (ROOT / "cui-sys/tests/link.rs").write_text("\n".join(link) + "\n")
+
+    layout = [
+        "//! Generated by scripts/gen_ffi.py: checks every FFI struct's size",
+        "//! and every field offset against the C ABI facts produced by the",
+        "//! layout probe (cui-sys/layout/<version>.toml). A missing entry",
+        "//! means the probe table needs regenerating (see vendor.sh).",
+        "#![allow(non_camel_case_types, non_snake_case, clippy::too_many_lines)]",
+        "",
+        "use core::mem::{offset_of, size_of};",
+        "use cui_sys::*;",
+        "",
+        "fn layout_table() -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>> {",
+        "    use std::collections::BTreeMap;",
+        "    let path = format!(\"{}/layout/{}.toml\", env!(\"CARGO_MANIFEST_DIR\"), CUI_VERSION_STRING);",
+        "    let src = std::fs::read_to_string(&path)",
+        "        .unwrap_or_else(|e| panic!(\"no layout probe table for CUI {CUI_VERSION_STRING} ({e}); run ./vendor.sh\"));",
+        "    let mut table: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();",
+        "    let mut section = String::new();",
+        "    for line in src.lines() {",
+        "        let line = line.trim();",
+        "        if line.is_empty() || line.starts_with('#') {",
+        "            continue;",
+        "        }",
+        "        if line.starts_with('[') && line.ends_with(']') {",
+        "            section = line[1..line.len() - 1].to_string();",
+        "            continue;",
+        "        }",
+        "        let Some((key, value)) = line.split_once('=') else {",
+        "            panic!(\"bad line in {path}: {line}\")",
+        "        };",
+        "        let key = key.trim().trim_matches('\"').to_string();",
+        "        if key == \"version\" {",
+        "            continue; // recorded in the filename; not a number",
+        "        }",
+        "        let value: u64 = value",
+        "            .trim()",
+        "            .parse()",
+        "            .unwrap_or_else(|_| panic!(\"bad number in {path}: {line}\"));",
+        "        table.entry(section.clone()).or_default().insert(key, value);",
+        "    }",
+        "    table",
+        "}",
+        "",
+        "fn check(table: &std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>>,",
+        "         section: &str, key: &str, actual: u64) {",
+        "    let expected = table",
+        "        .get(section)",
+        "        .and_then(|s| s.get(key))",
+        "        .unwrap_or_else(|| panic!(\"layout table for CUI {CUI_VERSION_STRING} lacks [{section}] {key}; regenerate with ./vendor.sh\"));",
+        "    assert_eq!(actual, *expected, \"[{section}] {key}: Rust FFI vs C ABI (CUI {CUI_VERSION_STRING})\");",
+        "}",
+        "",
+        "#[test]",
+        "fn struct_sizes_and_offsets_match_c() {",
+        "    let t = layout_table();",
+    ]
+    layout.extend(checks)
+    layout.append("}")
+    (ROOT / "cui-sys/tests/layout.rs").write_text("\n".join(layout) + "\n")
+
     (ROOT / "scripts/ffi-generated.txt").write_text("\n".join(todo) + "\n")
-    print(f"gen.rs: {len(new_fns)} functions, {len(needed)} types; gen_safe.rs methods: {len(emitted_methods)}")
+    n_sizes = sum(1 for c in checks if '"size"' in c)
+    n_offs = sum(1 for c in checks if '"offset"' in c)
+    print(f"gen.rs: {len(new_fns)} functions, {len(needed)} types; gen_safe.rs methods: {len(emitted_methods)}; "
+          f"link.rs: {len(decls)} decls; layout.rs: {n_sizes} sizes, {n_offs} offsets")
 
 
 if __name__ == "__main__":

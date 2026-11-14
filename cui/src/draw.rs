@@ -1,4 +1,4 @@
-//! Custom painting: [`Ui::canvas`] and the [`CanvasUi`] draw surface, plus
+//! Custom painting: [`Ui::canvas`](crate::Ui::canvas) and the [`CanvasUi`] draw surface, plus
 //! per-widget persistent state (C's `cui_state`).
 
 use crate::opts2::Corners;
@@ -7,7 +7,7 @@ use cui_sys as ffi;
 use core::ffi::{c_char, c_void};
 use core::marker::PhantomData;
 
-/// What a [`Ui::canvas`] reports this frame (C's `cui_canvas_result`).
+/// What a [`Ui::canvas`](crate::Ui::canvas) reports this frame (C's `cui_canvas_result`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CanvasResult {
     /// Where the canvas landed on the screen.
@@ -34,7 +34,7 @@ impl CanvasResult {
     }
 }
 
-/// A paint-only handle: the drawing surface a [`Ui::canvas`] closure draws
+/// A paint-only handle: the drawing surface a [`Ui::canvas`](crate::Ui::canvas) closure draws
 /// with. Only CUI's immediate draw calls live here — building widgets inside
 /// a paint callback is not supported (C calls the paint function after
 /// layout, outside the widget pass).
@@ -245,7 +245,7 @@ impl<'a> crate::Ui<'a> {
     /// `T` must be plain copyable data, as CUI snapshots it.
     ///
     /// Returns what happened this frame: clicks, hover and where the canvas
-    /// landed. A common companion is [`Ui::state`], which keeps per-canvas
+    /// landed. A common companion is [`Ui::state`](crate::Ui::state), which keeps per-canvas
     /// state (like a hover flag) between frames.
     pub fn canvas<T: Copy>(
         &mut self,

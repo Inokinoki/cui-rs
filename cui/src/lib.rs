@@ -51,6 +51,7 @@
 //! for bringing your own window.
 
 #![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 #[macro_use]
 mod types;
@@ -63,6 +64,7 @@ mod icons;
 mod opts;
 mod opts2;
 
+pub use arena::Arena;
 pub use draw::*;
 pub use ext::{
     date_from_days, date_to_days, date_today, file_dialog, http_method_name, http_reason, key_name,
@@ -73,7 +75,6 @@ pub use opts::*;
 pub use opts2::*;
 pub use types::*;
 
-use arena::Arena;
 use cui_sys as ffi;
 use core::ffi::{c_char, c_void};
 use core::marker::PhantomData;

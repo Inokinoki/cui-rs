@@ -732,7 +732,6 @@ pub struct cui_chart_opts {
     pub max: f32,
     pub annotations: *const cui_chart_annotation,
     pub annotation_count: c_int,
-    pub dither: bool,
 }
 
 /* ==== Context and frame (cui.h) ==== */
@@ -958,7 +957,6 @@ pub struct cui_progress_opts {
     pub label: *const c_char,
     pub show_value: bool,
     pub width: cui_size,
-    pub dither: bool,
 }
 
 /* ==== Data display: table and charts (cui.h) ==== */
@@ -1549,7 +1547,7 @@ extern "C" {
 
     /// Reads one log row; `text` receives a pointer into the buffer
     /// (C's `cui_log_get`).
-    pub fn cui_log_get_raw(buf: *const cui_log_buffer, i: i32, text: *mut *const c_char) -> *const cui_log_line;
+    pub fn cui_log_get(buf: *const cui_log_buffer, i: i32, text: *mut *const c_char) -> *const cui_log_line;
 }
 
 pub type cui_file_list_fn = Option<extern "C" fn(user: *mut c_void, path: *const c_char, out: *mut cui_file_entry, cap: i32, names: *mut c_char, names_cap: usize, hidden: bool) -> i32>;
@@ -1577,7 +1575,6 @@ extern crate std;
 mod tests {
     extern crate std;
     use super::*;
-    use core::mem::{offset_of, size_of};
     use std::format;
     use std::string::{String, ToString};
 
@@ -1626,114 +1623,9 @@ mod tests {
         assert_eq!(actual, *expected, "[{section}] {key}: Rust FFI vs C ABI (CUI {CUI_VERSION_STRING})");
     }
 
-    /// The Rust FFI structs must equal the C compiler's sizes for the exact
-    /// release we compile against; any drift fails here.
-    #[test]
-    fn struct_layouts_match_c() {
-        let table = layout_table();
-        for (name, size) in [
-            ("cui_color", size_of::<cui_color>()),
-            ("cui_size", size_of::<cui_size>()),
-            ("cui_vec2", size_of::<cui_vec2>()),
-            ("cui_rect", size_of::<cui_rect>()),
-            ("cui_box", size_of::<cui_box>()),
-            ("cui_button_opts", size_of::<cui_button_opts>()),
-            ("cui_input_opts", size_of::<cui_input_opts>()),
-            ("cui_app_desc", size_of::<cui_app_desc>()),
-            ("cui_series", size_of::<cui_series>()),
-            ("cui_table_column", size_of::<cui_table_column>()),
-            ("cui_chart_opts", size_of::<cui_chart_opts>()),
-            ("cui_card_opts", size_of::<cui_card_opts>()),
-            ("cui_scroll_opts", size_of::<cui_scroll_opts>()),
-            ("cui_text_opts", size_of::<cui_text_opts>()),
-            ("cui_check_opts", size_of::<cui_check_opts>()),
-            ("cui_slider_opts", size_of::<cui_slider_opts>()),
-            ("cui_number_opts", size_of::<cui_number_opts>()),
-            ("cui_select_opts", size_of::<cui_select_opts>()),
-            ("cui_tabs_opts", size_of::<cui_tabs_opts>()),
-            ("cui_nav_opts", size_of::<cui_nav_opts>()),
-            ("cui_dialog_opts", size_of::<cui_dialog_opts>()),
-            ("cui_toast_opts", size_of::<cui_toast_opts>()),
-            ("cui_badge_opts", size_of::<cui_badge_opts>()),
-            ("cui_empty_opts", size_of::<cui_empty_opts>()),
-            ("cui_metric_opts", size_of::<cui_metric_opts>()),
-            ("cui_table_opts", size_of::<cui_table_opts>()),
-            ("cui_table_sort", size_of::<cui_table_sort>()),
-            ("cui_segmented_opts", size_of::<cui_segmented_opts>()),
-            ("cui_chip_opts", size_of::<cui_chip_opts>()),
-            ("cui_sheet_opts", size_of::<cui_sheet_opts>()),
-            ("cui_progress_opts", size_of::<cui_progress_opts>()),
-            ("cui_chart_annotation", size_of::<cui_chart_annotation>()),
-            ("cui_menu_opts", size_of::<cui_menu_opts>()),
-            ("cui_menu_item_opts", size_of::<cui_menu_item_opts>()),
-            ("cui_split_opts", size_of::<cui_split_opts>()),
-            ("cui_avatar_opts", size_of::<cui_avatar_opts>()),
-            ("cui_user_menu_opts", size_of::<cui_user_menu_opts>()),
-            ("cui_list_item_opts", size_of::<cui_list_item_opts>()),
-            ("cui_timeline_opts", size_of::<cui_timeline_opts>()),
-            ("cui_text_fx_opts", size_of::<cui_text_fx_opts>()),
-            ("cui_chat_opts", size_of::<cui_chat_opts>()),
-            ("cui_reasoning_opts", size_of::<cui_reasoning_opts>()),
-            ("cui_tool_call_opts", size_of::<cui_tool_call_opts>()),
-            ("cui_plan_step", size_of::<cui_plan_step>()),
-            ("cui_agent_plan_opts", size_of::<cui_agent_plan_opts>()),
-            ("cui_agent_status_opts", size_of::<cui_agent_status_opts>()),
-            ("cui_source", size_of::<cui_source>()),
-            ("cui_response_actions_opts", size_of::<cui_response_actions_opts>()),
-            ("cui_prompt_suggestion", size_of::<cui_prompt_suggestion>()),
-            ("cui_prompt_suggestions_opts", size_of::<cui_prompt_suggestions_opts>()),
-            ("cui_model", size_of::<cui_model>()),
-            ("cui_model_picker_opts", size_of::<cui_model_picker_opts>()),
-            ("cui_composer_opts", size_of::<cui_composer_opts>()),
-            ("cui_viz_item", size_of::<cui_viz_item>()),
-            ("cui_context_opts", size_of::<cui_context_opts>()),
-            ("cui_dot_series", size_of::<cui_dot_series>()),
-            ("cui_dot_chart_opts", size_of::<cui_dot_chart_opts>()),
-            ("cui_dot_chart_result", size_of::<cui_dot_chart_result>()),
-            ("cui_event_track_opts", size_of::<cui_event_track_opts>()),
-            ("cui_event_track_result", size_of::<cui_event_track_result>()),
-            ("cui_readout_opts", size_of::<cui_readout_opts>()),
-            ("cui_dot_display_opts", size_of::<cui_dot_display_opts>()),
-            ("cui_command", size_of::<cui_command>()),
-            ("cui_corners", size_of::<cui_corners>()),
-            ("cui_canvas_result", size_of::<cui_canvas_result>()),
-            ("cui_shadow", size_of::<cui_shadow>()),
-            ("cui_theme", size_of::<cui_theme>()),
-            ("cui_file_dialog_opts", size_of::<cui_file_dialog_opts>()),
-            ("cui_file_entry", size_of::<cui_file_entry>()),
-        ] {
-            check(&table, "size", name, size as u64);
-        }
-    }
-
-    /// Field offsets pin the field order too — an inserted C field moves
-    /// everything after it and fails here even when sizes happen to match.
-    #[test]
-    fn field_offsets_match_c() {
-        let table = layout_table();
-        check(&table, "offset", "cui_box.dir", offset_of!(cui_box, dir) as u64);
-        check(&table, "offset", "cui_box.gap", offset_of!(cui_box, gap) as u64);
-        check(&table, "offset", "cui_box.bg", offset_of!(cui_box, bg) as u64);
-        check(&table, "offset", "cui_button_opts.tooltip", offset_of!(cui_button_opts, tooltip) as u64);
-        check(&table, "offset", "cui_button_opts.color", offset_of!(cui_button_opts, color) as u64);
-        check(&table, "offset", "cui_input_opts.size", offset_of!(cui_input_opts, size) as u64);
-        check(&table, "offset", "cui_input_opts.placeholder", offset_of!(cui_input_opts, placeholder) as u64);
-        check(&table, "offset", "cui_app_desc.renderer", offset_of!(cui_app_desc, renderer) as u64);
-        check(&table, "offset", "cui_series.values", offset_of!(cui_series, values) as u64);
-        check(&table, "offset", "cui_chart_opts.labels", offset_of!(cui_chart_opts, labels) as u64);
-        check(&table, "offset", "cui_menu_opts.placement", offset_of!(cui_menu_opts, placement) as u64);
-        check(&table, "offset", "cui_composer_opts.model", offset_of!(cui_composer_opts, model) as u64);
-        check(&table, "offset", "cui_dot_chart_result.x", offset_of!(cui_dot_chart_result, x) as u64);
-        check(&table, "offset", "cui_theme.font_scale", offset_of!(cui_theme, font_scale) as u64);
-        check(&table, "offset", "cui_text_fx_opts.speed", offset_of!(cui_text_fx_opts, speed) as u64);
-        check(&table, "offset", "cui_chat_opts.avatar", offset_of!(cui_chat_opts, avatar) as u64);
-        check(&table, "enum", "CUI_AXIS_HOURS", cui_axis_units::CUI_AXIS_HOURS as i32 as u64);
-        check(&table, "enum", "CUI_TASK_DONE", cui_task_status::CUI_TASK_DONE as i32 as u64);
-    }
-
-    /// C enum discriminants must match what the transmute-based to_ffi
-    /// relies on (the round-trip test in the `cui` crate checks the other
-    /// direction: our values against these).
+    /// Struct sizes and field offsets are checked exhaustively by the
+    /// generated tests/layout.rs; these spot checks pin the enum values the
+    /// hand-written layer cares about.
     #[test]
     fn enum_values_match_c() {
         let table = layout_table();

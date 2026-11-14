@@ -845,11 +845,16 @@ pub fn query_op_name(ty: i32, op: i32) -> Option<String> {
     str_of(unsafe { ffi::cui_query_op_name(ty, op) })
 }
 
-/// One row of a [`cui_log_buffer`](crate::cui_log_buffer) (C's `cui_log_get`).
-/// Returns the line's metadata and its text.
+/// One row of a [`cui_log_buffer`](cui_sys::cui_log_buffer) (C's `cui_log_get`).
+/// Returns the line's metadata and its text, or `None` when `i` is out of
+/// range (C returns a NULL line pointer) or the line is empty.
 pub fn log_get(buf: &ffi::cui_log_buffer, i: i32) -> Option<(ffi::cui_log_line, String)> {
     let mut text: *const c_char = core::ptr::null();
-    let line = unsafe { *ffi::cui_log_get_raw(buf, i, &mut text) };
+    let line = unsafe { ffi::cui_log_get(buf, i, &mut text) };
+    if line.is_null() {
+        return None;
+    }
+    let line = unsafe { *line };
     if line.len == 0 || text.is_null() {
         return None;
     }

@@ -157,6 +157,31 @@ cui/examples/  hello.rs, todo.rs — ports of the C examples
 vendor.sh  regenerates the vendored C + icons from an upstream CUI checkout
 ```
 
+## Versioning
+
+**The Rust crates version independently.** `cui` and `cui-sys` follow normal
+semver for their *binding* API; breaking a Rust signature bumps `cui`'s minor
+version, and neither is tied to upstream's release numbers.
+
+**The vendored C code is pinned by provenance, not by version numbers.**
+`cui-sys/VENDORED.md` records, for every snapshot: the upstream version, the
+exact upstream commit (and whether the tree was dirty), and the vendoring
+date. `vendor.sh` verifies the version against both upstream's CMakeLists and
+the `CUI_VERSION_STRING` define inside the generated header before writing
+anything, so the record cannot drift from what is compiled. `cui-sys` uses
+Cargo's `links = "cui"`, which also guarantees at most one copy of the C
+library in any dependency graph.
+
+**At runtime**, `cui::CUI_VERSION` (re-exported from `cui-sys`, where
+`build.rs` extracts it from `c/cui.h` at compile time) always tells you which
+CUI is inside your binary — e.g. for a diagnostic line or an `about` box.
+
+To take a new upstream snapshot: check out the tagged upstream release (e.g.
+`v1.5.0`), run `./vendor.sh path/to/checkout`, and commit the refreshed
+`cui-sys/c/`, `VENDORED.md` and `cui/src/icons.rs` together. When the upstream
+major/minor version moved, mention it in both crates' changelogs and review
+the upstream changelog for API changes to port into the safe layer.
+
 ## Building and testing
 
 ```sh

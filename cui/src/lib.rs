@@ -83,6 +83,11 @@ pub mod font {
     pub const ICONS: i32 = ffi::CUI_FONT_ICONS;
 }
 
+/// The upstream CUI version the vendored C sources were generated from,
+/// e.g. `"1.4.0"`. Always matches the C code compiled into your binary;
+/// full provenance in `cui-sys/VENDORED.md`.
+pub const CUI_VERSION: &str = cui_sys::CUI_VERSION_STRING;
+
 // ----------------------------------------------------------------- App layer
 
 /// Window and event loop description (C's `cui_app_desc`). Unset fields use

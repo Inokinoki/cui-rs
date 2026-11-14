@@ -49,6 +49,18 @@ fn main() {
     }
 
     b.compile("cui");
+
+    // Expose the upstream version of the vendored sources. The version of
+    // record is the CUI_VERSION_STRING define inside c/cui.h itself, so the
+    // constant always describes the C code that was actually compiled.
+    let header = std::fs::read_to_string("c/cui.h").expect("c/cui.h is missing; run vendor.sh");
+    let version = header
+        .lines()
+        .find_map(|l| l.strip_prefix("#define CUI_VERSION_STRING "))
+        .map(|rest| rest.trim().trim_matches('"').to_string())
+        .expect("CUI_VERSION_STRING not found in c/cui.h; run vendor.sh");
+    println!("cargo:rustc-env=CUI_VERSION_STRING={version}");
+
     println!("cargo:rerun-if-changed=c/cui.c");
     println!("cargo:rerun-if-changed=c/cui.h");
     println!("cargo:rerun-if-changed=build.rs");

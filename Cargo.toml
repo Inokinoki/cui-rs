@@ -3,7 +3,6 @@ resolver = "2"
 members = ["cui-sys", "cui"]
 
 [workspace.package]
-version = "0.1.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/yappologistic/CUI"

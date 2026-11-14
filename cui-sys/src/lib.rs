@@ -21,6 +21,12 @@ pub type cui_id = u32;
 pub type cui_texture = usize;
 pub type cui_font = c_int;
 
+/// The upstream CUI version the vendored sources were generated from,
+/// e.g. `"1.4.0"`. Extracted from `c/cui.h` at build time, so it always
+/// describes the C code that was actually compiled. See `VENDORED.md`
+/// for the full provenance (upstream commit, vendoring date).
+pub const CUI_VERSION_STRING: &str = env!("CUI_VERSION_STRING");
+
 /* ==== Basic types (cui.h) ==== */
 
 #[repr(C)]
@@ -1032,9 +1038,26 @@ extern "C" {
 }
 
 #[cfg(test)]
+extern crate std;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use core::mem::{offset_of, size_of};
+
+    /// Guard for the build.rs extraction: the constant must be a release
+    /// version string taken from the header we compile.
+    #[test]
+    fn version_constant_matches_header() {
+        let header = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/c/cui.h")).unwrap();
+        let from_header = header
+            .lines()
+            .find_map(|l| l.strip_prefix("#define CUI_VERSION_STRING "))
+            .map(|rest| rest.trim().trim_matches('"'))
+            .unwrap();
+        assert_eq!(CUI_VERSION_STRING, from_header);
+        assert!(CUI_VERSION_STRING.split('.').count() == 3);
+    }
 
     /// Sizes verified against the C compiler (x86_64-linux, `sizeof` of the
     /// amalgamated cui.h). Any drift between our #[repr(C)] structs and the

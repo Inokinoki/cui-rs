@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install X11 and the software GL stack
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libgl1-mesa-dri xvfb
+      - run: cargo test
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - run: cargo build --release --examples
+      - name: Smoke test every example under Xvfb
+        run: xvfb-run -a -s "-screen 0 1280x800x24" scripts/smoke.sh target/release
+      - name: Convert smoke screenshots
+        if: success() || failure()
+        run: |
+          if ! command -v convert >/dev/null; then sudo apt-get install -y imagemagick; fi
+          for f in /tmp/cui-smoke/*.xwd; do
+            [ -e "$f" ] || continue
+            convert "$f" "${f%.xwd}.png" || true
+          done
+      - name: Upload smoke screenshots
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          path: /tmp/cui-smoke/*.png
+          if-no-files-found: ignore
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test
+      - run: cargo build --release --examples
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test
+      - run: cargo build --release --examples

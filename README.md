@@ -109,29 +109,40 @@ can be followed along in Rust with only syntax changes.
 ## What is bound (v0.1)
 
 - **App layer**: window lifecycle, `run`, quit, title/size, backend queries,
-  software-renderer detection, screenshot buffer.
-- **Layout**: `column` / `row` / `box_` / `card` / `scroll`, spacer, gap,
-  separator; the full `BoxOpts` field set (pad/gap/align/justify/bg/border/
-  radius/elevation/scroll/clip/opacity/direction/grid).
+  software-renderer detection, screenshot buffer, native file dialogs.
+- **Layout**: `column` / `row` / `box_` / `card` / `scroll` / `split`,
+  spacer, gap, separator; the full container field set (pad/gap/align/
+  justify/bg/border/radius/elevation/scroll/clip/opacity/direction/grid).
 - **Text**: `text`, heading, label, secondary, muted, code, kbd, link, icon.
 - **Buttons**: button, icon button (all variants, sizes, icons, tooltips).
 - **Selection**: checkbox, switch, radio, radio group, slider, chip, segmented.
 - **Input**: input, textarea, search (with all `Input` options), number, select.
-- **Navigation**: tabs, nav item, nav section.
-- **Overlays**: dialog (+ footer), toast (+ handles), tooltip.
-- **Display**: badge, empty state, metric, progress.
-- **Charts**: line, bar, donut, sparkline (series, labels, annotations).
+- **Navigation**: tabs, nav item, nav section, breadcrumb, pagination.
+- **Overlays**: dialog (+ footer), menu, context menu, user menu, sheet,
+  toast (+ handles), tooltip, command palette.
+- **Display**: badge, avatar, avatar group, list item, empty state, metric,
+  progress, progress ring, timeline items, copy button, number roll,
+  typewriter.
+- **Charts**: line, bar, donut, sparkline (series, labels, annotations) and
+  the instrument family: dot-matrix chart, event track, readouts and the
+  dot-matrix display.
+- **Canvas**: `canvas` with paint closures over a `CanvasUi` draw surface
+  (rects, gradients, borders, circles, arcs, lines, polygons, text, icons,
+  clipping), plus per-widget persistent `state`.
+- **Conversation**: chat messages, composer, reasoning, tool calls, agent
+  plan/status, sources, citations, response actions, prompt suggestions,
+  model picker, context meter.
 - **Table**: begin/row/cell/end with sorting through `TableSort`.
 - **Identity**: push/pop id scopes, rects, hover/disabled queries.
-- **Input queries**: keys, shortcuts, mouse, clipboard.
-- **Theme**: light/dark, accents, color resolution, reduced motion.
+- **Input queries**: keys, shortcuts, mouse, clipboard, dropped files.
+- **Theme**: light/dark, accents, color resolution, font scale, reduced motion.
 
-Not bound yet (the raw FFI in `cui-sys` already declares some of them): menus
-and popovers, sheets, alerts, tables' virtualized data grid, the code editor,
-markdown, docking, terminal, calendar/date picker, custom canvas painting, the
-renderer SPI for bringing your own window. Adding a component is mechanical —
-one `extern "C"` line in `cui-sys`, one options struct in `opts.rs`, one
-method in `lib.rs` — see the git history for the pattern.
+Not bound yet: the rest of the gallery surface (code editor, markdown,
+terminal, docking, data grid editing, calendar/date pickers, emoji and color
+pickers, nodes, diff, hex viewer, photo/creative tools), the renderer SPI for
+bringing your own window, and text shaping. Adding a component is mechanical —
+one `extern "C"` line in `cui-sys`, one options struct, one safe method — see
+the git history for the pattern.
 
 ## Platform notes
 
@@ -147,6 +158,16 @@ plus SDL2/GLFW builds upstream. This crate compiles and links:
 Features map to the C macros: `default-fonts` (Inter/Geist/Lucide embedded),
 `stb-image` (PNG/JPEG loading), `app` (window layer; off = bring your own
 window), `text-shaping` (Arabic shaping + bidi).
+
+## Examples
+
+Every non-gallery example from upstream has a Rust twin in
+[`cui/examples/`](cui/examples): `hello`, `todo`, `settings`, `notes`,
+`dashboard`, `mail`, `finance`, `music`, `tracker`, `assistant` and
+`caffeine` — line-for-line ports of the C originals, each verified by the CI
+smoke test (every example runs for a few seconds under Xvfb; a crash or an
+early exit fails the build, and screenshots are uploaded as artifacts).
+The component gallery is the next port.
 
 ## Repository layout
 

@@ -52,13 +52,21 @@
 
 #![deny(missing_docs)]
 
-mod arena;
-mod icons;
-mod opts;
+#[macro_use]
 mod types;
 
+mod arena;
+mod draw;
+mod ext;
+mod icons;
+mod opts;
+mod opts2;
+
+pub use draw::*;
+pub use ext::file_dialog;
 pub use icons::*;
 pub use opts::*;
+pub use opts2::*;
 pub use types::*;
 
 use arena::Arena;
@@ -287,8 +295,8 @@ impl App {
 /// are methods on it. Child handles handed to closures share the same
 /// context and arena.
 pub struct Ui<'a> {
-    ctx: *mut ffi::cui_ctx,
-    arena: &'a Arena,
+    pub(crate) ctx: *mut ffi::cui_ctx,
+    pub(crate) arena: &'a Arena,
 }
 
 // The context is not thread safe (like C's cui_ctx); Ui wraps a raw pointer,
@@ -298,7 +306,7 @@ impl<'a> Ui<'a> {
         Ui { ctx, arena }
     }
 
-    fn cs(&self, s: &impl AsRef<str>) -> *const c_char {
+    pub(crate) fn cs(&self, s: &impl AsRef<str>) -> *const c_char {
         self.arena.cstr(s.as_ref())
     }
 
@@ -1024,6 +1032,12 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_dpi_scale(self.ctx) }
     }
 
+    /// Asks for a frame even with no input (C's `cui_request_redraw`), for
+    /// things that keep moving.
+    pub fn request_redraw(&mut self) {
+        unsafe { ffi::cui_request_redraw(self.ctx) }
+    }
+
     /// Seconds since the previous frame (C's `cui_delta_time`).
     pub fn delta_time(&mut self) -> f32 {
         unsafe { ffi::cui_delta_time(self.ctx) }
@@ -1085,7 +1099,12 @@ mod capability_cfg_tests {
     #[cfg(cui_ge_1_4)]
     #[test]
     fn capability_cfg_flows() {
-        assert!(cfg!(cui_ge_1_4));
-        assert!(!cfg!(cui_ge_1_9));
+        // cfg! folds to a constant on purpose: the point is that the gate
+        // was set by the build script at all.
+        #[allow(clippy::assertions_on_constants)]
+        {
+            assert!(cfg!(cui_ge_1_4));
+            assert!(!cfg!(cui_ge_1_9));
+        }
     }
 }

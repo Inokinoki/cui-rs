@@ -155,6 +155,18 @@ impl Color {
     pub const HOVER: Color = Color::token(Token::Hover);
     pub const SCRIM: Color = Color::token(Token::Scrim);
     /// The nth chart series color (0-based, wraps mod 6).
+    /// Multiplies the alpha channel by `alpha` (C's `cui_alpha`), a free
+    /// function in C because it needs no context.
+    pub fn with_alpha(self, alpha: f32) -> Color {
+        let c = unsafe {
+            cui_sys::cui_alpha(
+                cui_sys::cui_color { r: self.r, g: self.g, b: self.b, a: self.a },
+                alpha,
+            )
+        };
+        Color { r: c.r, g: c.g, b: c.b, a: c.a }
+    }
+
     pub const fn series(n: usize) -> Color {
         Color::token(match n % 6 {
             0 => Token::Series1,
@@ -273,6 +285,17 @@ ffi_enum! {
 }
 
 impl Accent {
+    /// The accents in CUI's display order, for pickers.
+    pub const ALL: [Accent; 8] = [
+        Accent::Neutral, Accent::Violet, Accent::Blue, Accent::Green,
+        Accent::Amber, Accent::Orange, Accent::Coral, Accent::Rose,
+    ];
+
+    /// The accent at `index` of [`Accent::ALL`] (the picker's order).
+    pub fn from_index(index: i32) -> Accent {
+        Self::ALL.get(index as usize).copied().unwrap_or(Accent::Neutral)
+    }
+
     pub(crate) fn from_ffi(v: ffi::cui_accent) -> Accent {
         match v {
             ffi::cui_accent::CUI_ACCENT_VIOLET => Accent::Violet,
@@ -459,3 +482,17 @@ mod tests {
         assert!(!m.contains(Mods::ALT));
     }
 }
+
+impl Tone {
+    /// The tones in CUI's display order, for pickers.
+    pub const ALL: [Tone; 9] = [
+        Tone::Neutral, Tone::Info, Tone::Success, Tone::Warning, Tone::Danger,
+        Tone::Violet, Tone::Teal, Tone::Rose, Tone::Accent,
+    ];
+
+    /// The tone at `index` of [`Tone::ALL`].
+    pub fn from_index(index: i32) -> Tone {
+        Self::ALL.get(index as usize).copied().unwrap_or(Tone::Neutral)
+    }
+}
+

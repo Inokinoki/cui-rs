@@ -1034,8 +1034,519 @@ extern "C" {
     pub fn cui_app_is_software(app: *mut cui_app) -> bool;
     pub fn cui_app_native_window(app: *mut cui_app) -> *mut c_void;
     pub fn cui_app_backend(app: *mut cui_app) -> *const c_char;
+    pub fn cui_command_palette(ui: *mut cui_ctx, open: *mut bool, commands: *const cui_command, count: c_int) -> c_int;
     pub fn cui_app_open_url(url: *const c_char) -> bool;
     pub fn cui_app_screenshot(app: *mut cui_app, rgba: *mut c_void, width: c_int, height: c_int) -> bool;
+}
+
+
+/* ==== Menus, split, conversation, instruments, canvas (cui.h) ==== */
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_menu_opts {
+    pub _pad: c_int,
+    pub icon: *const c_char,
+    pub variant: cui_button_variant,
+    pub placement: cui_placement,
+    pub width: f32,
+    pub icon_only: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_menu_item_opts {
+    pub _pad: c_int,
+    pub icon: *const c_char,
+    pub shortcut: *const c_char,
+    pub danger: bool,
+    pub disabled: bool,
+    pub checked: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_split_opts {
+    pub _pad: c_int,
+    pub vertical: bool,
+    pub min_first: f32,
+    pub min_second: f32,
+    pub width: cui_size,
+    pub height: cui_size,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_avatar_opts {
+    pub _pad: c_int,
+    pub size: f32,
+    pub image: cui_texture,
+    pub status: *const c_char,
+    pub square: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_list_item_opts {
+    pub _pad: c_int,
+    pub icon: *const c_char,
+    pub subtitle: *const c_char,
+    pub trailing: *const c_char,
+    pub selected: bool,
+    pub avatar: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_user_menu_opts {
+    pub _pad: c_int,
+    pub detail: *const c_char,
+    pub status: *const c_char,
+    pub avatar: cui_texture,
+    pub compact: bool,
+    pub placement: cui_placement,
+    pub width: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_timeline_opts {
+    pub _pad: c_int,
+    pub time: *const c_char,
+    pub description: *const c_char,
+    pub icon: *const c_char,
+    pub tone: cui_tone,
+    pub last: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_text_fx_opts {
+    pub _pad: c_int,
+    pub font: cui_font,
+    pub size: f32,
+    pub color: cui_color,
+    pub width: cui_size,
+    pub nowrap: bool,
+    pub speed: f32,
+    pub delay: f32,
+    pub caret: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_chat_opts {
+    pub _pad: c_int,
+    pub mine: bool,
+    pub author: *const c_char,
+    pub time: *const c_char,
+    pub status: *const c_char,
+    pub grouped: bool,
+    pub last_in_group: bool,
+    pub avatar: cui_texture,
+    pub markdown: bool,
+    pub markdown_result: *mut c_void,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum cui_task_status {
+    #[default]
+    CUI_TASK_PENDING = 0,
+    CUI_TASK_RUNNING,
+    CUI_TASK_DONE,
+    CUI_TASK_FAILED,
+    CUI_TASK_SKIPPED,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_reasoning_opts {
+    pub _pad: c_int,
+    pub thinking: bool,
+    pub seconds: f32,
+    pub title: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_tool_call_opts {
+    pub _pad: c_int,
+    pub status: cui_task_status,
+    pub icon: *const c_char,
+    pub detail: *const c_char,
+    pub input: *const c_char,
+    pub output: *const c_char,
+    pub seconds: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_plan_step {
+    pub title: *const c_char,
+    pub detail: *const c_char,
+    pub status: cui_task_status,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_agent_plan_opts {
+    pub _pad: c_int,
+    pub title: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_agent_status_opts {
+    pub _pad: c_int,
+    pub status: cui_task_status,
+    pub seconds: f32,
+    pub icon: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_source {
+    pub title: *const c_char,
+    pub url: *const c_char,
+    pub snippet: *const c_char,
+}
+
+pub const CUI_RESPONSE_COPY: c_int = 1;
+pub const CUI_RESPONSE_REGENERATE: c_int = 2;
+pub const CUI_RESPONSE_UP: c_int = 4;
+pub const CUI_RESPONSE_DOWN: c_int = 8;
+pub const CUI_RESPONSE_SHARE: c_int = 16;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_response_actions_opts {
+    pub _pad: c_int,
+    pub copy_text: *const c_char,
+    pub vote: *mut c_int,
+    pub no_regenerate: bool,
+    pub no_share: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_prompt_suggestion {
+    pub icon: *const c_char,
+    pub title: *const c_char,
+    pub detail: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_prompt_suggestions_opts {
+    pub _pad: c_int,
+    pub columns: c_int,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_model {
+    pub name: *const c_char,
+    pub detail: *const c_char,
+    pub badge: *const c_char,
+    pub icon: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_model_picker_opts {
+    pub _pad: c_int,
+    pub ghost: bool,
+    pub placement: cui_placement,
+}
+
+pub const CUI_COMPOSER_SEND: c_int = 1;
+pub const CUI_COMPOSER_STOP: c_int = 2;
+pub const CUI_COMPOSER_ATTACH: c_int = 4;
+pub const CUI_COMPOSER_REMOVE: c_int = 8;
+pub const CUI_COMPOSER_MODEL: c_int = 16;
+pub const CUI_COMPOSER_RECORD: c_int = 32;
+pub const CUI_COMPOSER_CANCEL: c_int = 64;
+pub const CUI_COMPOSER_VOICE: c_int = 128;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_composer_opts {
+    pub _pad: c_int,
+    pub placeholder: *const c_char,
+    pub busy: bool,
+    pub attachments: *const *const c_char,
+    pub attachment_count: c_int,
+    pub removed: *mut c_int,
+    pub models: *const cui_model,
+    pub model_count: c_int,
+    pub model: *mut c_int,
+    pub max_lines: c_int,
+    pub width: cui_size,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_viz_item {
+    pub label: *const c_char,
+    pub value: f32,
+    pub color: cui_color,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_context_opts {
+    pub _pad: c_int,
+    pub parts: *const cui_viz_item,
+    pub part_count: c_int,
+    pub unit: *const c_char,
+}
+
+/* ==== Instruments: dot charts, event track, readouts (cui.h) ==== */
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum cui_axis_units {
+    #[default]
+    CUI_AXIS_NUMBER = 0,
+    CUI_AXIS_HOURS,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_dot_series {
+    pub values: *const f32,
+    pub name: *const c_char,
+    pub accent: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_dot_chart_opts {
+    pub _pad: c_int,
+    pub width: cui_size,
+    pub height: f32,
+    pub x_min: f64,
+    pub x_max: f64,
+    pub x_units: cui_axis_units,
+    pub x_format: *const c_char,
+    pub x_step: f64,
+    pub min: f32,
+    pub max: f32,
+    pub format: *const c_char,
+    pub unit: *const c_char,
+    pub pitch: f32,
+    pub no_grid: bool,
+    pub no_axis: bool,
+    pub no_readout: bool,
+    pub annotations: *const cui_chart_annotation,
+    pub annotation_count: c_int,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_dot_chart_result {
+    pub hovered: c_int,
+    pub x: f64,
+    pub value: f32,
+    pub clicked: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_event_track_opts {
+    pub _pad: c_int,
+    pub width: cui_size,
+    pub step: f64,
+    pub units: cui_axis_units,
+    pub format: *const c_char,
+    pub label_step: f64,
+    pub selected: *mut c_int,
+    pub no_add: bool,
+    pub no_remove: bool,
+    pub no_axis: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_event_track_result {
+    pub changed: bool,
+    pub added: c_int,
+    pub removed: c_int,
+    pub selected: c_int,
+    pub dragging: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_readout_opts {
+    pub _pad: c_int,
+    pub unit: *const c_char,
+    pub detail: *const c_char,
+    pub size: cui_control_size,
+    pub tone: cui_tone,
+    pub accent: bool,
+    pub align: cui_text_align,
+    pub width: cui_size,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_dot_display_opts {
+    pub _pad: c_int,
+    pub pitch: f32,
+    pub color: cui_color,
+    pub accent: bool,
+    pub no_dim: bool,
+    pub marquee: bool,
+    pub align: cui_text_align,
+    pub width: cui_size,
+}
+
+/* ==== Command palette, canvas, theme, file dialog ==== */
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct cui_command {
+    pub title: *const c_char,
+    pub icon: *const c_char,
+    pub group: *const c_char,
+    pub shortcut: *const c_char,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct cui_corners {
+    pub tl: f32,
+    pub tr: f32,
+    pub br: f32,
+    pub bl: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_canvas_result {
+    pub rect: cui_rect,
+    pub hovered: bool,
+    pub pressed: bool,
+    pub clicked: bool,
+    pub mouse: cui_vec2,
+}
+
+pub type cui_paint_fn = Option<extern "C" fn(ui: *mut cui_ctx, rect: cui_rect, user: *mut c_void)>;
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_shadow {
+    pub y: f32,
+    pub blur: f32,
+    pub spread: f32,
+    pub alpha: f32,
+}
+
+#[repr(C)]
+pub struct cui_theme {
+    pub colors: [cui_color; 35],
+    pub tone_sky: cui_color,
+    pub tone_teal: cui_color,
+    pub tone_green: cui_color,
+    pub tone_amber: cui_color,
+    pub tone_rose: cui_color,
+    pub tone_orchid: cui_color,
+    pub tone_violet: cui_color,
+    pub radius_control: f32,
+    pub radius_panel: f32,
+    pub radius_surface: f32,
+    pub control_sm: f32,
+    pub control_md: f32,
+    pub control_lg: f32,
+    pub text_xs: f32,
+    pub text_sm: f32,
+    pub text_body: f32,
+    pub text_lg: f32,
+    pub heading: [f32; 4],
+    pub shadow_resting: [cui_shadow; 2],
+    pub shadow_raised: [cui_shadow; 2],
+    pub shadow_floating: [cui_shadow; 2],
+    pub motion: f32,
+    pub font_scale: f32,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum cui_file_dialog_kind {
+    #[default]
+    CUI_FILE_OPEN = 0,
+    CUI_FILE_SAVE,
+    CUI_FILE_FOLDER,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_file_dialog_opts {
+    pub kind: cui_file_dialog_kind,
+    pub title: *const c_char,
+    pub filter_name: *const c_char,
+    pub filter: *const c_char,
+    pub default_name: *const c_char,
+}
+
+extern "C" {
+    pub fn cui_menu_begin(ui: *mut cui_ctx, label: *const c_char, opts: *const cui_menu_opts) -> bool;
+    pub fn cui_menu_end(ui: *mut cui_ctx);
+    pub fn cui_context_menu_begin(ui: *mut cui_ctx, id: *const c_char) -> bool;
+    pub fn cui_context_menu_end(ui: *mut cui_ctx);
+    pub fn cui_menu_item_ex(ui: *mut cui_ctx, label: *const c_char, opts: *const cui_menu_item_opts) -> bool;
+    pub fn cui_menu_separator(ui: *mut cui_ctx);
+    pub fn cui_menu_label(ui: *mut cui_ctx, text: *const c_char);
+    pub fn cui_split_begin(ui: *mut cui_ctx, id: *const c_char, ratio: *mut f32, opts: *const cui_split_opts);
+    pub fn cui_split_next(ui: *mut cui_ctx);
+    pub fn cui_split_end(ui: *mut cui_ctx);
+    pub fn cui_user_menu_begin(ui: *mut cui_ctx, name: *const c_char, opts: *const cui_user_menu_opts) -> bool;
+    pub fn cui_user_menu_end(ui: *mut cui_ctx);
+    pub fn cui_avatar_ex(ui: *mut cui_ctx, name: *const c_char, opts: *const cui_avatar_opts);
+    pub fn cui_avatar_group(ui: *mut cui_ctx, names: *const *const c_char, count: c_int, max_visible: c_int, size: f32);
+    pub fn cui_list_item_ex(ui: *mut cui_ctx, title: *const c_char, opts: *const cui_list_item_opts) -> bool;
+    pub fn cui_pagination(ui: *mut cui_ctx, id: *const c_char, page: *mut c_int, page_count: c_int) -> bool;
+    pub fn cui_breadcrumb(ui: *mut cui_ctx, items: *const *const c_char, count: c_int) -> c_int;
+    pub fn cui_timeline_item_ex(ui: *mut cui_ctx, title: *const c_char, opts: *const cui_timeline_opts);
+    pub fn cui_copy_button(ui: *mut cui_ctx, id: *const c_char, text: *const c_char) -> bool;
+    pub fn cui_progress_ring(ui: *mut cui_ctx, label: *const c_char, value: f32, size: f32);
+    pub fn cui_typewriter_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_text_fx_opts) -> bool;
+    pub fn cui_number_roll_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_text_fx_opts);
+    pub fn cui_chat_message_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_chat_opts);
+    pub fn cui_reasoning_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_reasoning_opts) -> bool;
+    pub fn cui_reasoning_end(ui: *mut cui_ctx);
+    pub fn cui_tool_call_ex(ui: *mut cui_ctx, id: *const c_char, name: *const c_char, opts: *const cui_tool_call_opts);
+    pub fn cui_agent_plan_ex(ui: *mut cui_ctx, id: *const c_char, steps: *const cui_plan_step, count: c_int, opts: *const cui_agent_plan_opts) -> c_int;
+    pub fn cui_agent_status_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_agent_status_opts);
+    pub fn cui_source_list(ui: *mut cui_ctx, id: *const c_char, sources: *const cui_source, count: c_int) -> c_int;
+    pub fn cui_citation(ui: *mut cui_ctx, number: c_int, source: *const cui_source) -> bool;
+    pub fn cui_response_actions_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_response_actions_opts) -> c_int;
+    pub fn cui_prompt_suggestions_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_prompt_suggestion, count: c_int, opts: *const cui_prompt_suggestions_opts) -> c_int;
+    pub fn cui_model_picker_ex(ui: *mut cui_ctx, id: *const c_char, models: *const cui_model, count: c_int, selected: *mut c_int, opts: *const cui_model_picker_opts) -> bool;
+    pub fn cui_chat_composer_ex(ui: *mut cui_ctx, id: *const c_char, buf: *mut c_char, cap: usize, opts: *const cui_composer_opts) -> c_int;
+    pub fn cui_context_meter_ex(ui: *mut cui_ctx, id: *const c_char, used: f32, limit: f32, opts: *const cui_context_opts);
+    pub fn cui_dot_chart_ex(ui: *mut cui_ctx, id: *const c_char, series: *const cui_dot_series, series_count: c_int, count: c_int, opts: *const cui_dot_chart_opts) -> cui_dot_chart_result;
+    pub fn cui_event_track_ex(ui: *mut cui_ctx, id: *const c_char, times: *mut f64, count: *mut c_int, capacity: c_int, min: f64, max: f64, opts: *const cui_event_track_opts) -> cui_event_track_result;
+    pub fn cui_readout_ex(ui: *mut cui_ctx, label: *const c_char, value: *const c_char, opts: *const cui_readout_opts);
+    pub fn cui_dot_display_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_dot_display_opts);
+    pub fn cui_canvas(ui: *mut cui_ctx, id: *const c_char, width: cui_size, height: cui_size, paint: cui_paint_fn, user: *const c_void, user_size: usize) -> cui_canvas_result;
+    pub fn cui_state(ui: *mut cui_ctx, id: cui_id, size: usize) -> *mut c_void;
+    pub fn cui_draw_rect(ui: *mut cui_ctx, r: cui_rect, radius: cui_corners, fill: cui_color);
+    pub fn cui_draw_rect_gradient(ui: *mut cui_ctx, r: cui_rect, radius: cui_corners, from: cui_color, to: cui_color);
+    pub fn cui_draw_rect_border(ui: *mut cui_ctx, r: cui_rect, radius: cui_corners, fill: cui_color, border: cui_color, width: f32);
+    pub fn cui_draw_shadow(ui: *mut cui_ctx, r: cui_rect, radius: cui_corners, blur: f32, spread: f32, offset: cui_vec2, color: cui_color);
+    pub fn cui_draw_line(ui: *mut cui_ctx, a: cui_vec2, b: cui_vec2, thickness: f32, color: cui_color);
+    pub fn cui_draw_polygon(ui: *mut cui_ctx, points: *const cui_vec2, count: c_int, color: cui_color);
+    pub fn cui_draw_circle(ui: *mut cui_ctx, center: cui_vec2, radius: f32, color: cui_color);
+    pub fn cui_draw_arc(ui: *mut cui_ctx, center: cui_vec2, radius: f32, a0: f32, a1: f32, thickness: f32, color: cui_color);
+    pub fn cui_draw_text(ui: *mut cui_ctx, font: cui_font, size: f32, pos: cui_vec2, color: cui_color, text: *const c_char, len: c_int);
+    pub fn cui_draw_icon(ui: *mut cui_ctx, icon: *const c_char, r: cui_rect, size: f32, color: cui_color);
+    pub fn cui_push_clip(ui: *mut cui_ctx, r: cui_rect);
+    pub fn cui_pop_clip(ui: *mut cui_ctx);
+    pub fn cui_theme_get(ui: *mut cui_ctx) -> *mut cui_theme;
+    pub fn cui_app_file_dialog(app: *mut cui_app, opts: *const cui_file_dialog_opts, out: *mut c_char, cap: usize) -> bool;
 }
 
 #[cfg(test)]
@@ -1132,6 +1643,42 @@ mod tests {
             ("cui_sheet_opts", size_of::<cui_sheet_opts>()),
             ("cui_progress_opts", size_of::<cui_progress_opts>()),
             ("cui_chart_annotation", size_of::<cui_chart_annotation>()),
+            ("cui_menu_opts", size_of::<cui_menu_opts>()),
+            ("cui_menu_item_opts", size_of::<cui_menu_item_opts>()),
+            ("cui_split_opts", size_of::<cui_split_opts>()),
+            ("cui_avatar_opts", size_of::<cui_avatar_opts>()),
+            ("cui_user_menu_opts", size_of::<cui_user_menu_opts>()),
+            ("cui_list_item_opts", size_of::<cui_list_item_opts>()),
+            ("cui_timeline_opts", size_of::<cui_timeline_opts>()),
+            ("cui_text_fx_opts", size_of::<cui_text_fx_opts>()),
+            ("cui_chat_opts", size_of::<cui_chat_opts>()),
+            ("cui_reasoning_opts", size_of::<cui_reasoning_opts>()),
+            ("cui_tool_call_opts", size_of::<cui_tool_call_opts>()),
+            ("cui_plan_step", size_of::<cui_plan_step>()),
+            ("cui_agent_plan_opts", size_of::<cui_agent_plan_opts>()),
+            ("cui_agent_status_opts", size_of::<cui_agent_status_opts>()),
+            ("cui_source", size_of::<cui_source>()),
+            ("cui_response_actions_opts", size_of::<cui_response_actions_opts>()),
+            ("cui_prompt_suggestion", size_of::<cui_prompt_suggestion>()),
+            ("cui_prompt_suggestions_opts", size_of::<cui_prompt_suggestions_opts>()),
+            ("cui_model", size_of::<cui_model>()),
+            ("cui_model_picker_opts", size_of::<cui_model_picker_opts>()),
+            ("cui_composer_opts", size_of::<cui_composer_opts>()),
+            ("cui_viz_item", size_of::<cui_viz_item>()),
+            ("cui_context_opts", size_of::<cui_context_opts>()),
+            ("cui_dot_series", size_of::<cui_dot_series>()),
+            ("cui_dot_chart_opts", size_of::<cui_dot_chart_opts>()),
+            ("cui_dot_chart_result", size_of::<cui_dot_chart_result>()),
+            ("cui_event_track_opts", size_of::<cui_event_track_opts>()),
+            ("cui_event_track_result", size_of::<cui_event_track_result>()),
+            ("cui_readout_opts", size_of::<cui_readout_opts>()),
+            ("cui_dot_display_opts", size_of::<cui_dot_display_opts>()),
+            ("cui_command", size_of::<cui_command>()),
+            ("cui_corners", size_of::<cui_corners>()),
+            ("cui_canvas_result", size_of::<cui_canvas_result>()),
+            ("cui_shadow", size_of::<cui_shadow>()),
+            ("cui_theme", size_of::<cui_theme>()),
+            ("cui_file_dialog_opts", size_of::<cui_file_dialog_opts>()),
         ] {
             check(&table, "size", name, size as u64);
         }
@@ -1152,6 +1699,14 @@ mod tests {
         check(&table, "offset", "cui_app_desc.renderer", offset_of!(cui_app_desc, renderer) as u64);
         check(&table, "offset", "cui_series.values", offset_of!(cui_series, values) as u64);
         check(&table, "offset", "cui_chart_opts.labels", offset_of!(cui_chart_opts, labels) as u64);
+        check(&table, "offset", "cui_menu_opts.placement", offset_of!(cui_menu_opts, placement) as u64);
+        check(&table, "offset", "cui_composer_opts.model", offset_of!(cui_composer_opts, model) as u64);
+        check(&table, "offset", "cui_dot_chart_result.x", offset_of!(cui_dot_chart_result, x) as u64);
+        check(&table, "offset", "cui_theme.font_scale", offset_of!(cui_theme, font_scale) as u64);
+        check(&table, "offset", "cui_text_fx_opts.speed", offset_of!(cui_text_fx_opts, speed) as u64);
+        check(&table, "offset", "cui_chat_opts.avatar", offset_of!(cui_chat_opts, avatar) as u64);
+        check(&table, "enum", "CUI_AXIS_HOURS", cui_axis_units::CUI_AXIS_HOURS as i32 as u64);
+        check(&table, "enum", "CUI_TASK_DONE", cui_task_status::CUI_TASK_DONE as i32 as u64);
     }
 
     /// C enum discriminants must match what the transmute-based to_ffi

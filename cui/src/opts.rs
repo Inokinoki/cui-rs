@@ -16,16 +16,16 @@ use cui_sys as ffi;
 use core::ffi::c_char;
 use core::ptr;
 
-fn cstr(a: &Arena, s: Option<&str>) -> *const c_char {
+pub(crate) fn cstr(a: &Arena, s: Option<&str>) -> *const c_char {
     s.map_or(ptr::null(), |s| a.cstr(s))
 }
-fn cstr_array(a: &Arena, s: &[&str]) -> *const *const c_char {
+pub(crate) fn cstr_array(a: &Arena, s: &[&str]) -> *const *const c_char {
     if s.is_empty() { ptr::null() } else { a.cstr_array(s) }
 }
-fn sz(s: Size) -> ffi::cui_size {
+pub(crate) fn sz(s: Size) -> ffi::cui_size {
     size_to_ffi(s)
 }
-fn col(c: Color) -> ffi::cui_color {
+pub(crate) fn col(c: Color) -> ffi::cui_color {
     color_to_ffi(c)
 }
 
@@ -995,6 +995,28 @@ impl Chart<'_> {
             annotations,
             annotation_count,
             dither: false,
+        }
+    }
+}
+
+/// Options for [`crate::Ui::sheet`] (C's `cui_sheet_opts`).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Sheet<'a> {
+    /// Which side the sheet slides in from; default right.
+    pub side: Side,
+    /// The sheet's size in points along its slide axis.
+    pub size: f32,
+    /// A muted line under the title.
+    pub description: Option<&'a str>,
+}
+
+impl Sheet<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_sheet_opts {
+        ffi::cui_sheet_opts {
+            _pad: 0,
+            side: self.side.to_ffi(),
+            size: self.size,
+            description: cstr(a, self.description),
         }
     }
 }

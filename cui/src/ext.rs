@@ -1,0 +1,419 @@
+//! Second batch of [`Ui`] methods: menus, splits, overlays, conversation,
+//! instruments, canvas helpers — mirroring the second half of the bound C
+//! surface. Doc comments carry the C name, so the upstream docs translate.
+
+use crate::arena::Arena;
+use crate::opts::{cstr, Sheet};
+use crate::App;
+use crate::Ui;
+use crate::opts2::*;
+use crate::types::*;
+use cui_sys as ffi;
+use core::ffi::c_char;
+
+impl<'a> crate::Ui<'a> {
+    // ---------------------------------------------------------------- menus
+
+    /// A dropdown menu (C's `cui_menu` scope). The closure runs only while
+    /// the menu is open; it builds the items.
+    pub fn menu(&mut self, label: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.menu_impl(label.as_ref(), &ffi::cui_menu_opts::default(), f);
+    }
+
+    /// A menu with options ([`Menu`]).
+    pub fn menu_with(&mut self, label: impl AsRef<str>, o: &Menu, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = o.flatten(self.arena);
+        self.menu_impl(label.as_ref(), &fo, f);
+    }
+
+    fn menu_impl(&mut self, label: &str, fo: &ffi::cui_menu_opts, f: impl FnOnce(&mut Ui<'a>)) {
+        let is_open = unsafe { ffi::cui_menu_begin(self.ctx, self.arena.cstr(label), fo) };
+        if is_open {
+            self.scope(ffi::cui_menu_end, f);
+        }
+    }
+
+    /// A context menu over the previous component (C's `cui_context_menu`
+    /// scope); opens on right click. The closure runs only while it is open.
+    pub fn context_menu(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        let is_open = unsafe { ffi::cui_context_menu_begin(self.ctx, self.cs(&id)) };
+        if is_open {
+            self.scope(ffi::cui_context_menu_end, f);
+        }
+    }
+
+    /// A menu item (C's `cui_menu_item`). Returns true when clicked.
+    pub fn menu_item(&mut self, label: impl AsRef<str>) -> bool {
+        unsafe { ffi::cui_menu_item_ex(self.ctx, self.cs(&label), &ffi::cui_menu_item_opts::default()) }
+    }
+
+    /// A menu item with options ([`MenuItem`]). Returns true when clicked.
+    pub fn menu_item_with(&mut self, label: impl AsRef<str>, o: &MenuItem) -> bool {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_menu_item_ex(self.ctx, self.cs(&label), &fo) }
+    }
+
+    /// A hairline between menu groups (C's `cui_menu_separator`).
+    pub fn menu_separator(&mut self) {
+        unsafe { ffi::cui_menu_separator(self.ctx) }
+    }
+
+    /// A quiet heading inside a menu (C's `cui_menu_label`).
+    pub fn menu_label(&mut self, text: impl AsRef<str>) {
+        unsafe { ffi::cui_menu_label(self.ctx, self.cs(&text)) }
+    }
+
+    // ---------------------------------------------------------------- split
+
+    /// Two panes with a draggable divider (C's `cui_split` scope). `ratio`
+    /// is the first pane's share in 0..1, owned by the app; call
+    /// [`Ui::split_next`] between the panes inside the closure.
+    pub fn split(&mut self, id: impl AsRef<str>, ratio: &mut f32, o: &Split, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = o.flatten();
+        unsafe { ffi::cui_split_begin(self.ctx, self.cs(&id), ratio, &fo) };
+        self.scope(ffi::cui_split_end, f);
+    }
+
+    /// Moves to the second pane of a [`Ui::split`] (C's `cui_split_next`).
+    pub fn split_next(&mut self) {
+        unsafe { ffi::cui_split_next(self.ctx) }
+    }
+
+    // -------------------------------------------------------------- overlays
+
+    /// A side drawer (C's `cui_sheet` scope). Drawn while `open` is true;
+    /// closing sets it to false. The closure runs only while open.
+    pub fn sheet(&mut self, title: impl AsRef<str>, open: &mut bool, o: &Sheet, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = o.flatten(self.arena);
+        let is_open = unsafe { ffi::cui_sheet_begin(self.ctx, self.arena.cstr(title.as_ref()), open, &fo) };
+        if is_open {
+            self.scope(ffi::cui_sheet_end, f);
+        }
+    }
+
+    /// A Spotlight style command palette (C's `cui_command_palette`).
+    /// Returns the chosen command's index, or -1.
+    pub fn command_palette(&mut self, open: &mut bool, commands: &[Command]) -> i32 {
+        assert!(!commands.is_empty());
+        let flat: Vec<ffi::cui_command> = commands.iter().map(|c| c.flatten(self.arena)).collect();
+        unsafe { ffi::cui_command_palette(self.ctx, open, flat.as_ptr(), flat.len() as i32) }
+    }
+
+    /// Page buttons (C's `cui_pagination`). `page` is 0 based; returns true
+    /// when it changed.
+    pub fn pagination(&mut self, id: impl AsRef<str>, page: &mut i32, page_count: i32) -> bool {
+        unsafe { ffi::cui_pagination(self.ctx, self.cs(&id), page, page_count) }
+    }
+
+    /// A user menu: an avatar button that opens a menu (C's `cui_user_menu`
+    /// scope). The closure runs only while the menu is open.
+    pub fn user_menu(&mut self, name: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.user_menu_impl(name.as_ref(), &ffi::cui_user_menu_opts::default(), f);
+    }
+
+    /// A user menu with options ([`UserMenu`]).
+    pub fn user_menu_with(&mut self, name: impl AsRef<str>, o: &UserMenu, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = o.flatten(self.arena);
+        self.user_menu_impl(name.as_ref(), &fo, f);
+    }
+
+    fn user_menu_impl(&mut self, name: &str, fo: &ffi::cui_user_menu_opts, f: impl FnOnce(&mut Ui<'a>)) {
+        let is_open = unsafe { ffi::cui_user_menu_begin(self.ctx, self.arena.cstr(name), fo) };
+        if is_open {
+            self.scope(ffi::cui_user_menu_end, f);
+        }
+    }
+
+    /// A breadcrumb trail (C's `cui_breadcrumb`). Returns the clicked index
+    /// or -1.
+    pub fn breadcrumb(&mut self, items: &[&str]) -> i32 {
+        assert!(!items.is_empty());
+        unsafe { ffi::cui_breadcrumb(self.ctx, self.arena.cstr_array(items), items.len() as i32) }
+    }
+
+    // -------------------------------------------------------------- display
+
+    /// An avatar with initials (C's `cui_avatar`).
+    pub fn avatar(&mut self, name: impl AsRef<str>) {
+        unsafe { ffi::cui_avatar_ex(self.ctx, self.cs(&name), &ffi::cui_avatar_opts::default()) }
+    }
+
+    /// An avatar with options ([`Avatar`]).
+    pub fn avatar_with(&mut self, name: impl AsRef<str>, o: &Avatar) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_avatar_ex(self.ctx, self.cs(&name), &fo) }
+    }
+
+    /// A row of overlapping avatars (C's `cui_avatar_group`).
+    pub fn avatar_group(&mut self, names: &[&str], max_visible: i32, size: f32) {
+        assert!(!names.is_empty());
+        unsafe { ffi::cui_avatar_group(self.ctx, self.arena.cstr_array(names), names.len() as i32, max_visible, size) }
+    }
+
+    /// A selectable row with optional icon, subtitle and trailing text
+    /// (C's `cui_list_item`). Returns true when clicked.
+    pub fn list_item(&mut self, title: impl AsRef<str>) -> bool {
+        unsafe { ffi::cui_list_item_ex(self.ctx, self.cs(&title), &ffi::cui_list_item_opts::default()) }
+    }
+
+    /// A list item with options ([`ListItem`]). Returns true when clicked.
+    pub fn list_item_with(&mut self, title: impl AsRef<str>, o: &ListItem) -> bool {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_list_item_ex(self.ctx, self.cs(&title), &fo) }
+    }
+
+    /// A small button that copies text and confirms with a check
+    /// (C's `cui_copy_button`).
+    pub fn copy_button(&mut self, id: impl AsRef<str>, text: impl AsRef<str>) -> bool {
+        unsafe { ffi::cui_copy_button(self.ctx, self.cs(&id), self.cs(&text)) }
+    }
+
+    /// Circular progress with the value in the middle (C's `cui_progress_ring`).
+    pub fn progress_ring(&mut self, label: impl AsRef<str>, value: f32, size: f32) {
+        unsafe { ffi::cui_progress_ring(self.ctx, self.cs(&label), value, size) }
+    }
+
+    /// A chat bubble (C's `cui_chat_message`).
+    pub fn chat_message(&mut self, text: impl AsRef<str>) {
+        unsafe { ffi::cui_chat_message_ex(self.ctx, self.cs(&text), &ffi::cui_chat_opts::default()) }
+    }
+
+    /// A chat bubble with options ([`ChatMessage`]).
+    pub fn chat_message_with(&mut self, text: impl AsRef<str>, o: &ChatMessage) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_chat_message_ex(self.ctx, self.cs(&text), &fo) }
+    }
+
+    /// An activity timeline entry (C's `cui_timeline_item`).
+    pub fn timeline_item(&mut self, title: impl AsRef<str>) {
+        unsafe { ffi::cui_timeline_item_ex(self.ctx, self.cs(&title), &ffi::cui_timeline_opts::default()) }
+    }
+
+    /// A timeline entry with options ([`TimelineItem`]).
+    pub fn timeline_item_with(&mut self, title: impl AsRef<str>, o: &TimelineItem) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_timeline_item_ex(self.ctx, self.cs(&title), &fo) }
+    }
+
+    /// Types the text out (C's `cui_typewriter`). Returns true once complete.
+    pub fn typewriter(&mut self, id: impl AsRef<str>, text: impl AsRef<str>, o: &TextFx) -> bool {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_typewriter_ex(self.ctx, self.cs(&id), self.cs(&text), &fo) }
+    }
+
+    /// A figure that rolls when it changes (C's `cui_number_roll`).
+    pub fn number_roll(&mut self, id: impl AsRef<str>, text: impl AsRef<str>, o: &TextFx) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_number_roll_ex(self.ctx, self.cs(&id), self.cs(&text), &fo) }
+    }
+
+    // ---------------------------------------------------------- conversation
+
+    /// A collapsible block (C's `cui_reasoning` scope). The
+    /// closure runs only while the block is shown.
+    pub fn reasoning(&mut self, id: impl AsRef<str>, o: &Reasoning, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = o.flatten(self.arena);
+        let shown = unsafe { ffi::cui_reasoning_begin(self.ctx, self.cs(&id), &fo) };
+        if shown {
+            self.scope(ffi::cui_reasoning_end, f);
+        }
+    }
+
+    /// A tool call row that opens to its input and output (C's `cui_tool_call`).
+    pub fn tool_call(&mut self, id: impl AsRef<str>, name: impl AsRef<str>, o: &ToolCall) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_tool_call_ex(self.ctx, self.cs(&id), self.cs(&name), &fo) }
+    }
+
+    /// An agent's plan with steps on a rail (C's `cui_agent_plan`).
+    /// Returns the running step, or -1.
+    pub fn agent_plan(&mut self, id: impl AsRef<str>, steps: &[PlanStep], o: &AgentPlan) -> i32 {
+        assert!(!steps.is_empty());
+        let flat: Vec<ffi::cui_plan_step> = steps.iter().map(|s| s.flatten(self.arena)).collect();
+        let fo = ffi::cui_agent_plan_opts { _pad: 0, title: cstr(self.arena, o.title) };
+        unsafe { ffi::cui_agent_plan_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, &fo) }
+    }
+
+    /// A pill with what the agent is doing right now (C's `cui_agent_status`).
+    pub fn agent_status(&mut self, text: impl AsRef<str>, o: &AgentStatus) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_agent_status_ex(self.ctx, self.cs(&text), &fo) }
+    }
+
+    /// Cards for the documents an answer used (C's `cui_source_list`).
+    /// Returns the clicked index or -1.
+    pub fn source_list(&mut self, id: impl AsRef<str>, sources: &[Source]) -> i32 {
+        assert!(!sources.is_empty());
+        let flat: Vec<ffi::cui_source> = sources.iter().map(|s| s.flatten(self.arena)).collect();
+        unsafe { ffi::cui_source_list(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32) }
+    }
+
+    /// An inline citation that shows a hover card (C's `cui_citation`).
+    /// Returns true when clicked.
+    pub fn citation(&mut self, number: i32, source: &Source) -> bool {
+        let fs = source.flatten(self.arena);
+        unsafe { ffi::cui_citation(self.ctx, number, &fs) }
+    }
+
+    /// Copy, regenerate, vote and share under an answer (C's `cui_response_actions`).
+    /// Returns what was clicked.
+    pub fn response_actions(&mut self, id: impl AsRef<str>, o: &mut ResponseActions) -> ResponseActionsFlags {
+        let fo = o.flatten(self.arena);
+        ResponseActionsFlags::from_bits(unsafe { ffi::cui_response_actions_ex(self.ctx, self.cs(&id), &fo) })
+    }
+
+    /// Cards to start a conversation with (C's `cui_prompt_suggestions`).
+    /// Returns the clicked card's index or -1.
+    pub fn prompt_suggestions(&mut self, id: impl AsRef<str>, items: &[PromptSuggestion], o: &PromptSuggestions) -> i32 {
+        assert!(!items.is_empty());
+        let flat: Vec<ffi::cui_prompt_suggestion> = items.iter().map(|s| s.flatten(self.arena)).collect();
+        let fo = o.flatten();
+        unsafe { ffi::cui_prompt_suggestions_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, &fo) }
+    }
+
+    /// The current model on a button; a list with details opens
+    /// (C's `cui_model_picker`). Returns true when the selection changed.
+    pub fn model_picker(&mut self, id: impl AsRef<str>, models: &[Model], selected: &mut i32, o: &ModelPicker) -> bool {
+        assert!(!models.is_empty());
+        let flat: Vec<ffi::cui_model> = models.iter().map(|m| m.flatten(self.arena)).collect();
+        let fo = o.flatten();
+        unsafe {
+            ffi::cui_model_picker_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, selected, &fo)
+        }
+    }
+
+    /// A small ring of how full the context is (C's `cui_context_meter`).
+    pub fn context_meter(&mut self, id: impl AsRef<str>, used: f32, limit: f32, o: &ContextMeter) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_context_meter_ex(self.ctx, self.cs(&id), used, limit, &fo) }
+    }
+
+    /// A growing composer with attachments, a model picker and a send/stop
+    /// button (C's `cui_chat_composer`). Edits `value` in place like
+    /// [`Ui::input`]; returns what happened.
+    pub fn chat_composer(&mut self, id: impl AsRef<str>, value: &mut String, o: &mut Composer) -> ComposerFlags {
+        self.composer_impl(id.as_ref(), value, &o.flatten(self.arena))
+    }
+
+    fn composer_impl(&mut self, id: &str, value: &mut String, opts: &ffi::cui_composer_opts) -> ComposerFlags {
+        let idp = self.arena.cstr(id);
+        if value.capacity() == 0 {
+            value.reserve(1023);
+        }
+        value.push('\0');
+        let cap = value.capacity();
+        let flags = unsafe { ffi::cui_chat_composer_ex(self.ctx, idp, value.as_mut_ptr() as *mut c_char, cap, opts) };
+        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
+        let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
+        value.clear();
+        match core::str::from_utf8(&bytes[..len]) {
+            Ok(s) => value.push_str(s),
+            Err(_) => {
+                let s = String::from_utf8_lossy(&bytes[..len]);
+                value.push_str(&s);
+            }
+        }
+        ComposerFlags::from_bits(flags)
+    }
+
+    // ----------------------------------------------------------- instruments
+
+    /// A dot-matrix chart (C's `cui_dot_chart`). `count` values are spread
+    /// evenly from `x_min` to `x_max`; returns clicks and the readout.
+    pub fn dot_chart(&mut self, id: impl AsRef<str>, series: &[DotSeries], count: i32, o: &DotChart) -> DotChartResult {
+        assert!(!series.is_empty());
+        let flat: Vec<ffi::cui_dot_series> = series.iter().map(|s| s.flatten(self.arena)).collect();
+        let fo = o.flatten(self.arena);
+        let r = unsafe {
+            ffi::cui_dot_chart_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, count, &fo)
+        };
+        DotChartResult { hovered: r.hovered, x: r.x, value: r.value, clicked: r.clicked }
+    }
+
+    /// Moments on a time axis, as dots you drag along it (C's `cui_event_track`).
+    /// You own the array: the track keeps it sorted, edits it in place and
+    /// never grows it past its length. `count` is the live event count.
+    pub fn event_track(
+        &mut self,
+        id: impl AsRef<str>,
+        times: &mut [f64],
+        count: &mut i32,
+        min: f64,
+        max: f64,
+        o: &mut EventTrack,
+    ) -> EventTrackResult {
+        assert!(times.len() as i32 >= *count && !times.is_empty());
+        let fo = ffi::cui_event_track_opts {
+            _pad: 0,
+            width: size_to_ffi(o.width),
+            step: o.step,
+            units: o.units.to_ffi(),
+            format: o.format.map_or(core::ptr::null(), |f| self.arena.cstr(f)),
+            label_step: o.label_step,
+            selected: o.selected.as_deref_mut().map_or(core::ptr::null_mut(), |s| s as *mut i32 as *mut core::ffi::c_int),
+            no_add: o.no_add,
+            no_remove: o.no_remove,
+            no_axis: o.no_axis,
+        };
+        let r = unsafe {
+            ffi::cui_event_track_ex(self.ctx, self.cs(&id), times.as_mut_ptr(), count, times.len() as i32, min, max, &fo)
+        };
+        EventTrackResult {
+            changed: r.changed,
+            added: r.added,
+            removed: r.removed,
+            selected: r.selected,
+            dragging: r.dragging,
+        }
+    }
+
+    /// One figure as an instrument shows it (C's `cui_readout`).
+    pub fn readout(&mut self, label: impl AsRef<str>, value: impl AsRef<str>) {
+        unsafe { ffi::cui_readout_ex(self.ctx, self.cs(&label), self.cs(&value), &ffi::cui_readout_opts::default()) }
+    }
+
+    /// A readout with options ([`Readout`]).
+    pub fn readout_with(&mut self, label: impl AsRef<str>, value: impl AsRef<str>, o: &Readout) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_readout_ex(self.ctx, self.cs(&label), self.cs(&value), &fo) }
+    }
+
+    /// Text drawn with a 5 by 7 dot font (C's `cui_dot_display`).
+    pub fn dot_display(&mut self, text: impl AsRef<str>) {
+        unsafe { ffi::cui_dot_display_ex(self.ctx, self.cs(&text), &ffi::cui_dot_display_opts::default()) }
+    }
+
+    /// A dot-matrix display with options ([`DotDisplay`]).
+    pub fn dot_display_with(&mut self, text: impl AsRef<str>, o: &DotDisplay) {
+        let fo = o.flatten(self.arena);
+        unsafe { ffi::cui_dot_display_ex(self.ctx, self.cs(&text), &fo) }
+    }
+
+    // ----------------------------------------------------------------- theme
+
+    /// Scales all text in the app (C's `cui_theme_get(ui)->font_scale`).
+    pub fn set_font_scale(&mut self, scale: f32) {
+        unsafe { (*ffi::cui_theme_get(self.ctx)).font_scale = scale }
+    }
+
+    /// Keeps state changes but drops travel and bounce (C's `cui_set_reduced_motion`).
+    pub fn set_reduced_motion(&mut self, reduced: bool) {
+        unsafe { ffi::cui_set_reduced_motion(self.ctx, reduced) }
+    }
+}
+
+/// A native file dialog (C's `cui_app_file_dialog`). Blocking; returns the
+/// chosen path when the user confirms. On Linux this uses zenity or kdialog
+/// when installed. Callable from a frame closure: like C's `NULL` app, it
+/// targets the running app.
+pub fn file_dialog(o: &FileDialog) -> Option<String> {
+    let arena = Arena::new();
+    let fo = o.flatten(&arena);
+    let mut buf = vec![0u8; 1024];
+    let ok = unsafe { ffi::cui_app_file_dialog(core::ptr::null_mut(), &fo, buf.as_mut_ptr() as *mut _, buf.len()) };
+    if !ok {
+        return None;
+    }
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(0);
+    Some(String::from_utf8_lossy(&buf[..end]).into_owned())
+}

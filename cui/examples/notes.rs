@@ -217,7 +217,6 @@ impl NotesApp {
                             icon: Some(cui::ICON_NOTEBOOK_PEN),
                             description: Some("Pick a note on the left or start a new one."),
                             action: Some("New note"),
-                            ..Default::default()
                         },
                     );
                     if clicked {

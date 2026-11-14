@@ -16,6 +16,11 @@ jobs:
       - name: Install X11 and the software GL stack
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libgl1-mesa-dri xvfb
       - run: cargo test
+      - name: Feature combinations compile
+        run: |
+          cargo build -p cui-sys --no-default-features
+          cargo build -p cui-sys --no-default-features --features default-fonts
+          cargo build -p cui-sys --no-default-features --features stb-image,text-shaping
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
       - run: cargo build --release --examples
@@ -36,6 +41,18 @@ jobs:
           name: smoke-screenshots
           path: /tmp/cui-smoke/*.png
           if-no-files-found: ignore
+
+  # The windowed macOS build (the Objective-C backend inside the
+  # amalgamation) currently conflicts with Xcode 26 SDK headers
+  # (netinet/ip.h via Cocoa); upstream compiles the macOS backend with CMake,
+  # not the amalgamation. Until that is sorted, macOS CI verifies the
+  # library without the window layer.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --lib -p cui-sys -p cui --no-default-features --features default-fonts,stb-image
+      - run: cargo test -p cui-sys --no-default-features --features default-fonts,stb-image
 
   windows:
     runs-on: windows-2022

@@ -433,7 +433,7 @@ impl<'a> Ui<'a> {
     ) -> ffi::cui_blame_result {
         assert!(!lines.is_empty());
         let ids = self.arena.cstr_array(lines);
-        let res = unsafe {
+        unsafe {
             ffi::cui_blame_ex(
                 self.ctx,
                 self.cs(&id),
@@ -444,8 +444,7 @@ impl<'a> Ui<'a> {
                 commits.len() as i32,
                 o,
             )
-        };
-        res
+        }
     }
 
     /// Inline data-grid edit box (C's `cui_data_grid_edit`). Edits `value`.
@@ -541,7 +540,11 @@ impl<'a> Ui<'a> {
 
     /// Lists a folder (C's `cui_fs_list`). Low-level: the gallery's file
     /// browser calls it through its own list function.
-    pub fn fs_list(
+    ///
+    /// # Safety
+    /// `user` is passed through to CUI's list callback and must be valid
+    /// for the call.
+    pub unsafe fn fs_list(
         &mut self,
         user: *mut c_void,
         path: impl AsRef<str>,
@@ -818,16 +821,19 @@ impl<'a> Ui<'a> {
 }
 
 /// The date `days` days after the epoch CUI uses (C's `cui_date_from_days`).
+#[allow(dead_code)] // used by the gallery example
 pub fn date_from_days(days: i32) -> Date {
     Date::from_ffi(unsafe { ffi::cui_date_from_days(days) })
 }
 
 /// Days since the CUI epoch (C's `cui_date_to_days`).
+#[allow(dead_code)] // used by the gallery example
 pub fn date_to_days(d: Date) -> i32 {
     unsafe { ffi::cui_date_to_days(d.to_ffi()) }
 }
 
 /// Today according to the system clock (C's `cui_date_today`).
+#[allow(dead_code)] // used by the gallery example
 pub fn date_today() -> Date {
     Date::from_ffi(unsafe { ffi::cui_date_today() })
 }

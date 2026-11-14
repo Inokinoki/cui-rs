@@ -511,6 +511,7 @@ pub struct Date {
     pub day: i32,
 }
 
+#[allow(dead_code)] // used by the gallery example
 impl Date {
     pub(crate) fn to_ffi(self) -> ffi::cui_date {
         ffi::cui_date { year: self.year, month: self.month, day: self.day }

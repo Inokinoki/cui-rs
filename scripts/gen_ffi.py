@@ -235,6 +235,10 @@ def main():
             return "i64"
         if ctype == "void":
             return "c_void"
+        if ctype in ("va_list", "..."):
+            return "c_void"
+        if ctype in ("cui_gl_renderer", "cui_sw_renderer"):
+            return "c_void"
         if ctype in ("uint8_t", "unsigned char"):
             return "u8"
         if ctype in ("uint64_t",):

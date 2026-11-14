@@ -1557,6 +1557,10 @@ pub struct cui_file_entry {
     pub mtime: f64,
 }
 
+pub type cui_gl_renderer = c_void;
+pub type cui_sw_renderer = c_void;
+pub type cui_gl_loader = Option<extern "C" fn(name: *const c_char) -> *mut c_void>;
+
 mod gen;
 pub use gen::*;
 

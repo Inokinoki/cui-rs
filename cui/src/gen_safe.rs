@@ -36,6 +36,16 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_alert_ex(self.ctx, title, opts) }
     }
 
+    /// a count badge on the icon ("99+" above 99); 0 for none
+    pub fn animate(&mut self, id: u32, target: f32) -> f32 {
+        unsafe { ffi::cui_animate(self.ctx, id, target) }
+    }
+
+    /// a count badge on the icon ("99+" above 99); 0 for none
+    pub fn animate_spring(&mut self, id: u32, target: f32, duration: f32, bounce: f32) -> f32 {
+        unsafe { ffi::cui_animate_spring(self.ctx, id, target, duration, bounce) }
+    }
+
     /// amount traded in the period, drawn as a bar under the candle; 0 for none
     pub fn api_explorer(&mut self, id: &c_char, endpoints: &ffi::cui_api_endpoint, count: i32, opts: &ffi::cui_api_explorer_opts) -> ffi::cui_api_explorer_result {
         unsafe { ffi::cui_api_explorer_ex(self.ctx, id, endpoints, count, opts) }
@@ -57,9 +67,18 @@ impl<'a> Ui<'a> {
     }
 
     /// ------------------------------------------------------------------------
-    pub fn button_group(&mut self, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_button_group_begin(self.ctx) };
-            self.scope(ffi::cui_button_group_end, f);
+    pub fn button_group_begin(&mut self) {
+        unsafe { ffi::cui_button_group_begin(self.ctx) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn button_group_end(&mut self) {
+        unsafe { ffi::cui_button_group_end(self.ctx) }
+    }
+
+    /// CUI_ALIGN_DEFAULT: columns stretch their children, rows center them.
+    pub fn calendar(&mut self, id: &c_char, value: &mut ffi::cui_date) -> bool {
+        unsafe { ffi::cui_calendar(self.ctx, id, value) }
     }
 
     /// default the width it gets and 360
@@ -83,21 +102,33 @@ impl<'a> Ui<'a> {
     }
 
     /// number of `annotations`
-    pub fn card_stack_item(&mut self, depth: i32, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_card_stack_item_begin(self.ctx, depth) };
-            self.scope(ffi::cui_card_stack_item_end, f);
+    pub fn card_stack_item_begin(&mut self, depth: i32) {
+        unsafe { ffi::cui_card_stack_item_begin(self.ctx, depth) }
+    }
+
+    /// number of `annotations`
+    pub fn card_stack_item_end(&mut self) {
+        unsafe { ffi::cui_card_stack_item_end(self.ctx) }
     }
 
     /// bar chart
-    pub fn carousel(&mut self, id: &c_char, count: i32, index: &mut i32, opts: &ffi::cui_carousel_opts, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_carousel_begin(self.ctx, id, count, index, opts) };
-            self.scope(ffi::cui_carousel_end, f);
+    pub fn carousel_begin(&mut self, id: &c_char, count: i32, index: &mut i32, opts: &ffi::cui_carousel_opts) -> bool {
+        unsafe { ffi::cui_carousel_begin(self.ctx, id, count, index, opts) }
+    }
+
+    /// fixed y range when min != max
+    pub fn carousel_end(&mut self) {
+        unsafe { ffi::cui_carousel_end(self.ctx) }
     }
 
     /// value format for axis and tooltip, default "%.0f"
-    pub fn carousel_slide(&mut self, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_carousel_slide_begin(self.ctx) };
-            self.scope(ffi::cui_carousel_slide_end, f);
+    pub fn carousel_slide_begin(&mut self) {
+        unsafe { ffi::cui_carousel_slide_begin(self.ctx) }
+    }
+
+    /// value format for axis and tooltip, default "%.0f"
+    pub fn carousel_slide_end(&mut self) {
+        unsafe { ffi::cui_carousel_slide_end(self.ctx) }
     }
 
     /// a vertical line at `x`, labelled at its top
@@ -113,6 +144,21 @@ impl<'a> Ui<'a> {
     /// rounded square instead of a circle
     pub fn code_block(&mut self, id: &c_char, code: &c_char, opts: &ffi::cui_code_opts) {
         unsafe { ffi::cui_code_block_ex(self.ctx, id, code, opts) }
+    }
+
+    /// the node created by the last cui_tree_begin was clicked
+    pub fn code_editor_find(&mut self, id: &c_char, query: &c_char) {
+        unsafe { ffi::cui_code_editor_find(self.ctx, id, query) }
+    }
+
+    /// drawn with the active background and medium weight text
+    pub fn code_editor_goto(&mut self, id: &c_char, line: i32, column: i32) {
+        unsafe { ffi::cui_code_editor_goto(self.ctx, id, line, column) }
+    }
+
+    /// drawn with the active background and medium weight text
+    pub fn code_editor_select(&mut self, id: &c_char, anchor: i32, cursor: i32) {
+        unsafe { ffi::cui_code_editor_select(self.ctx, id, anchor, cursor) }
     }
 
     /// identity for scroll state etc. (defaults to an automatic id)
@@ -165,6 +211,11 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_cropper_ex(self.ctx, id, tex, image_w, image_h, crop, opts) }
     }
 
+    /// folded rows shown, and the unchanged lines they hide
+    pub fn curve_editor(&mut self, id: &c_char, keys: &mut ffi::cui_curve_key, count: &mut i32, capacity: i32, opts: &ffi::cui_curve_opts) -> ffi::cui_curve_result {
+        unsafe { ffi::cui_curve_editor_ex(self.ctx, id, keys, count, capacity, opts) }
+    }
+
     /// the card, default 300
     pub fn data_grid_begin(&mut self, id: &c_char, columns: &ffi::cui_grid_column, column_count: i32, row_count: i32, first: &mut i32, last: &mut i32, opts: &ffi::cui_grid_opts) -> bool {
         unsafe { ffi::cui_data_grid_begin_ex(self.ctx, id, columns, column_count, row_count, first, last, opts) }
@@ -200,10 +251,29 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_date_range_picker_ex(self.ctx, id, range, opts) }
     }
 
+    /// default fill
+    pub fn diff_view(&mut self, id: &c_char, old_text: &c_char, new_text: &c_char, opts: &ffi::cui_diff_opts) -> ffi::cui_diff_result {
+        unsafe { ffi::cui_diff_view_ex(self.ctx, id, old_text, new_text, opts) }
+    }
+
+    /// rows take keyboard focus and show the hand cursor (pass the chosen row's state to `cui_table_row`)
+    pub fn diff_view_rows(&mut self, id: &c_char, rows: &mut ffi::cui_diff_row, first: i32, cap: i32) -> i32 {
+        unsafe { ffi::cui_diff_view_rows(self.ctx, id, rows, first, cap) }
+    }
+
+    /// cui_doc_tabs_ex
+    pub fn doc_tabs(&mut self, id: &c_char, tabs: &ffi::cui_doc_tab, count: i32, selected: &mut i32, opts: &ffi::cui_doc_tabs_opts) -> ffi::cui_doc_tabs_result {
+        unsafe { ffi::cui_doc_tabs_ex(self.ctx, id, tabs, count, selected, opts) }
+    }
+
     /// one icon per menu item, in the order of the items; `NULL` for none
-    pub fn dock(&mut self, id: &c_char, opts: &ffi::cui_dock_opts, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_dock_begin(self.ctx, id, opts) };
-            self.scope(ffi::cui_dock_end, f);
+    pub fn dock_begin(&mut self, id: &c_char, opts: &ffi::cui_dock_opts) {
+        unsafe { ffi::cui_dock_begin(self.ctx, id, opts) }
+    }
+
+    /// Toggle group: a row of toggles (bold, italic...). values[i] is toggled
+    pub fn dock_end(&mut self) {
+        unsafe { ffi::cui_dock_end(self.ctx) }
     }
 
     /// one icon per menu item, in the order of the items; `NULL` for none
@@ -211,9 +281,49 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_dock_item_ex(self.ctx, icon, label, opts) }
     }
 
+    /// cui_dock_load
+    pub fn dock_load(&mut self, id: &c_char, text: &c_char) -> bool {
+        unsafe { ffi::cui_dock_load(self.ctx, id, text) }
+    }
+
+    /// cui_dock_panel_begin_ex
+    pub fn dock_panel_begin(&mut self, title: &c_char, open: &mut bool, opts: &ffi::cui_dock_panel_opts) -> bool {
+        unsafe { ffi::cui_dock_panel_begin_ex(self.ctx, title, open, opts) }
+    }
+
+    /// cui_dock_panel_end
+    pub fn dock_panel_end(&mut self) {
+        unsafe { ffi::cui_dock_panel_end(self.ctx) }
+    }
+
     /// Toggle group: a row of toggles (bold, italic...). values[i] is toggled
     pub fn dock_separator(&mut self) {
         unsafe { ffi::cui_dock_separator(self.ctx) }
+    }
+
+    /// cui_dockspace_begin_ex
+    pub fn dockspace_begin(&mut self, id: &c_char, opts: &ffi::cui_dockspace_opts) {
+        unsafe { ffi::cui_dockspace_begin_ex(self.ctx, id, opts) }
+    }
+
+    /// cui_dockspace_end
+    pub fn dockspace_end(&mut self) {
+        unsafe { ffi::cui_dockspace_end(self.ctx) }
+    }
+
+    /// On the editor's next frame: put the caret at a line and column (1 based),
+    pub fn draw_emoji(&mut self, utf8: &c_char, len: i32, r: ffi::cui_rect) {
+        unsafe { ffi::cui_draw_emoji(self.ctx, utf8, len, r) }
+    }
+
+    /// a light travels around the card's edge all the time
+    pub fn draw_image(&mut self, tex: usize, r: ffi::cui_rect, uv: ffi::cui_rect, radius: ffi::cui_corners, tint: ffi::cui_color) {
+        unsafe { ffi::cui_draw_image(self.ctx, tex, r, uv, radius, tint) }
+    }
+
+    /// the gradient drifts along the text
+    pub fn draw_polyline(&mut self, points: &ffi::cui_vec2, count: i32, thickness: f32, color: ffi::cui_color, closed: bool) {
+        unsafe { ffi::cui_draw_polyline(self.ctx, points, count, thickness, color, closed) }
     }
 
     /// Lists a folder into out (names copied into names). Returns the number of
@@ -221,17 +331,39 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_dropzone_ex(self.ctx, id, opts) }
     }
 
-    /// ---- Diff viewer ----
-    pub fn emoji_picker(&mut self, id: &c_char, opts: &ffi::cui_emoji_picker_opts) -> *const c_char {
-        unsafe { ffi::cui_emoji_picker_ex(self.ctx, id, opts) }
+    /// On the editor's next frame: put the caret at a line and column (1 based),
+    pub fn emoji(&mut self, utf8: &c_char, size: f32) {
+        unsafe { ffi::cui_emoji(self.ctx, utf8, size) }
+    }
+
+    /// with the find bar open: matches, and which one is selected (1 based, 0 none)
+    pub fn emoji_font_load_file(&mut self, path: &c_char) -> bool {
+        unsafe { ffi::cui_emoji_font_load_file(self.ctx, path) }
+    }
+
+    /// with the find bar open: matches, and which one is selected (1 based, 0 none)
+    pub fn emoji_font_load_memory(&mut self, data: &c_void, size: usize, copy: bool) -> bool {
+        unsafe { ffi::cui_emoji_font_load_memory(self.ctx, data, size, copy) }
+    }
+
+    /// with the find bar open: matches, and which one is selected (1 based, 0 none)
+    pub fn emoji_font_load_system(&mut self) -> bool {
+        unsafe { ffi::cui_emoji_font_load_system(self.ctx) }
+    }
+
+    /// with the find bar open: matches, and which one is selected (1 based, 0 none)
+    pub fn emoji_supported(&mut self, utf8: &c_char, len: i32) -> bool {
+        unsafe { ffi::cui_emoji_supported(self.ctx, utf8, len) }
     }
 
     /// the table sets and clears it
-    pub fn expandable_card(&mut self, title: &c_char, open: &mut bool, opts: &ffi::cui_expandable_card_opts, f: impl FnOnce(&mut Ui)) {
-        let shown = unsafe { ffi::cui_expandable_card_begin(self.ctx, title, open, opts) };
-        if shown {
-            self.scope(ffi::cui_expandable_card_end, f);
-        }
+    pub fn expandable_card_begin(&mut self, title: &c_char, open: &mut bool, opts: &ffi::cui_expandable_card_opts) -> bool {
+        unsafe { ffi::cui_expandable_card_begin(self.ctx, title, open, opts) }
+    }
+
+    /// children pending: an open node shows a spinner row; clear it when loaded
+    pub fn expandable_card_end(&mut self) {
+        unsafe { ffi::cui_expandable_card_end(self.ctx) }
     }
 
     /// cui_expandable_text_ex
@@ -242,6 +374,21 @@ impl<'a> Ui<'a> {
     /// True while the menu of separator *segment is showing: build menu items
     pub fn fader(&mut self, id: &c_char, value: &mut f32, min: f32, max: f32, opts: &ffi::cui_fader_opts) -> bool {
         unsafe { ffi::cui_fader_ex(self.ctx, id, value, min, max, opts) }
+    }
+
+    /// cui_file_drag_active
+    pub fn file_drag_active(&mut self) -> bool {
+        unsafe { ffi::cui_file_drag_active(self.ctx) }
+    }
+
+    /// Diff viewer: compares two versions of a text line by line, side by side or
+    pub fn flame_graph(&mut self, id: &c_char, spans: &ffi::cui_flame_span, count: i32, view: &mut ffi::cui_flame_view, selected: &mut i32, opts: &ffi::cui_flame_opts) -> ffi::cui_flame_result {
+        unsafe { ffi::cui_flame_graph_ex(self.ctx, id, spans, count, view, selected, opts) }
+    }
+
+    /// a header above the sides, e.g. file names, with the +/- summary
+    pub fn flame_span_rect(&mut self, flame: u32, span: &ffi::cui_flame_span) -> ffi::cui_rect {
+        unsafe { ffi::cui_flame_span_rect(self.ctx, flame, span) }
     }
 
     /// width / height to keep, 0 for free
@@ -259,6 +406,16 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_gauge(self.ctx, label, value, size) }
     }
 
+    /// optional, defaults to malloc/free
+    pub fn get_cursor(&mut self) -> c_int {
+        unsafe { ffi::cui_get_cursor(self.ctx) }
+    }
+
+    /// the search hit its limit: correct, maybe not the shortest
+    pub fn gradient_editor(&mut self, id: &c_char, stops: &mut ffi::cui_gradient_stop, count: &mut i32, capacity: i32, opts: &ffi::cui_gradient_opts) -> ffi::cui_gradient_result {
+        unsafe { ffi::cui_gradient_editor_ex(self.ctx, id, stops, count, capacity, opts) }
+    }
+
     /// Circular progress with the value in the middle.
     pub fn gradient_text(&mut self, text: &c_char, opts: &ffi::cui_gradient_text_opts) {
         unsafe { ffi::cui_gradient_text_ex(self.ctx, text, opts) }
@@ -274,6 +431,16 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_heatmap_ex(self.ctx, id, values, rows, cols, opts) }
     }
 
+    /// cui_hex_view_ex
+    pub fn hex_view(&mut self, id: &c_char, data: &u8, size: usize, sel: &mut ffi::cui_hex_selection, opts: &ffi::cui_hex_view_opts) -> ffi::cui_hex_result {
+        unsafe { ffi::cui_hex_view_ex(self.ctx, id, data, size, sel, opts) }
+    }
+
+    /// cui_hex_view_goto
+    pub fn hex_view_goto(&mut self, id: &c_char, offset: usize) {
+        unsafe { ffi::cui_hex_view_goto(self.ctx, id, offset) }
+    }
+
     /// separators open a menu of the next segment's siblings
     pub fn histogram_slider(&mut self, label: &c_char, bins: &f32, bin_count: i32, lo: &mut f32, hi: &mut f32, min: f32, max: f32, opts: &ffi::cui_histogram_opts) -> bool {
         unsafe { ffi::cui_histogram_slider_ex(self.ctx, label, bins, bin_count, lo, hi, min, max, opts) }
@@ -285,11 +452,13 @@ impl<'a> Ui<'a> {
     }
 
     /// ---- Tree table and path bar ----
-    pub fn hover_card(&mut self, id: &c_char, opts: &ffi::cui_hover_card_opts, f: impl FnOnce(&mut Ui)) {
-        let shown = unsafe { ffi::cui_hover_card_begin(self.ctx, id, opts) };
-        if shown {
-            self.scope(ffi::cui_hover_card_end, f);
-        }
+    pub fn hover_card_begin(&mut self, id: &c_char, opts: &ffi::cui_hover_card_opts) -> bool {
+        unsafe { ffi::cui_hover_card_begin(self.ctx, id, opts) }
+    }
+
+    /// ---- Tree table and path bar ----
+    pub fn hover_card_end(&mut self) {
+        unsafe { ffi::cui_hover_card_end(self.ctx) }
     }
 
     /// number of `annotations`
@@ -307,9 +476,74 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_image_destroy(self.ctx, tex) }
     }
 
+    /// Text input
+    pub fn image(&mut self, tex: usize, opts: &ffi::cui_image_opts) {
+        unsafe { ffi::cui_image_ex(self.ctx, tex, opts) }
+    }
+
+    /// Elastic slider: the track stretches like rubber when dragged past its ends.
+    pub fn image_load(&mut self, path: &c_char, w: &mut i32, h: &mut i32) -> usize {
+        unsafe { ffi::cui_image_load(self.ctx, path, w, h) }
+    }
+
     /// error text below (red)
     pub fn image_viewer(&mut self, id: &c_char, tex: usize, image_w: i32, image_h: i32, view: &mut ffi::cui_image_view, opts: &ffi::cui_image_viewer_opts) -> bool {
         unsafe { ffi::cui_image_viewer_ex(self.ctx, id, tex, image_w, image_h, view, opts) }
+    }
+
+    /// How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn input_file_hover(&mut self, hovering: bool, x: f32, y: f32) {
+        unsafe { ffi::cui_input_file_hover(self.ctx, hovering, x, y) }
+    }
+
+    /// How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn input_focus(&mut self, window_focused: bool) {
+        unsafe { ffi::cui_input_focus(self.ctx, window_focused) }
+    }
+
+    /// How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn input_key(&mut self, key: c_int, down: bool, mods: i32) {
+        unsafe { ffi::cui_input_key(self.ctx, key, down, mods) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn input_mouse_button(&mut self, button: c_int, down: bool) {
+        unsafe { ffi::cui_input_mouse_button(self.ctx, button, down) }
+    }
+
+    /// How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn input_mouse_leave(&mut self) {
+        unsafe { ffi::cui_input_mouse_leave(self.ctx) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn input_mouse_move(&mut self, x: f32, y: f32) {
+        unsafe { ffi::cui_input_mouse_move(self.ctx, x, y) }
+    }
+
+    /// How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn input_scroll(&mut self, dx: f32, dy: f32) {
+        unsafe { ffi::cui_input_scroll(self.ctx, dx, dy) }
+    }
+
+    /// How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn input_text(&mut self, utf8: &c_char) {
+        unsafe { ffi::cui_input_text(self.ctx, utf8) }
+    }
+
+    /// smaller headings and tighter spacing, for chat bubbles
+    pub fn inspector_begin(&mut self, id: &c_char, opts: &ffi::cui_inspector_opts) -> bool {
+        unsafe { ffi::cui_inspector_begin_ex(self.ctx, id, opts) }
+    }
+
+    /// URL of the link clicked (or activated with Enter) this frame, or NULL; frame memory
+    pub fn inspector_end(&mut self) {
+        unsafe { ffi::cui_inspector_end(self.ctx) }
+    }
+
+    /// URL of the link under the pointer, or NULL; frame memory
+    pub fn inspector_group(&mut self, title: &c_char, open: &mut bool) -> bool {
+        unsafe { ffi::cui_inspector_group(self.ctx, title, open) }
     }
 
     /// rounded square instead of a circle
@@ -372,6 +606,41 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_loader_ex(self.ctx, opts) }
     }
 
+    /// a highlighted range of bytes: color 0 is the accent, 1 to 6 the series colors
+    pub fn log_view(&mut self, id: &c_char, buf: &mut ffi::cui_log_buffer, opts: &ffi::cui_log_view_opts) {
+        unsafe { ffi::cui_log_view_ex(self.ctx, id, buf, opts) }
+    }
+
+    /// text shown instead of the percentage, e.g. "+12 this week"; `delta` still sets arrow and color
+    pub fn markdown(&mut self, id: &c_char, text: &c_char, opts: &ffi::cui_markdown_opts) -> ffi::cui_markdown_result {
+        unsafe { ffi::cui_markdown_ex(self.ctx, id, text, opts) }
+    }
+
+    /// cui_measure_text
+    pub fn measure_text(&mut self, font: i32, size: f32, text: &c_char, len: i32) -> ffi::cui_text_metrics {
+        unsafe { ffi::cui_measure_text(self.ctx, font, size, text, len) }
+    }
+
+    /// Code block with syntax highlighting (lang: "c", "cpp", "js", "ts",
+    pub fn menu_bar_begin(&mut self, id: &c_char, opts: &ffi::cui_menu_bar_opts) {
+        unsafe { ffi::cui_menu_bar_begin(self.ctx, id, opts) }
+    }
+
+    /// Code block with syntax highlighting (lang: "c", "cpp", "js", "ts",
+    pub fn menu_bar_end(&mut self) {
+        unsafe { ffi::cui_menu_bar_end(self.ctx) }
+    }
+
+    /// a column of line numbers on the left
+    pub fn menu_bar_menu_begin(&mut self, label: &c_char, opts: &ffi::cui_menu_bar_menu_opts) -> bool {
+        unsafe { ffi::cui_menu_bar_menu_begin(self.ctx, label, opts) }
+    }
+
+    /// scrolls beyond this, default none
+    pub fn menu_bar_menu_end(&mut self) {
+        unsafe { ffi::cui_menu_bar_menu_end(self.ctx) }
+    }
+
     /// inline code
     pub fn meter(&mut self, label: &c_char, used: f32, total: f32, unit: &c_char) {
         unsafe { ffi::cui_meter(self.ctx, label, used, total, unit) }
@@ -385,6 +654,71 @@ impl<'a> Ui<'a> {
     /// Tree cell: indentation, a disclosure chevron and a label, for tree tables
     pub fn month_calendar(&mut self, id: &c_char, month: &mut ffi::cui_date, events: &ffi::cui_month_event, count: i32, opts: &ffi::cui_month_opts) -> ffi::cui_month_result {
         unsafe { ffi::cui_month_calendar_ex(self.ctx, id, month, events, count, opts) }
+    }
+
+    /// cui_next_wakeup
+    pub fn next_wakeup(&mut self) -> f32 {
+        unsafe { ffi::cui_next_wakeup(self.ctx) }
+    }
+
+    /// function that lists a folder (the local disk unless set); default `cui_fs_list`
+    pub fn node_begin(&mut self, node_id: i32, x: &mut f32, y: &mut f32, title: &c_char, opts: &ffi::cui_node_opts) -> bool {
+        unsafe { ffi::cui_node_begin_ex(self.ctx, node_id, x, y, title, opts) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_content_begin(&mut self) {
+        unsafe { ffi::cui_node_content_begin(self.ctx) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_content_end(&mut self) {
+        unsafe { ffi::cui_node_content_end(self.ctx) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_deleted(&mut self, node_id: &mut i32) -> bool {
+        unsafe { ffi::cui_node_deleted(self.ctx, node_id) }
+    }
+
+    /// the folder to start in, default the current directory
+    pub fn node_editor_begin(&mut self, id: &c_char, view: &mut ffi::cui_node_view, opts: &ffi::cui_node_editor_opts) -> bool {
+        unsafe { ffi::cui_node_editor_begin_ex(self.ctx, id, view, opts) }
+    }
+
+    /// e.g. "*.png;*.jpg"
+    pub fn node_editor_end(&mut self) {
+        unsafe { ffi::cui_node_editor_end(self.ctx) }
+    }
+
+    /// passed to `list` as its first argument
+    pub fn node_end(&mut self) {
+        unsafe { ffi::cui_node_end(self.ctx) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_input(&mut self, pin_id: i32, label: &c_char, opts: &ffi::cui_pin_opts) -> bool {
+        unsafe { ffi::cui_node_input_ex(self.ctx, pin_id, label, opts) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_link(&mut self, link_id: i32, from_pin: i32, to_pin: i32) -> bool {
+        unsafe { ffi::cui_node_link(self.ctx, link_id, from_pin, to_pin) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_link_created(&mut self, from_pin: &mut i32, to_pin: &mut i32) -> bool {
+        unsafe { ffi::cui_node_link_created(self.ctx, from_pin, to_pin) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_link_removed(&mut self, link_id: &mut i32) -> bool {
+        unsafe { ffi::cui_node_link_removed(self.ctx, link_id) }
+    }
+
+    /// True once, with the chosen path in out, when the dialog is confirmed;
+    pub fn node_output(&mut self, pin_id: i32, label: &c_char, opts: &ffi::cui_pin_opts) -> bool {
+        unsafe { ffi::cui_node_output_ex(self.ctx, pin_id, label, opts) }
     }
 
     /// default "Failed"
@@ -402,17 +736,34 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_password_strength(self.ctx, password) }
     }
 
+    /// A right-aligned row for dialog actions.
+    pub fn path_bar_menu_begin(&mut self, id: &c_char, segment: &mut i32) -> bool {
+        unsafe { ffi::cui_path_bar_menu_begin(self.ctx, id, segment) }
+    }
+
+    /// A right-aligned row for dialog actions.
+    pub fn path_bar_menu_end(&mut self) {
+        unsafe { ffi::cui_path_bar_menu_end(self.ctx) }
+    }
+
     /// inherited by default; mirrors horizontal layout and padding
-    pub fn popover(&mut self, id: &c_char, opts: &ffi::cui_popover_opts, f: impl FnOnce(&mut Ui)) {
-        let shown = unsafe { ffi::cui_popover_begin(self.ctx, id, opts) };
-        if shown {
-            self.scope(ffi::cui_popover_end, f);
-        }
+    pub fn popover_begin(&mut self, id: &c_char, opts: &ffi::cui_popover_opts) -> bool {
+        unsafe { ffi::cui_popover_begin(self.ctx, id, opts) }
     }
 
     /// identity of the card, for its hover state (defaults to an automatic id)
     pub fn popover_close(&mut self, id: &c_char) {
         unsafe { ffi::cui_popover_close(self.ctx, id) }
+    }
+
+    /// inherited by default; mirrors horizontal layout and padding
+    pub fn popover_end(&mut self) {
+        unsafe { ffi::cui_popover_end(self.ctx) }
+    }
+
+    /// left and right padding in points; 0 uses `pad`
+    pub fn popover_is_open(&mut self, id: &c_char) -> bool {
+        unsafe { ffi::cui_popover_is_open(self.ctx, id) }
     }
 
     /// identity of the card, for its hover state (defaults to an automatic id)
@@ -433,6 +784,31 @@ impl<'a> Ui<'a> {
     /// Comment with replies. depth indents replies under a connector line.
     pub fn problems(&mut self, id: &c_char, diags: &ffi::cui_diagnostic, count: i32, opts: &ffi::cui_problems_opts) -> ffi::cui_problems_result {
         unsafe { ffi::cui_problems_ex(self.ctx, id, diags, count, opts) }
+    }
+
+    /// Writes a reported task toggle into text ('x' or ' ' between the brackets).
+    pub fn prop_bool(&mut self, label: &c_char, value: &mut bool, opts: &ffi::cui_prop_opts) -> bool {
+        unsafe { ffi::cui_prop_bool_ex(self.ctx, label, value, opts) }
+    }
+
+    /// ---- Code editor ----
+    pub fn prop_color(&mut self, label: &c_char, value: &mut ffi::cui_color, opts: &ffi::cui_prop_opts) -> bool {
+        unsafe { ffi::cui_prop_color_ex(self.ctx, label, value, opts) }
+    }
+
+    /// height of the view in the latest layout
+    pub fn prop_float(&mut self, label: &c_char, value: &mut f32, opts: &ffi::cui_prop_opts) -> bool {
+        unsafe { ffi::cui_prop_float_ex(self.ctx, label, value, opts) }
+    }
+
+    /// height of the view in the latest layout
+    pub fn prop_int(&mut self, label: &c_char, value: &mut i32, opts: &ffi::cui_prop_opts) -> bool {
+        unsafe { ffi::cui_prop_int_ex(self.ctx, label, value, opts) }
+    }
+
+    /// ---- Code editor ----
+    pub fn prop_vec(&mut self, label: &c_char, value: &mut f32, components: i32, opts: &ffi::cui_prop_opts) -> bool {
+        unsafe { ffi::cui_prop_vec_ex(self.ctx, label, value, components, opts) }
     }
 
     /// ------------------------------------------------------------------------
@@ -481,9 +857,18 @@ impl<'a> Ui<'a> {
     }
 
     /// month 1..12
-    pub fn reorder_item(&mut self, position: i32, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_reorder_item_begin(self.ctx, position) };
-            self.scope(ffi::cui_reorder_item_end, f);
+    pub fn reorder_item_begin(&mut self, position: i32) {
+        unsafe { ffi::cui_reorder_item_begin(self.ctx, position) }
+    }
+
+    /// month 1..12
+    pub fn reorder_item_end(&mut self) {
+        unsafe { ffi::cui_reorder_item_end(self.ctx) }
+    }
+
+    /// cui_request_wakeup
+    pub fn request_wakeup(&mut self, seconds: f32) {
+        unsafe { ffi::cui_request_wakeup(self.ctx, seconds) }
     }
 
     /// keeps the items in the order given instead of sorting them largest first
@@ -506,6 +891,21 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_scrub_ex(self.ctx, label, value, min, max, opts) }
     }
 
+    /// optional, defaults to malloc/free
+    pub fn set_platform(&mut self, platform: &ffi::cui_platform_iface) {
+        unsafe { ffi::cui_set_platform(self.ctx, platform) }
+    }
+
+    /// cui_set_renderer
+    pub fn set_renderer(&mut self, renderer: &ffi::cui_renderer_iface) {
+        unsafe { ffi::cui_set_renderer(self.ctx, renderer) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn set_strings(&mut self, strings: &ffi::cui_strings) {
+        unsafe { ffi::cui_set_strings(self.ctx, strings) }
+    }
+
     /// muted text at the right of the title, e.g. "2h ago"
     pub fn shimmer_text(&mut self, text: &c_char, opts: &ffi::cui_text_fx_opts) {
         unsafe { ffi::cui_shimmer_text_ex(self.ctx, text, opts) }
@@ -516,9 +916,19 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_shortcut_recorder_ex(self.ctx, id, combo, opts) }
     }
 
+    /// seconds since 1970 (UTC); 0 unknown
+    pub fn signature_clear(&mut self, id: &c_char) {
+        unsafe { ffi::cui_signature_clear(self.ctx, id) }
+    }
+
     /// File browser and file picker (an open or save dialog drawn by CUI, like
     pub fn signature_pad(&mut self, id: &c_char, opts: &ffi::cui_signature_opts) -> bool {
         unsafe { ffi::cui_signature_pad_ex(self.ctx, id, opts) }
+    }
+
+    /// bytes
+    pub fn signature_points(&mut self, id: &c_char, points: &ffi::cui_vec2, stroke_ends: &i32, stroke_count: &mut i32) -> i32 {
+        unsafe { ffi::cui_signature_points(self.ctx, id, points, stroke_ends, stroke_count) }
     }
 
     /// ------------------------------------------------------------------------
@@ -542,9 +952,13 @@ impl<'a> Ui<'a> {
     }
 
     /// ------------------------------------------------------------------------
-    pub fn spotlight(&mut self, id: &c_char, opts: &ffi::cui_spotlight_opts, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_spotlight_begin(self.ctx, id, opts) };
-            self.scope(ffi::cui_spotlight_end, f);
+    pub fn spotlight_begin(&mut self, id: &c_char, opts: &ffi::cui_spotlight_opts) {
+        unsafe { ffi::cui_spotlight_begin(self.ctx, id, opts) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn spotlight_end(&mut self) {
+        unsafe { ffi::cui_spotlight_end(self.ctx) }
     }
 
     /// Split bar: one bar split into parts, with a legend of values and shares.
@@ -555,6 +969,36 @@ impl<'a> Ui<'a> {
     /// a small dot under the icon
     pub fn state_on_free(&mut self, id: u32) {
         unsafe { ffi::cui_state_on_free(self.ctx, id) }
+    }
+
+    /// points; taller content scrolls. 0 shows everything
+    pub fn status_bar_begin(&mut self, id: &c_char, opts: &ffi::cui_status_bar_opts) {
+        unsafe { ffi::cui_status_bar_begin(self.ctx, id, opts) }
+    }
+
+    /// ---- Markdown view ----
+    pub fn status_bar_end(&mut self) {
+        unsafe { ffi::cui_status_bar_end(self.ctx) }
+    }
+
+    /// ---- Markdown view ----
+    pub fn status_bar_item(&mut self, label: &c_char, opts: &ffi::cui_status_item_opts) -> bool {
+        unsafe { ffi::cui_status_bar_item_ex(self.ctx, label, opts) }
+    }
+
+    /// cui_status_bar_progress_ex
+    pub fn status_bar_progress(&mut self, value: f32, opts: &ffi::cui_status_progress_opts) {
+        unsafe { ffi::cui_status_bar_progress_ex(self.ctx, value, opts) }
+    }
+
+    /// ---- Markdown view ----
+    pub fn status_bar_spacer(&mut self) {
+        unsafe { ffi::cui_status_bar_spacer(self.ctx) }
+    }
+
+    /// ---- Markdown view ----
+    pub fn status_bar_text(&mut self, text: &c_char, opts: &ffi::cui_status_item_opts) {
+        unsafe { ffi::cui_status_bar_text_ex(self.ctx, text, opts) }
     }
 
     /// page is 0 based
@@ -577,6 +1021,11 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_tab_bar_ex(self.ctx, id, items, count, selected, opts) }
     }
 
+    /// Square/round button with only an icon. Give it a tooltip so it has a name.
+    pub fn table_cell_textf(&mut self, fmt: &c_char) {
+        unsafe { ffi::cui_table_cell_textf(self.ctx, fmt) }
+    }
+
     /// the bracket beside the caret and its partner, byte offsets, or -1
     pub fn terminal(&mut self, id: &c_char, t: &mut ffi::cui_terminal_buffer, opts: &ffi::cui_terminal_opts) -> ffi::cui_terminal_result {
         unsafe { ffi::cui_terminal_ex(self.ctx, id, t, opts) }
@@ -587,14 +1036,14 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_test_explorer_ex(self.ctx, id, items, count, opts) }
     }
 
-    /// user text scale multiplier (default 1)
-    pub fn textf(&mut self, fmt: &c_char) {
-        unsafe { ffi::cui_textf(self.ctx, fmt) }
-    }
-
     /// the final item: no connector line below its dot and no space after it
     pub fn text_reveal(&mut self, id: &c_char, text: &c_char, opts: &ffi::cui_text_fx_opts) {
         unsafe { ffi::cui_text_reveal_ex(self.ctx, id, text, opts) }
+    }
+
+    /// user text scale multiplier (default 1)
+    pub fn textf(&mut self, fmt: &c_char) {
+        unsafe { ffi::cui_textf(self.ctx, fmt) }
     }
 
     /// Popover anchored to the previous component. Toggle it with
@@ -627,6 +1076,11 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_time_picker_ex(self.ctx, id, hour, minute, opts) }
     }
 
+    /// Word marks between two versions of one line, as byte ranges (a length of -1
+    pub fn timeline_editor(&mut self, id: &c_char, tracks: &mut ffi::cui_timeline_track, count: i32, time: &mut f32, opts: &ffi::cui_timeline_editor_opts) -> ffi::cui_timeline_editor_result {
+        unsafe { ffi::cui_timeline_editor_ex(self.ctx, id, tracks, count, time, opts) }
+    }
+
     /// -1 when it has none, or none loaded yet
     pub fn toc(&mut self, scroll_id: &c_char, items: &ffi::cui_toc_item, count: i32) -> i32 {
         unsafe { ffi::cui_toc(self.ctx, scroll_id, items, count) }
@@ -635,6 +1089,31 @@ impl<'a> Ui<'a> {
     /// CUI_TREE_*
     pub fn toc_anchor(&mut self, anchor: &c_char) {
         unsafe { ffi::cui_toc_anchor(self.ctx, anchor) }
+    }
+
+    /// no title bar, even with a lang
+    pub fn toolbar_begin(&mut self, id: &c_char, opts: &ffi::cui_toolbar_opts) {
+        unsafe { ffi::cui_toolbar_begin(self.ctx, id, opts) }
+    }
+
+    /// JSON viewer: a collapsible tree with typed colors and item counts.
+    pub fn toolbar_button(&mut self, icon: &c_char, opts: &ffi::cui_tool_opts) -> bool {
+        unsafe { ffi::cui_toolbar_button_ex(self.ctx, icon, opts) }
+    }
+
+    /// no title bar, even with a lang
+    pub fn toolbar_end(&mut self) {
+        unsafe { ffi::cui_toolbar_end(self.ctx) }
+    }
+
+    /// levels of the tree that start open, default 2
+    pub fn toolbar_separator(&mut self) {
+        unsafe { ffi::cui_toolbar_separator(self.ctx) }
+    }
+
+    /// points; taller content scrolls. 0 shows everything
+    pub fn toolbar_spacer(&mut self) {
+        unsafe { ffi::cui_toolbar_spacer(self.ctx) }
     }
 
     /// Card: a bordered surface with generous padding.
@@ -667,6 +1146,31 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_tree_end(self.ctx) }
     }
 
+    /// a check mark at the right edge of the item
+    pub fn tree_table_begin(&mut self, id: &c_char, columns: &ffi::cui_grid_column, column_count: i32, nodes: &mut ffi::cui_tree_node, node_count: i32, opts: &ffi::cui_tree_table_opts) {
+        unsafe { ffi::cui_tree_table_begin_ex(self.ctx, id, columns, column_count, nodes, node_count, opts) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn tree_table_depth(&mut self) -> i32 {
+        unsafe { ffi::cui_tree_table_depth(self.ctx) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn tree_table_end(&mut self) -> ffi::cui_tree_table_events {
+        unsafe { ffi::cui_tree_table_end(self.ctx) }
+    }
+
+    /// Dialogs, sheets, toasts, alerts
+    pub fn tree_table_name(&mut self, label: &c_char, icon: &c_char) {
+        unsafe { ffi::cui_tree_table_name(self.ctx, label, icon) }
+    }
+
+    /// ------------------------------------------------------------------------
+    pub fn tree_table_row(&mut self) -> i32 {
+        unsafe { ffi::cui_tree_table_row(self.ctx) }
+    }
+
     /// Returns true when the view changed.
     pub fn treemap(&mut self, id: &c_char, items: &ffi::cui_viz_item, count: i32, opts: &ffi::cui_treemap_opts) -> i32 {
         unsafe { ffi::cui_treemap_ex(self.ctx, id, items, count, opts) }
@@ -683,9 +1187,13 @@ impl<'a> Ui<'a> {
     }
 
     /// the one main action
-    pub fn virtual_list(&mut self, id: &c_char, count: i32, row_height: f32, height: ffi::cui_size, first: &mut i32, last: &mut i32, f: impl FnOnce(&mut Ui)) {
-        unsafe { ffi::cui_virtual_list_begin(self.ctx, id, count, row_height, height, first, last) };
-            self.scope(ffi::cui_virtual_list_end, f);
+    pub fn virtual_list_begin(&mut self, id: &c_char, count: i32, row_height: f32, height: ffi::cui_size, first: &mut i32, last: &mut i32) {
+        unsafe { ffi::cui_virtual_list_begin(self.ctx, id, count, row_height, height, first, last) }
+    }
+
+    /// the one main action
+    pub fn virtual_list_end(&mut self) {
+        unsafe { ffi::cui_virtual_list_end(self.ctx) }
     }
 
     /// not resizable

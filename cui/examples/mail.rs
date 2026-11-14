@@ -4,9 +4,8 @@
 //! one pane at a time.
 
 use cui::{
-    Align, App, AppDesc, Avatar, Badge, Button, ButtonVariant, CanvasResult, Card, Color,
-    ControlSize, Corners, Dialog, EmptyState, Input, Justify, Menu as _, MenuItem, Nav, Rect,
-    Row, Size, Text as _, Tone, Token, Ui, Vec2,
+    Align, App, AppDesc, Avatar, Badge, Button, ButtonVariant, CanvasResult, Color, ControlSize,
+    Corners, Dialog, EmptyState, Input, Justify, MenuItem, Nav, Rect, Row, Size, Tone, Token, Ui,
 };
 
 struct Message {
@@ -22,25 +21,11 @@ struct Message {
     label: i32, // -1 none, else tone
 }
 
-fn messages() -> &'static mut [Message] {
-    static mut MESSAGES: Option<Vec<Message>> = None;
-    // The examples are single threaded (one Ui per thread), like the C originals.
-    unsafe {
-        MESSAGES.get_or_insert_with(|| {
-            vec![
-                Message { from: "Jonas Berg", email: "jonas@northlight.io", subject: "Review of the onboarding flow", preview: "I went through all six screens on a 13 inch laptop. Step three scrolls before the button is visible.", time: "9:41", body: "Hi Maya,\n\nI went through all six screens on a 13 inch laptop. Step three scrolls before the button is visible, and the skip link reads like an error.\n\nCould we look at it together on Thursday at 10?\n\nJonas", folder: 0, unread: true, starred: true, label: Tone::Info as i32 },
-                Message { from: "Priya Nair", email: "priya@harbor.dev", subject: "Invoice 2024-118", preview: "The October invoice is attached. Payment terms are 30 days as usual.", time: "8:15", body: "Hi,\n\nThe October invoice is attached. Payment terms are 30 days as usual. Let me know if the purchase order number needs to change.\n\nPriya", folder: 0, unread: true, starred: false, label: -1 },
-                Message { from: "Tomas Rivera", email: "tomas@kiln.app", subject: "Export is slow for large projects", preview: "A 900 file project takes about four minutes to export on my machine.", time: "Yesterday", body: "A 900 file project takes about four minutes to export on my machine, most of it in the thumbnail step. I attached a trace.\n\nTomas", folder: 0, unread: false, starred: true, label: Tone::Warning as i32 },
-                Message { from: "Lena Fischer", email: "lena@fischer.dev", subject: "Re: Release notes draft", preview: "Looks good. I tightened the second paragraph and fixed two links.", time: "Yesterday", body: "Looks good. I tightened the second paragraph and fixed two links that pointed at the old docs.\n\nLena", folder: 0, unread: false, starred: false, label: Tone::Success as i32 },
-                Message { from: "Aiko Tanaka", email: "aiko@tanaka.design", subject: "Icons for the settings page", preview: "Here are the twelve icons at 16 and 20 px, outline only.", time: "Mon", body: "Here are the twelve icons at 16 and 20 px, outline only, on the same 1.5 px stroke as the rest of the set.\n\nAiko", folder: 0, unread: false, starred: false, label: Tone::Violet as i32 },
-                Message { from: "Sam Whitfield", email: "sam@whitfield.co", subject: "Office closed on Friday", preview: "The building is closed for maintenance. Work from home if you can.", time: "Mon", body: "The building is closed for maintenance on Friday. Work from home if you can; the server room stays reachable over the VPN.\n\nSam", folder: 3, unread: false, starred: true, label: -1 },
-            ]
-        })
-    }
-}
 
 #[derive(Default)]
+#[allow(dead_code)] // dark stays for parity with the C example
 struct MailApp {
+    messages: Vec<Message>,
     folder: i32,
     selected: i32,
     query: String,
@@ -54,6 +39,17 @@ struct MailApp {
     panes: i32,   // 3, 2 or 1, from the window width
     reading: bool, // one pane: the message is open
     drawer: bool,  // folders in a drawer below three panes
+}
+
+fn build_messages() -> Vec<Message> {
+    vec![
+        Message { from: "Jonas Berg", email: "jonas@northlight.io", subject: "Review of the onboarding flow", preview: "I went through all six screens on a 13 inch laptop. Step three scrolls before the button is visible.", time: "9:41", body: "Hi Maya,\n\nI went through all six screens on a 13 inch laptop. Step three scrolls before the button is visible, and the skip link reads like an error.\n\nCould we look at it together on Thursday at 10?\n\nJonas", folder: 0, unread: true, starred: true, label: Tone::Info as i32 },
+        Message { from: "Priya Nair", email: "priya@harbor.dev", subject: "Invoice 2024-118", preview: "The October invoice is attached. Payment terms are 30 days as usual.", time: "8:15", body: "Hi,\n\nThe October invoice is attached. Payment terms are 30 days as usual. Let me know if the purchase order number needs to change.\n\nPriya", folder: 0, unread: true, starred: false, label: -1 },
+        Message { from: "Tomas Rivera", email: "tomas@kiln.app", subject: "Export is slow for large projects", preview: "A 900 file project takes about four minutes to export on my machine.", time: "Yesterday", body: "A 900 file project takes about four minutes to export on my machine, most of it in the thumbnail step. I attached a trace.\n\nTomas", folder: 0, unread: false, starred: true, label: Tone::Warning as i32 },
+        Message { from: "Lena Fischer", email: "lena@fischer.dev", subject: "Re: Release notes draft", preview: "Looks good. I tightened the second paragraph and fixed two links.", time: "Yesterday", body: "Looks good. I tightened the second paragraph and fixed two links that pointed at the old docs.\n\nLena", folder: 0, unread: false, starred: false, label: Tone::Success as i32 },
+        Message { from: "Aiko Tanaka", email: "aiko@tanaka.design", subject: "Icons for the settings page", preview: "Here are the twelve icons at 16 and 20 px, outline only.", time: "Mon", body: "Here are the twelve icons at 16 and 20 px, outline only, on the same 1.5 px stroke as the rest of the set.\n\nAiko", folder: 0, unread: false, starred: false, label: Tone::Violet as i32 },
+        Message { from: "Sam Whitfield", email: "sam@whitfield.co", subject: "Office closed on Friday", preview: "The building is closed for maintenance. Work from home if you can.", time: "Mon", body: "The building is closed for maintenance on Friday. Work from home if you can; the server room stays reachable over the VPN.\n\nSam", folder: 3, unread: false, starred: true, label: -1 },
+    ]
 }
 
 fn matches(m: &Message, q: &str) -> bool {
@@ -100,7 +96,7 @@ fn folders(ui: &mut Ui, a: &mut MailApp, drawer: bool) {
             const NAMES: [&str; 4] = ["Inbox", "Starred", "Sent", "Archive"];
             const ICONS: [&str; 4] = [cui::ICON_INBOX, cui::ICON_STAR, cui::ICON_SEND, cui::ICON_ARCHIVE];
             for (f, name) in NAMES.iter().enumerate() {
-                let unread = messages().iter().filter(|m| in_folder(m, f as i32) && m.unread).count();
+                let unread = a.messages.iter().filter(|m| in_folder(m, f as i32) && m.unread).count();
                 if ui.nav_item_with(
                     name,
                     &Nav {
@@ -178,19 +174,19 @@ fn message_list(ui: &mut Ui, a: &mut MailApp) {
             ui.scroll(
                 &cui::Scroll { id: Some("list"), gap: 0., fade_edges: true, ..Default::default() },
                 |ui| {
-                    let count = messages().len() as i32;
+                    let count = a.messages.len() as i32;
                     let mut shown = 0;
                     for i in 0..count {
-                        let matches_msg = { matches(&messages()[i as usize], &a.query) };
-                        if !in_folder(&messages()[i as usize], a.folder) || !matches_msg {
+                        let matches_msg = { matches(&a.messages[i as usize], &a.query) };
+                        if !in_folder(&a.messages[i as usize], a.folder) || !matches_msg {
                             continue;
                         }
                         shown += 1;
                         let _g = ui.push_id_int(i);
                         let mut next = i + 1;
                         while next < count
-                            && (!in_folder(&messages()[next as usize], a.folder)
-                                || !matches(&messages()[next as usize], &a.query))
+                            && (!in_folder(&a.messages[next as usize], a.folder)
+                                || !matches(&a.messages[next as usize], &a.query))
                         {
                             next += 1;
                         }
@@ -201,7 +197,7 @@ fn message_list(ui: &mut Ui, a: &mut MailApp) {
                         *ui.state::<bool>(bg_id) = res.hovered;
                         if res.clicked {
                             a.selected = i;
-                            messages()[i as usize].unread = false;
+                            a.messages[i as usize].unread = false;
                             a.reading = true;
                         }
                         // every row keeps the dot's gutter, so names line up read or unread
@@ -211,7 +207,7 @@ fn message_list(ui: &mut Ui, a: &mut MailApp) {
                                 ui.box_(
                                     &cui::BoxOpts { width: Size::px(26.), pad_top: 6., align: Align::Center, ..Default::default() },
                                     |ui| {
-                                        if messages()[i as usize].unread {
+                                        if a.messages[i as usize].unread {
                                             ui.box_(
                                                 &cui::BoxOpts {
                                                     width: Size::px(7.),
@@ -225,7 +221,7 @@ fn message_list(ui: &mut Ui, a: &mut MailApp) {
                                         }
                                     },
                                 );
-                                let m = &messages()[i as usize];
+                                let m = &a.messages[i as usize];
                                 ui.column(&cui::Column { gap: 3., width: Size::FILL, ..Default::default() }, |ui| {
                                     ui.row(&Row { gap: 8., width: Size::FILL, ..Default::default() }, |ui| {
                                         ui.text_with(
@@ -253,26 +249,26 @@ fn message_list(ui: &mut Ui, a: &mut MailApp) {
                                 });
                             },
                         );
-                        let unread = messages()[i as usize].unread;
-                        let starred = messages()[i as usize].starred;
+                        let unread = a.messages[i as usize].unread;
+                        let starred = a.messages[i as usize].starred;
                         ui.context_menu("row-menu", |ui| {
                             if ui.menu_item_with(
                                 if unread { "Mark as read" } else { "Mark as unread" },
                                 &MenuItem { icon: Some(cui::ICON_MAIL), ..Default::default() },
                             ) {
-                                messages()[i as usize].unread = !unread;
+                                a.messages[i as usize].unread = !unread;
                             }
                             if ui.menu_item_with(
                                 if starred { "Unstar" } else { "Star" },
                                 &MenuItem { icon: Some(cui::ICON_STAR), ..Default::default() },
                             ) {
-                                messages()[i as usize].starred = !starred;
+                                a.messages[i as usize].starred = !starred;
                             }
                             if ui.menu_item_with(
                                 "Archive",
                                 &MenuItem { icon: Some(cui::ICON_ARCHIVE), ..Default::default() },
                             ) {
-                                messages()[i as usize].folder = 3;
+                                a.messages[i as usize].folder = 3;
                             }
                         });
                     }
@@ -290,7 +286,7 @@ fn message_list(ui: &mut Ui, a: &mut MailApp) {
 
 fn reading_pane(ui: &mut Ui, a: &mut MailApp) {
     ui.column(&cui::Column { width: Size::FILL, height: Size::FILL, ..Default::default() }, |ui| {
-        if a.selected < 0 || a.selected as usize >= messages().len() {
+        if a.selected < 0 || a.selected as usize >= a.messages.len() {
             ui.column(
                 &cui::Column { width: Size::FILL, height: Size::FILL, justify: Justify::Center, ..Default::default() },
                 |ui| {
@@ -318,12 +314,12 @@ fn reading_pane(ui: &mut Ui, a: &mut MailApp) {
                     cui::ICON_ARCHIVE,
                     &Button { tooltip: Some("Archive"), shortcut: Some("E"), ..Default::default() },
                 ) {
-                    messages()[idx].folder = 3;
+                    a.messages[idx].folder = 3;
                     a.selected = -1;
                     ui.toast_with("Archived", &cui::Toast { action: Some("Undo"), ..Default::default() });
                 }
                 ui.icon_button_with(cui::ICON_TRASH_2, &Button { tooltip: Some("Delete"), ..Default::default() });
-                let starred = messages()[idx].starred;
+                let starred = a.messages[idx].starred;
                 if ui.icon_button_with(
                     cui::ICON_STAR,
                     &Button {
@@ -333,13 +329,13 @@ fn reading_pane(ui: &mut Ui, a: &mut MailApp) {
                         ..Default::default()
                     },
                 ) {
-                    messages()[idx].starred = !starred;
+                    a.messages[idx].starred = !starred;
                 }
                 ui.spacer();
                 if ui.button_with("Reply", &Button { icon: Some(cui::ICON_UNDO_2), size: ControlSize::Sm, ..Default::default() }) {
                     a.compose = true;
-                    a.to = messages()[idx].email.to_string();
-                    a.subject = format!("Re: {}", messages()[idx].subject);
+                    a.to = a.messages[idx].email.to_string();
+                    a.subject = format!("Re: {}", a.messages[idx].subject);
                 }
             },
         );
@@ -347,7 +343,7 @@ fn reading_pane(ui: &mut Ui, a: &mut MailApp) {
         if a.selected < 0 {
             return;
         }
-        let m = &messages()[idx];
+        let m = &a.messages[idx];
         ui.scroll(
             &cui::Scroll {
                 id: Some("reader"),
@@ -503,8 +499,15 @@ fn frame(ui: &mut Ui, a: &mut MailApp) {
 }
 
 fn main() {
-    let mut a = MailApp { folder: 0, selected: 0, split1: 0.2, split2: 0.38, ..Default::default() };
-    messages()[0].unread = false;
+    let mut a = MailApp {
+        messages: build_messages(),
+        folder: 0,
+        selected: 0,
+        split1: 0.2,
+        split2: 0.38,
+        ..Default::default()
+    };
+    a.messages[0].unread = false;
     let code = App::run(
         &AppDesc { title: Some("Mail"), width: 1280, height: 800, accent: cui::Accent::Blue, ..Default::default() },
         |ui| frame(ui, &mut a),

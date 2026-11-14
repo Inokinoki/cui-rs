@@ -3,9 +3,8 @@
 //! message plays a short scripted answer. Dark by default.
 
 use cui::{
-    Align, App, AppDesc, Avatar, Button, ButtonVariant, Card, Color, ControlSize, Input, Justify,
-    Menu as _, MenuItem, Model, Nav, Placement, PlanStep, Row, Size, TaskStatus, TextAlign, Tone,
-    Ui, VizItem,
+    Align, App, AppDesc, Button, ButtonVariant, Card, Color, ControlSize, Justify, MenuItem,
+    Model, Nav, Placement, PlanStep, Row, Size, TaskStatus, TextAlign, Tone, Ui, VizItem,
 };
 
 #[derive(Default)]
@@ -240,7 +239,7 @@ fn conversation(ui: &mut Ui, s: &mut AppState) {
                     "model",
                     &models(),
                     &mut s.model,
-                    &cui::ModelPicker { ghost: true, placement: Placement::BottomStart, ..Default::default() },
+                    &cui::ModelPicker { ghost: true, placement: Placement::BottomStart },
                 );
                 ui.spacer();
                 const PARTS: [(&str, f32); 3] = [("Instructions", 3200.), ("Files", 41800.), ("Messages", 68400.)];
@@ -396,7 +395,7 @@ fn side_panel(ui: &mut Ui, s: &mut AppState) {
                 cui::PromptSuggestion { icon: Some(cui::ICON_CHART_BAR), title: "Compare with last quarter", detail: Some("Revenue, churn and costs") },
                 cui::PromptSuggestion { icon: Some(cui::ICON_LIST_CHECKS), title: "Turn this into a checklist", detail: None },
             ];
-            let pick = ui.prompt_suggestions("sugg", &SUGG, &cui::PromptSuggestions { columns: 1, ..Default::default() });
+            let pick = ui.prompt_suggestions("sugg", &SUGG, &cui::PromptSuggestions { columns: 1 });
             if pick >= 0 {
                 s.draft = SUGG[pick as usize].title.to_string();
             }

@@ -2,11 +2,7 @@
 //! dot-matrix chart with annotations, an event track under it, readouts and
 //! a dot-matrix display.
 
-use cui::{
-    Align, App, AppDesc, Axis, Color, DotChart, DotDisplay, DotSeries, EventTrack, Readout,
-    Size, TextAlign, Ui,
-};
-use std::f64::consts::TAU;
+use cui::{Align, App, AppDesc, Axis, Color, DotChart, DotSeries, EventTrack, Readout, Size, Ui};
 
 const MAX_CUPS: usize = 12;
 const SAMPLES: usize = 145; // every 10 minutes from 06:00 to 06:00
@@ -246,7 +242,6 @@ fn frame(ui: &mut Ui, a: &mut AppState) {
             );
         },
     );
-    let _ = TextAlign::Start;
 }
 
 fn main() {

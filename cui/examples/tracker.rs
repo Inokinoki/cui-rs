@@ -53,6 +53,7 @@ const STATUS_NAMES: [&str; ST_COUNT] = ["Backlog", "Todo", "In progress", "In re
 const PRIORITY_NAMES: [&str; 5] = ["No priority", "Low", "Medium", "High", "Urgent"];
 
 #[derive(Default)]
+#[allow(dead_code)] // parity with the C example, which keeps spare fields
 struct AppState {
     nav: i32,
     tab: i32,
@@ -105,9 +106,7 @@ fn paint_status(ui: &mut cui::CanvasUi, r: Rect, g: &StatusGlyph) {
             } else {
                 ui.draw_polygon(&pts[..18], col);
                 let mut rest = [c; 18];
-                for i in 0..17 {
-                    rest[i + 1] = pts[17 + i];
-                }
+                rest[1..18].copy_from_slice(&pts[17..34]);
                 ui.draw_polygon(&rest, col);
             }
         }
@@ -162,9 +161,9 @@ fn paint_priority(ui: &mut cui::CanvasUi, r: Rect, g: &PriorityGlyph) {
     for i in 0..3 {
         let h = 4. + i as f32 * 3.5;
         ui.draw_rect(
-            Rect { x: r.x + 2. + i as f32 * 4.5, y: r.y + r.h - 2. - h, w: 3., h: h },
+            Rect { x: r.x + 2. + i as f32 * 4.5, y: r.y + r.h - 2. - h, w: 3., h },
             Corners::all(1.),
-            if (i as i32) < g.priority { on } else { off },
+            if i < g.priority { on } else { off },
         );
     }
 }
@@ -201,6 +200,7 @@ fn row_background(ui: &mut Ui, id: &str, selected: bool, radius: f32) -> bool {
     res.clicked
 }
 
+#[allow(dead_code)] // the C original keeps this helper for team colors
 fn team_dot(ui: &mut Ui, c: Color) {
     ui.box_(
         &cui::BoxOpts {
@@ -258,7 +258,6 @@ fn sidebar(ui: &mut Ui, s: &mut AppState, drawer: bool) {
                         badge: if MAIN_BADGES[i].is_empty() { None } else { Some(MAIN_BADGES[i]) },
                         selected: s.nav == i as i32,
                         group: Some("nav"),
-                        ..Default::default()
                     },
                 ) {
                     s.nav = i as i32;

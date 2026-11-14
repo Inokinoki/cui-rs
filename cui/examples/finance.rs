@@ -57,7 +57,7 @@ fn paint_card(ui: &mut cui::CanvasUi, r: cui::Rect, c: &CardPaint) {
         Vec2 { x: r.x + r.w * 0.92, y: r.y + r.h * 1.05 },
         r.h * 0.75,
         0.,
-        6.283_185_3,
+        TAU,
         1.,
         Color::rgba(0xff, 0xff, 0xff, 0x1c),
     );
@@ -65,7 +65,7 @@ fn paint_card(ui: &mut cui::CanvasUi, r: cui::Rect, c: &CardPaint) {
         Vec2 { x: r.x + r.w * 0.92, y: r.y + r.h * 1.05 },
         r.h * 0.55,
         0.,
-        6.283_185_3,
+        TAU,
         1.,
         Color::rgba(0xff, 0xff, 0xff, 0x14),
     );

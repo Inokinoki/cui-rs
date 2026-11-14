@@ -429,6 +429,19 @@ impl InputFlags {
     }
 }
 
+impl Tone {
+    /// The tones in CUI's display order, for pickers.
+    pub const ALL: [Tone; 9] = [
+        Tone::Neutral, Tone::Info, Tone::Success, Tone::Warning, Tone::Danger,
+        Tone::Violet, Tone::Teal, Tone::Rose, Tone::Accent,
+    ];
+
+    /// The tone at `index` of [`Tone::ALL`].
+    pub fn from_index(index: i32) -> Tone {
+        Self::ALL.get(index as usize).copied().unwrap_or(Tone::Neutral)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -483,16 +496,4 @@ mod tests {
     }
 }
 
-impl Tone {
-    /// The tones in CUI's display order, for pickers.
-    pub const ALL: [Tone; 9] = [
-        Tone::Neutral, Tone::Info, Tone::Success, Tone::Warning, Tone::Danger,
-        Tone::Violet, Tone::Teal, Tone::Rose, Tone::Accent,
-    ];
-
-    /// The tone at `index` of [`Tone::ALL`].
-    pub fn from_index(index: i32) -> Tone {
-        Self::ALL.get(index as usize).copied().unwrap_or(Tone::Neutral)
-    }
-}
 

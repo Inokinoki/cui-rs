@@ -3,8 +3,8 @@
 //! command palette. On a phone the list and the editor take turns.
 
 use cui::{
-    Align, App, AppDesc, Button, ButtonVariant, Color, Command, ComposerFlags as _, ControlSize,
-    Dialog, Input, MenuItem, Menu as _, Row, Size, TextAlign, Tone, Ui,
+    App, AppDesc, Button, ButtonVariant, Color, Command, ControlSize, Dialog, Input, MenuItem,
+    Row, Size, Tone, Ui,
 };
 
 const MAX_NOTES: usize = 64;
@@ -133,9 +133,9 @@ impl NotesApp {
                                 if ui.list_item_with(
                                     title,
                                     &cui::ListItem {
+                                        icon: Some(icon),
                                         subtitle: Some(preview.as_str()),
                                         selected,
-                                        icon: Some(icon),
                                         ..Default::default()
                                     },
                                 ) {

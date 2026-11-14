@@ -3,8 +3,8 @@
 //! custom painting mixed with stock components.
 
 use cui::{
-    Align, App, AppDesc, Avatar, Button, ButtonVariant, Card, Color, Command, ControlSize,
-    Corners, Input, Justify, Menu, MenuItem, Nav, Rect, Row, Size, TextAlign, Tone, Ui, Vec2,
+    Align, App, AppDesc, Avatar, Button, ButtonVariant, Card, Color, ControlSize, Corners, Input,
+    Justify, Menu, MenuItem, Nav, Rect, Row, Size, TextAlign, Ui, Vec2,
 };
 use std::f32::consts::TAU;
 
@@ -137,7 +137,7 @@ fn paint_eq(ui: &mut cui::CanvasUi, r: Rect, e: &EqPaint) {
     for i in 0..3 {
         let h = 4. + 8. * (0.5 + 0.5 * (e.t * 6. + i as f32 * 1.9).sin());
         ui.draw_rect(
-            Rect { x: r.x + 2. + i as f32 * 4.5, y: r.y + r.h - 2. - h, w: 3., h: h },
+            Rect { x: r.x + 2. + i as f32 * 4.5, y: r.y + r.h - 2. - h, w: 3., h },
             Corners::all(1.),
             accent,
         );

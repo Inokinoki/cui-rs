@@ -3,7 +3,7 @@
 
 use cui::{
     Align, App, AppDesc, Avatar, Button, ButtonVariant, Card, Check, Color, ControlSize, Dialog,
-    Input, Justify, ListItem, Nav, Row, Segmented, Select, Slider, Tone, Ui,
+    Input, Justify, ListItem, Nav, Row, Segmented, Slider, Tone, Ui,
 };
 
 #[derive(Default)]
@@ -82,9 +82,9 @@ fn profile(ui: &mut Ui, s: &mut Settings) {
                         value,
                         &Input {
                             label: Some(label),
-                            icon: icon,
+                            icon,
                             hint: (id == "email").then_some("Used for sign in and notifications."),
-                            error: error,
+                            error,
                             ..Default::default()
                         },
                     );

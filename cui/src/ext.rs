@@ -4,7 +4,6 @@
 
 use crate::arena::Arena;
 use crate::opts::{cstr, Sheet};
-use crate::App;
 use crate::Ui;
 use crate::opts2::*;
 use crate::types::*;

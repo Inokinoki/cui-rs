@@ -165,8 +165,10 @@ window), `text-shaping` (Arabic shaping + bidi).
 `caffeine` — line-for-line ports of the C originals, each verified by the CI
 smoke test (every example runs for a few seconds under Xvfb; a crash or an
 early exit fails the build, and screenshots are uploaded as artifacts).
-The component gallery (the 12th example, ~3,000 lines) is the last piece:
-its bindings are complete, the example port is in progress.
+The component gallery (the 12th example, ~3,000 lines covering 18
+extended pages) is not yet ported — all 268 `cui_` calls it uses have
+bindings (see `scripts/ffi-manifest.txt`), the example code is the
+remaining work for v0.2.
 
 ## Repository layout
 

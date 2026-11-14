@@ -296,6 +296,16 @@ impl Accent {
         Self::ALL.get(index as usize).copied().unwrap_or(Accent::Neutral)
     }
 
+    /// The accent's display name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Accent::Neutral => "Neutral", Accent::Violet => "Violet",
+            Accent::Blue => "Blue", Accent::Green => "Green",
+            Accent::Amber => "Amber", Accent::Orange => "Orange",
+            Accent::Coral => "Coral", Accent::Rose => "Rose",
+        }
+    }
+
     pub(crate) fn from_ffi(v: ffi::cui_accent) -> Accent {
         match v {
             ffi::cui_accent::CUI_ACCENT_VIOLET => Accent::Violet,

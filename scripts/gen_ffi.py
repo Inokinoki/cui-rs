@@ -449,7 +449,7 @@ def main():
                         sig.append(f"{pname}: {rt}")
                     begin_args.append(pname)
             cond = "let shown = unsafe {" if kind == "if" else "unsafe {"
-            safe.append(f"    pub fn {mname}(&mut self{', ' + ', '.join(sig) if sig else ''}, f: impl FnOnce(&mut Ui)) {{")
+            safe.append(f"    pub fn {mname}(&self{', ' + ', '.join(sig) if sig else ''}, f: impl FnOnce(&mut Ui)) {{")
             safe.append(f"        {cond} ffi::{begin}(self.ctx{', ' if begin_args else ''}{', '.join(begin_args)}) }};")
             if kind == "if":
                 safe.append("        if shown {")
@@ -531,7 +531,7 @@ def main():
                 else:
                     ret_rust = f" -> {rrt}"
             joiner = ", " if sig else ""
-            safe.append(f"    pub fn {mname}(&mut self{joiner}{', '.join(sig)}){ret_rust} {{")
+            safe.append(f"    pub fn {mname}(&self{joiner}{', '.join(sig)}){ret_rust} {{")
             body_call = f"ffi::{fn}(self.ctx{', ' if call else ''}{', '.join(call)}){ret_call}"
             safe.append(f"        unsafe {{ {body_call} }}")
             safe.append("    }")
@@ -550,7 +550,7 @@ def main():
         "    /// Converts a string into an arena-backed C string, valid for this\n"
         "    /// frame. For filling raw generated opts structs (their string fields\n"
         "    /// stay raw pointers).\n"
-        "    pub fn cstr(&mut self, s: impl AsRef<str>) -> *const c_char {\n"
+        "    pub fn cstr(&self, s: impl AsRef<str>) -> *const c_char {\n"
         "        self.arena.cstr(s.as_ref())\n"
         "    }\n\n"
         + re.sub(r"^(\s*//! .*\n)+", "", body.rstrip()) + "\n}\n"

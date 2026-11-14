@@ -26,6 +26,8 @@ pub type cui_font = c_int;
 /// e.g. `"1.4.0"`. Extracted from the release-asset header at build time,
 /// so it always describes the C code that was actually compiled. The
 /// digest-verified pin lives in `UPSTREAM.toml`.
+pub const CUI_VERSION_MAJOR: i32 = 1;
+pub const CUI_VERSION_MINOR: i32 = 4;
 pub const CUI_VERSION_STRING: &str = env!("CUI_VERSION_STRING");
 
 /* ==== Basic types (cui.h) ==== */

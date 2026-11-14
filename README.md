@@ -162,7 +162,16 @@ vendor.sh  pins/fetches the upstream release (--pin, --fetch) or amalgamates
 
 **The Rust crates version independently.** `cui` and `cui-sys` follow normal
 semver for their *binding* API; breaking a Rust signature bumps `cui`'s minor
-version, and neither is tied to upstream's release numbers.
+version.
+
+**The bound upstream release rides in the build metadata.** Both crates are
+versioned `0.1.0+cui1.4.0`: the `+cui…` suffix — the same convention as
+`zstd-sys 2.0.9+zstd.1.5.5` or `libgit2-sys 0.16.2+1.7.2` — states which
+upstream release the binding targets. It shows up in `cargo pkgid`, crates.io
+and docs.rs without affecting dependency resolution. When the pin moves to a
+new upstream release, the crates re-release as e.g. `0.1.1+cui1.5.0`: one
+binding release per upstream release, so a crate version always names the
+exact CUI it was written for.
 
 **The pinned C sources are committed, digest-checked at every build.**
 `cui-sys/UPSTREAM.toml` records the upstream release (version, tag and the

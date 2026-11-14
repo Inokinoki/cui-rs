@@ -1546,6 +1546,10 @@ extern "C" {
     pub fn cui_pop_clip(ui: *mut cui_ctx);
     pub fn cui_theme_get(ui: *mut cui_ctx) -> *mut cui_theme;
     pub fn cui_app_file_dialog(app: *mut cui_app, opts: *const cui_file_dialog_opts, out: *mut c_char, cap: usize) -> bool;
+
+    /// Reads one log row; `text` receives a pointer into the buffer
+    /// (C's `cui_log_get`).
+    pub fn cui_log_get_raw(buf: *const cui_log_buffer, i: i32, text: *mut *const c_char) -> *const cui_log_line;
 }
 
 pub type cui_file_list_fn = Option<extern "C" fn(user: *mut c_void, path: *const c_char, out: *mut cui_file_entry, cap: i32, names: *mut c_char, names_cap: usize, hidden: bool) -> i32>;
@@ -1554,9 +1558,9 @@ pub type cui_file_list_fn = Option<extern "C" fn(user: *mut c_void, path: *const
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_file_entry {
     pub name: *const c_char,
-    pub kind: c_int,
+    pub dir: bool,
     pub size: u64,
-    pub mtime: f64,
+    pub modified: i64,
 }
 
 pub type cui_gl_renderer = c_void;
@@ -1696,6 +1700,7 @@ mod tests {
             ("cui_shadow", size_of::<cui_shadow>()),
             ("cui_theme", size_of::<cui_theme>()),
             ("cui_file_dialog_opts", size_of::<cui_file_dialog_opts>()),
+            ("cui_file_entry", size_of::<cui_file_entry>()),
         ] {
             check(&table, "size", name, size as u64);
         }

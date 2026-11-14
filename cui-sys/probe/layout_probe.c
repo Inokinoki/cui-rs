@@ -34,7 +34,7 @@ void base_probe(void) {
     SZ(cui_context_opts); SZ(cui_dot_series); SZ(cui_dot_chart_opts); SZ(cui_dot_chart_result);
     SZ(cui_event_track_opts); SZ(cui_event_track_result); SZ(cui_readout_opts);
     SZ(cui_dot_display_opts); SZ(cui_command); SZ(cui_corners); SZ(cui_canvas_result);
-    SZ(cui_shadow); SZ(cui_theme); SZ(cui_file_dialog_opts);
+    SZ(cui_shadow); SZ(cui_theme); SZ(cui_file_dialog_opts); SZ(cui_file_entry);
 
     puts("[offset]");
     OFF(cui_box, dir); OFF(cui_box, gap); OFF(cui_box, bg);

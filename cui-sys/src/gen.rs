@@ -283,14 +283,20 @@ pub struct cui_comment_opts {
 
 // cards of the deck that show at once, default 3
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_commit {
     pub hash: *const c_char,
     pub message: *const c_char,
     pub author: *const c_char,
     pub date: *const c_char,
     pub refs: *const c_char,
-    // unparsed: int parent[2]
+    pub parent: [i32; 2],
+}
+impl Default for cui_commit {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // cards of the deck that show at once, default 3
@@ -699,6 +705,26 @@ pub struct cui_dropzone_opts {
     pub compact: bool,
 }
 
+// On the next frame: select bytes anchor..cursor, focus and scroll there.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_emoji_picker_opts {
+    pub _pad: i32,
+    pub width: cui_size,
+    pub height: f32,
+    pub size: f32,
+    pub recent: *mut c_char,
+    pub recent_cap: usize,
+    pub tone: *mut i32,
+    pub placeholder: *const c_char,
+    pub empty_text: *const c_char,
+    pub hint: *const c_char,
+    pub group_names: *mut c_char,
+    pub no_search: bool,
+    pub no_preview: bool,
+    pub no_tone: bool,
+}
+
 // Tree table: an expandable tree with columns (a file explorer, a scene
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -743,12 +769,18 @@ pub struct cui_fader_opts {
 
 // draws the marker at `target`
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_feature_flag {
     pub key: *const c_char,
     pub description: *const c_char,
-    // unparsed: bool on[CUI_FLAG_ENVS]
-    // unparsed: int rollout[CUI_FLAG_ENVS]
+    pub on: [bool; 8],
+    pub rollout: [i32; 8],
+}
+impl Default for cui_feature_flag {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // a thick arc filled to the value instead of a needle
@@ -1267,12 +1299,18 @@ pub struct cui_kv_editor_opts {
 
 // right aligned, accent bubble
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_kv_pair {
-    // unparsed: char key[64]
-    // unparsed: char value[256]
+    pub key: [c_char; 64],
+    pub value: [c_char; 256],
     pub enabled: bool,
     pub secret: bool,
+}
+impl Default for cui_kv_pair {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // cui_level_meter_opts
@@ -1303,7 +1341,7 @@ pub struct cui_loader_opts {
 
 // cui_log_buffer
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_log_buffer {
     pub now: f64,
     pub lines: *mut cui_log_line,
@@ -1314,7 +1352,13 @@ pub struct cui_log_buffer {
     pub count: i32,
     pub text_end: u32,
     pub total: u64,
-    // unparsed: int level_count[CUI_LOG_LEVEL_COUNT]
+    pub level_count: [i32; 5],
+}
+impl Default for cui_log_buffer {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // ---- Code editor ----
@@ -1447,7 +1491,7 @@ pub struct cui_multi_select_opts {
 
 // points per second, default 40
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_net_request {
     pub name: *const c_char,
     pub method: *const c_char,
@@ -1455,7 +1499,13 @@ pub struct cui_net_request {
     pub type_: *const c_char,
     pub size: f64,
     pub start: f64,
-    // unparsed: float timing[6]
+    pub timing: [f32; 6],
+}
+impl Default for cui_net_request {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // default "Open", "Save" or "Choose a folder"
@@ -1650,14 +1700,20 @@ pub struct cui_query_field {
 
 // away: the avatar dims, its ring turns gray and the tooltip adds "(away)"
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_query_node {
     pub depth: i32,
     pub group: bool,
     pub any: bool,
     pub field: i32,
     pub op: i32,
-    // unparsed: char value[64]
+    pub value: [c_char; 64],
+}
+impl Default for cui_query_node {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // ------------------------------------------------------------------------
@@ -1718,14 +1774,20 @@ pub struct cui_reaction {
 
 // the item's amount: its area, length or share, by chart (activity rings: 1 is a full turn)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_regex_match {
     pub start: i32,
     pub end: i32,
     pub groups: i32,
-    // unparsed: int group_start[CUI_REGEX_GROUPS]
-    // unparsed: int group_end[CUI_REGEX_GROUPS]
-    // unparsed: char group_name[CUI_REGEX_GROUPS][24]
+    pub group_start: [i32; 10],
+    pub group_end: [i32; 10],
+    pub group_name: [[c_char; 24]; 10],
+}
+impl Default for cui_regex_match {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // value at the outer ring; 0 picks a round number above the largest value
@@ -2028,14 +2090,20 @@ pub struct cui_status_progress_opts {
 
 // seconds since the last frame
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_strings {
-    // unparsed: const char *month[12]
-    // unparsed: const char *month_short[12]
-    // unparsed: const char *weekday[7]
-    // unparsed: const char *weekday_short[7]
-    // unparsed: const char *weekday_min[7]
+    pub month: [*mut c_char; 12],
+    pub month_short: [*mut c_char; 12],
+    pub weekday: [*mut c_char; 7],
+    pub weekday_short: [*mut c_char; 7],
+    pub weekday_min: [*mut c_char; 7],
     pub today: *const c_char,
+}
+impl Default for cui_strings {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // Popover anchored to the previous component. Toggle it with
@@ -2078,7 +2146,7 @@ pub struct cui_tag_opts {
 
 // font size, default 13
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct cui_terminal_buffer {
     pub text: *mut c_char,
     pub text_cap: u32,
@@ -2090,8 +2158,14 @@ pub struct cui_terminal_buffer {
     pub total: u64,
     pub mode: u8,
     pub seq_n: u8,
-    // unparsed: char seq[30]
+    pub seq: [c_char; 30],
     pub cr: bool,
+}
+impl Default for cui_terminal_buffer {
+    fn default() -> Self {
+        // SAFETY: see above — a POD struct accepts the zeroed value
+        unsafe { core::mem::zeroed() }
+    }
 }
 
 // default fill
@@ -2631,6 +2705,372 @@ pub struct cui_wheel_opts {
     pub join_right: bool,
 }
 
+// ---- enum constants ----
+// anon115341
+pub const CUI_REGEX_ICASE: i32 = 1;
+pub const CUI_REGEX_MULTILINE: i32 = 2;
+pub const CUI_REGEX_DOTALL: i32 = 4;
+// anon128337
+pub const CUI_SHADE_TEXT: i32 = 0;
+pub const CUI_SHADE_RRECT: i32 = 1;
+pub const CUI_SHADE_SHADOW: i32 = 2;
+pub const CUI_SHADE_IMAGE: i32 = 3;
+pub const CUI_SHADE_SOLID: i32 = 4;
+// anon20905
+pub const CUI_FONT_BODY: i32 = 0;
+pub const CUI_FONT_MEDIUM: i32 = 1;
+pub const CUI_FONT_DISPLAY: i32 = 2;
+pub const CUI_FONT_MONO: i32 = 3;
+pub const CUI_FONT_ICONS: i32 = 4;
+// anon29350
+pub const CUI_CHANGED: i32 = 1;
+pub const CUI_SUBMITTED: i32 = 2;
+pub const CUI_FOCUSED: i32 = 4;
+pub const CUI_BLURRED: i32 = 8;
+// anon33272
+pub const CUI_TOUR_NONE: i32 = 0;
+pub const CUI_TOUR_NEXT: i32 = 1;
+pub const CUI_TOUR_BACK: i32 = 2;
+pub const CUI_TOUR_DONE: i32 = 3;
+pub const CUI_TOUR_SKIPPED: i32 = 4;
+// anon49509
+pub const CUI_TREE_HAS_CHILDREN: i32 = 0;
+pub const CUI_TREE_OPEN: i32 = 1;
+pub const CUI_TREE_SELECTED: i32 = 2;
+pub const CUI_TREE_LOADING: i32 = 3;
+// anon58893
+pub const CUI_DIFF_IGNORE_EOL: i32 = 1;
+// anon60027
+pub const CUI_COMMENT_LIKE: i32 = 1;
+pub const CUI_COMMENT_REPLY: i32 = 2;
+// anon71919
+pub const CUI_PLAYER_TOGGLE: i32 = 1;
+pub const CUI_PLAYER_PREV: i32 = 2;
+pub const CUI_PLAYER_NEXT: i32 = 4;
+pub const CUI_PLAYER_SEEK: i32 = 8;
+// anon74161
+pub const CUI_RESPONSE_COPY: i32 = 1;
+pub const CUI_RESPONSE_REGENERATE: i32 = 2;
+pub const CUI_RESPONSE_UP: i32 = 4;
+pub const CUI_RESPONSE_DOWN: i32 = 8;
+pub const CUI_RESPONSE_SHARE: i32 = 16;
+// anon75481
+pub const CUI_COMPOSER_SEND: i32 = 1;
+pub const CUI_COMPOSER_STOP: i32 = 2;
+pub const CUI_COMPOSER_ATTACH: i32 = 4;
+pub const CUI_COMPOSER_REMOVE: i32 = 8;
+pub const CUI_COMPOSER_MODEL: i32 = 16;
+// cui_accent
+pub const CUI_ACCENT_NEUTRAL: i32 = 0;
+pub const CUI_ACCENT_VIOLET: i32 = 1;
+pub const CUI_ACCENT_BLUE: i32 = 2;
+pub const CUI_ACCENT_GREEN: i32 = 3;
+pub const CUI_ACCENT_AMBER: i32 = 4;
+pub const CUI_ACCENT_ORANGE: i32 = 5;
+pub const CUI_ACCENT_CORAL: i32 = 6;
+pub const CUI_ACCENT_ROSE: i32 = 7;
+pub const CUI_ACCENT_COUNT: i32 = 8;
+// cui_align
+pub const CUI_ALIGN_DEFAULT: i32 = 0;
+pub const CUI_ALIGN_START: i32 = 1;
+pub const CUI_ALIGN_CENTER: i32 = 2;
+pub const CUI_ALIGN_END: i32 = 3;
+pub const CUI_ALIGN_STRETCH: i32 = 4;
+// cui_annotation_kind
+pub const CUI_ANNOTATION_X: i32 = 0;
+pub const CUI_ANNOTATION_Y: i32 = 1;
+pub const CUI_ANNOTATION_POINT: i32 = 2;
+// cui_axis_units
+pub const CUI_AXIS_NUMBER: i32 = 0;
+pub const CUI_AXIS_HOURS: i32 = 1;
+// cui_button_variant
+pub const CUI_BUTTON_DEFAULT: i32 = 0;
+pub const CUI_BUTTON_SECONDARY: i32 = 1;
+pub const CUI_BUTTON_PRIMARY: i32 = 2;
+pub const CUI_BUTTON_OUTLINE: i32 = 3;
+pub const CUI_BUTTON_GHOST: i32 = 4;
+pub const CUI_BUTTON_DANGER: i32 = 5;
+pub const CUI_BUTTON_LINK: i32 = 6;
+// cui_control_size
+pub const CUI_SIZE_MD: i32 = 0;
+pub const CUI_SIZE_SM: i32 = 1;
+pub const CUI_SIZE_LG: i32 = 2;
+// cui_cursor
+pub const CUI_CURSOR_ARROW: i32 = 0;
+pub const CUI_CURSOR_HAND: i32 = 1;
+pub const CUI_CURSOR_TEXT: i32 = 2;
+pub const CUI_CURSOR_RESIZE_EW: i32 = 3;
+pub const CUI_CURSOR_RESIZE_NS: i32 = 4;
+pub const CUI_CURSOR_MOVE: i32 = 5;
+pub const CUI_CURSOR_NOT_ALLOWED: i32 = 6;
+pub const CUI_CURSOR_COUNT: i32 = 7;
+// cui_curve_mode
+pub const CUI_CURVE_SMOOTH: i32 = 0;
+pub const CUI_CURVE_FREE: i32 = 1;
+pub const CUI_CURVE_LINEAR: i32 = 2;
+pub const CUI_CURVE_STEP: i32 = 3;
+// cui_diff_mode
+pub const CUI_DIFF_SPLIT: i32 = 0;
+pub const CUI_DIFF_INLINE: i32 = 1;
+// cui_diff_row_kind
+pub const CUI_DIFF_ROW_SAME: i32 = 0;
+pub const CUI_DIFF_ROW_REMOVED: i32 = 1;
+pub const CUI_DIFF_ROW_ADDED: i32 = 2;
+pub const CUI_DIFF_ROW_CHANGED: i32 = 3;
+pub const CUI_DIFF_ROW_FOLD: i32 = 4;
+// cui_dir
+pub const CUI_COLUMN: i32 = 0;
+pub const CUI_ROW: i32 = 1;
+pub const CUI_STACK: i32 = 2;
+pub const CUI_GRID: i32 = 3;
+// cui_direction
+pub const CUI_DIRECTION_INHERIT: i32 = 0;
+pub const CUI_DIRECTION_LTR: i32 = 1;
+pub const CUI_DIRECTION_RTL: i32 = 2;
+pub const CUI_DIRECTION_AUTO: i32 = 3;
+// cui_elevation
+pub const CUI_ELEVATION_NONE: i32 = 0;
+pub const CUI_ELEVATION_RESTING: i32 = 1;
+pub const CUI_ELEVATION_RAISED: i32 = 2;
+pub const CUI_ELEVATION_FLOATING: i32 = 3;
+// cui_file_dialog_kind
+pub const CUI_FILE_OPEN: i32 = 0;
+pub const CUI_FILE_SAVE: i32 = 1;
+pub const CUI_FILE_FOLDER: i32 = 2;
+// cui_http_method
+pub const CUI_HTTP_GET: i32 = 0;
+pub const CUI_HTTP_POST: i32 = 1;
+pub const CUI_HTTP_PUT: i32 = 2;
+pub const CUI_HTTP_PATCH: i32 = 3;
+pub const CUI_HTTP_DELETE: i32 = 4;
+pub const CUI_HTTP_HEAD: i32 = 5;
+pub const CUI_HTTP_OPTIONS: i32 = 6;
+// cui_job_status
+pub const CUI_JOB_PENDING: i32 = 0;
+pub const CUI_JOB_RUNNING: i32 = 1;
+pub const CUI_JOB_PASSED: i32 = 2;
+pub const CUI_JOB_FAILED: i32 = 3;
+pub const CUI_JOB_SKIPPED: i32 = 4;
+pub const CUI_JOB_CANCELED: i32 = 5;
+// cui_justify
+pub const CUI_JUSTIFY_START: i32 = 0;
+pub const CUI_JUSTIFY_CENTER: i32 = 1;
+pub const CUI_JUSTIFY_END: i32 = 2;
+pub const CUI_JUSTIFY_BETWEEN: i32 = 3;
+pub const CUI_JUSTIFY_AROUND: i32 = 4;
+// cui_key
+pub const CUI_KEY_NONE: i32 = 0;
+pub const CUI_KEY_TAB: i32 = 1;
+pub const CUI_KEY_ENTER: i32 = 2;
+pub const CUI_KEY_ESCAPE: i32 = 3;
+pub const CUI_KEY_BACKSPACE: i32 = 4;
+pub const CUI_KEY_DELETE: i32 = 5;
+pub const CUI_KEY_SPACE: i32 = 6;
+pub const CUI_KEY_LEFT: i32 = 7;
+pub const CUI_KEY_RIGHT: i32 = 8;
+pub const CUI_KEY_UP: i32 = 9;
+pub const CUI_KEY_DOWN: i32 = 10;
+pub const CUI_KEY_HOME: i32 = 11;
+pub const CUI_KEY_END: i32 = 12;
+pub const CUI_KEY_PAGE_UP: i32 = 13;
+pub const CUI_KEY_PAGE_DOWN: i32 = 14;
+pub const CUI_KEY_A: i32 = 15;
+pub const CUI_KEY_B: i32 = 16;
+pub const CUI_KEY_C: i32 = 17;
+pub const CUI_KEY_D: i32 = 18;
+pub const CUI_KEY_E: i32 = 19;
+pub const CUI_KEY_F: i32 = 20;
+pub const CUI_KEY_G: i32 = 21;
+pub const CUI_KEY_H: i32 = 22;
+pub const CUI_KEY_I: i32 = 23;
+pub const CUI_KEY_J: i32 = 24;
+pub const CUI_KEY_K: i32 = 25;
+pub const CUI_KEY_L: i32 = 26;
+pub const CUI_KEY_M: i32 = 27;
+pub const CUI_KEY_N: i32 = 28;
+pub const CUI_KEY_O: i32 = 29;
+pub const CUI_KEY_P: i32 = 30;
+pub const CUI_KEY_Q: i32 = 31;
+pub const CUI_KEY_R: i32 = 32;
+pub const CUI_KEY_S: i32 = 33;
+pub const CUI_KEY_T: i32 = 34;
+pub const CUI_KEY_U: i32 = 35;
+pub const CUI_KEY_V: i32 = 36;
+pub const CUI_KEY_W: i32 = 37;
+pub const CUI_KEY_X: i32 = 38;
+pub const CUI_KEY_Y: i32 = 39;
+pub const CUI_KEY_Z: i32 = 40;
+pub const CUI_KEY_0: i32 = 41;
+pub const CUI_KEY_1: i32 = 42;
+pub const CUI_KEY_2: i32 = 43;
+pub const CUI_KEY_3: i32 = 44;
+pub const CUI_KEY_4: i32 = 45;
+pub const CUI_KEY_5: i32 = 46;
+pub const CUI_KEY_6: i32 = 47;
+pub const CUI_KEY_7: i32 = 48;
+pub const CUI_KEY_8: i32 = 49;
+pub const CUI_KEY_9: i32 = 50;
+pub const CUI_KEY_MINUS: i32 = 51;
+pub const CUI_KEY_EQUAL: i32 = 52;
+pub const CUI_KEY_COMMA: i32 = 53;
+pub const CUI_KEY_PERIOD: i32 = 54;
+pub const CUI_KEY_SLASH: i32 = 55;
+pub const CUI_KEY_F1: i32 = 56;
+pub const CUI_KEY_F2: i32 = 57;
+pub const CUI_KEY_F3: i32 = 58;
+pub const CUI_KEY_F4: i32 = 59;
+pub const CUI_KEY_F5: i32 = 60;
+pub const CUI_KEY_F6: i32 = 61;
+pub const CUI_KEY_F7: i32 = 62;
+pub const CUI_KEY_F8: i32 = 63;
+pub const CUI_KEY_F9: i32 = 64;
+pub const CUI_KEY_F10: i32 = 65;
+pub const CUI_KEY_F11: i32 = 66;
+pub const CUI_KEY_F12: i32 = 67;
+pub const CUI_KEY_COUNT: i32 = 68;
+// cui_loader_style
+pub const CUI_LOADER_DOTS: i32 = 0;
+pub const CUI_LOADER_BARS: i32 = 1;
+pub const CUI_LOADER_PULSE: i32 = 2;
+pub const CUI_LOADER_ORBIT: i32 = 3;
+pub const CUI_LOADER_GRID: i32 = 4;
+// cui_log_level
+pub const CUI_LOG_TRACE: i32 = 0;
+pub const CUI_LOG_DEBUG: i32 = 1;
+pub const CUI_LOG_INFO: i32 = 2;
+pub const CUI_LOG_WARN: i32 = 3;
+pub const CUI_LOG_ERROR: i32 = 4;
+pub const CUI_LOG_LEVEL_COUNT: i32 = 5;
+// cui_mod
+pub const CUI_MOD_SHIFT: i32 = 0;
+pub const CUI_MOD_CTRL: i32 = 1;
+pub const CUI_MOD_ALT: i32 = 2;
+pub const CUI_MOD_SUPER: i32 = 3;
+// cui_mouse_button
+pub const CUI_MOUSE_LEFT: i32 = 0;
+pub const CUI_MOUSE_RIGHT: i32 = 1;
+pub const CUI_MOUSE_MIDDLE: i32 = 2;
+// cui_placement
+pub const CUI_PLACE_BOTTOM_START: i32 = 0;
+pub const CUI_PLACE_BOTTOM: i32 = 1;
+pub const CUI_PLACE_BOTTOM_END: i32 = 2;
+pub const CUI_PLACE_TOP_START: i32 = 3;
+pub const CUI_PLACE_TOP: i32 = 4;
+pub const CUI_PLACE_TOP_END: i32 = 5;
+pub const CUI_PLACE_RIGHT_START: i32 = 6;
+pub const CUI_PLACE_LEFT_START: i32 = 7;
+pub const CUI_PLACE_RIGHT: i32 = 8;
+pub const CUI_PLACE_LEFT: i32 = 9;
+// cui_query_type
+pub const CUI_QUERY_TEXT: i32 = 0;
+pub const CUI_QUERY_NUMBER: i32 = 1;
+pub const CUI_QUERY_CHOICE: i32 = 2;
+pub const CUI_QUERY_BOOL: i32 = 3;
+// cui_renderer_kind
+pub const CUI_RENDERER_AUTO: i32 = 0;
+pub const CUI_RENDERER_OPENGL: i32 = 1;
+pub const CUI_RENDERER_SOFTWARE: i32 = 2;
+// cui_severity
+pub const CUI_SEVERITY_ERROR: i32 = 0;
+pub const CUI_SEVERITY_WARNING: i32 = 1;
+pub const CUI_SEVERITY_INFO: i32 = 2;
+pub const CUI_SEVERITY_HINT: i32 = 3;
+// cui_side
+pub const CUI_SIDE_RIGHT: i32 = 0;
+pub const CUI_SIDE_LEFT: i32 = 1;
+pub const CUI_SIDE_BOTTOM: i32 = 2;
+pub const CUI_SIDE_TOP: i32 = 3;
+// cui_size_kind
+pub const CUI_SIZE_FIT: i32 = 0;
+pub const CUI_SIZE_GROW: i32 = 1;
+pub const CUI_SIZE_FIXED: i32 = 2;
+pub const CUI_SIZE_PERCENT: i32 = 3;
+// cui_status
+pub const CUI_STATUS_IDLE: i32 = 0;
+pub const CUI_STATUS_BUSY: i32 = 1;
+pub const CUI_STATUS_SUCCESS: i32 = 2;
+pub const CUI_STATUS_ERROR: i32 = 3;
+// cui_sw_format
+pub const CUI_SW_RGBA: i32 = 0;
+pub const CUI_SW_BGRA: i32 = 1;
+// cui_tabs_variant
+pub const CUI_TABS_UNDERLINE: i32 = 0;
+pub const CUI_TABS_PILL: i32 = 1;
+// cui_task_status
+pub const CUI_TASK_PENDING: i32 = 0;
+pub const CUI_TASK_RUNNING: i32 = 1;
+pub const CUI_TASK_DONE: i32 = 2;
+pub const CUI_TASK_FAILED: i32 = 3;
+pub const CUI_TASK_SKIPPED: i32 = 4;
+// cui_text_align
+pub const CUI_TEXT_START: i32 = 0;
+pub const CUI_TEXT_CENTER: i32 = 1;
+pub const CUI_TEXT_RIGHT: i32 = 2;
+pub const CUI_TEXT_LEFT: i32 = 3;
+pub const CUI_TEXT_END: i32 = 4;
+// cui_texture_format
+pub const CUI_TEXTURE_R8: i32 = 1;
+pub const CUI_TEXTURE_RGBA8: i32 = 4;
+// cui_theme_mode
+pub const CUI_THEME_LIGHT: i32 = 0;
+pub const CUI_THEME_DARK: i32 = 1;
+// cui_timeline_ruler
+pub const CUI_TIMELINE_FRAMES: i32 = 0;
+pub const CUI_TIMELINE_SECONDS: i32 = 1;
+pub const CUI_TIMELINE_TIMECODE: i32 = 2;
+// cui_token
+pub const CUI_TOKEN_NONE: i32 = 0;
+pub const CUI_TOKEN_BACKGROUND: i32 = 1;
+pub const CUI_TOKEN_SURFACE: i32 = 2;
+pub const CUI_TOKEN_SURFACE_RAISED: i32 = 3;
+pub const CUI_TOKEN_SURFACE_MUTED: i32 = 4;
+pub const CUI_TOKEN_FOREGROUND: i32 = 5;
+pub const CUI_TOKEN_TEXT_SECONDARY: i32 = 6;
+pub const CUI_TOKEN_TEXT_MUTED: i32 = 7;
+pub const CUI_TOKEN_BORDER: i32 = 8;
+pub const CUI_TOKEN_BORDER_SUBTLE: i32 = 9;
+pub const CUI_TOKEN_BORDER_STRONG: i32 = 10;
+pub const CUI_TOKEN_ACCENT: i32 = 11;
+pub const CUI_TOKEN_ACCENT_STRONG: i32 = 12;
+pub const CUI_TOKEN_ACCENT_SUBTLE: i32 = 13;
+pub const CUI_TOKEN_ACCENT_FOREGROUND: i32 = 14;
+pub const CUI_TOKEN_SUCCESS: i32 = 15;
+pub const CUI_TOKEN_WARNING: i32 = 16;
+pub const CUI_TOKEN_DANGER: i32 = 17;
+pub const CUI_TOKEN_INFO: i32 = 18;
+pub const CUI_TOKEN_CONTROL_ON: i32 = 19;
+pub const CUI_TOKEN_CONTROL_GLYPH: i32 = 20;
+pub const CUI_TOKEN_CONTROL_TRACK: i32 = 21;
+pub const CUI_TOKEN_CONTROL_TRACK_HOVER: i32 = 22;
+pub const CUI_TOKEN_CONTROL_THUMB: i32 = 23;
+pub const CUI_TOKEN_CONTROL_THUMB_ON: i32 = 24;
+pub const CUI_TOKEN_HOVER: i32 = 25;
+pub const CUI_TOKEN_ACTIVE: i32 = 26;
+pub const CUI_TOKEN_SCRIM: i32 = 27;
+pub const CUI_TOKEN_FOCUS_RING: i32 = 28;
+pub const CUI_TOKEN_SERIES_1: i32 = 29;
+pub const CUI_TOKEN_SERIES_2: i32 = 30;
+pub const CUI_TOKEN_SERIES_3: i32 = 31;
+pub const CUI_TOKEN_SERIES_4: i32 = 32;
+pub const CUI_TOKEN_SERIES_5: i32 = 33;
+pub const CUI_TOKEN_SERIES_6: i32 = 34;
+pub const CUI_TOKEN_COUNT: i32 = 35;
+// cui_tone
+pub const CUI_TONE_NEUTRAL: i32 = 0;
+pub const CUI_TONE_INFO: i32 = 1;
+pub const CUI_TONE_SUCCESS: i32 = 2;
+pub const CUI_TONE_WARNING: i32 = 3;
+pub const CUI_TONE_DANGER: i32 = 4;
+pub const CUI_TONE_VIOLET: i32 = 5;
+pub const CUI_TONE_TEAL: i32 = 6;
+pub const CUI_TONE_ROSE: i32 = 7;
+pub const CUI_TONE_ACCENT: i32 = 8;
+// cui_voice_state
+pub const CUI_VOICE_IDLE: i32 = 0;
+pub const CUI_VOICE_LISTENING: i32 = 1;
+pub const CUI_VOICE_THINKING: i32 = 2;
+pub const CUI_VOICE_SPEAKING: i32 = 3;
+
 extern "C" {
     // inline code
     pub fn cui_accordion_begin(ui: *mut cui_ctx, title: *const c_char, open: *mut bool) -> bool;
@@ -2711,6 +3151,8 @@ extern "C" {
     pub fn cui_counter_ex(ui: *mut cui_ctx, id: *const c_char, value: f64, opts: *const cui_counter_opts);
     // Radial gauge: one value on a dial with colored bands, labelled ticks, a
     pub fn cui_coverage_ex(ui: *mut cui_ctx, id: *const c_char, files: *const cui_coverage_file, count: i32, opts: *const cui_coverage_opts) -> cui_coverage_result;
+    // caption in the top left corner, default "Before"
+    pub fn cui_cron_describe(ui: *mut cui_ctx, cron: *const c_char) -> *const c_char;
     // Before and after: drag the divider to compare two images. *pos is 0..1.
     pub fn cui_cron_next(cron: *const c_char, after: i64, utc_offset: i32, next: *mut i64) -> bool;
     // textarea: height in points; negative fills the space
@@ -2739,10 +3181,10 @@ extern "C" {
     pub fn cui_date_picker_ex(ui: *mut cui_ctx, id: *const c_char, value: *mut cui_date, opts: *const cui_date_opts) -> bool;
     // The next row in view: returns its node, or -1 when done. Then build its
     pub fn cui_date_range_picker_ex(ui: *mut cui_ctx, id: *const c_char, range: *mut cui_date_range, opts: *const cui_date_range_opts) -> bool;
-    // The first cell: indentation, guides, the chevron, an icon and the name
-    pub fn cui_date_to_days(d: cui_date) -> i32;
     // CUI_ALIGN_DEFAULT: columns stretch their children, rows center them.
     pub fn cui_date_today() -> cui_date;
+    // The first cell: indentation, guides, the chevron, an icon and the name
+    pub fn cui_date_to_days(d: cui_date) -> i32;
     // Next cell; put any components inside, or use cui_table_cell_text.
     pub fn cui_diff_compute(old_text: *const c_char, old_len: usize, new_text: *const c_char, new_len: usize, flags: u32, hunks: *mut cui_diff_hunk, cap: i32, stats: *mut cui_diff_stats) -> i32;
     // default fill
@@ -2751,7 +3193,6 @@ extern "C" {
     pub fn cui_diff_view_rows(ui: *mut cui_ctx, id: *const c_char, rows: *mut cui_diff_row, first: i32, cap: i32) -> i32;
     // shown in the legend and in the hover tooltip
     pub fn cui_diff_words(old_line: *const c_char, old_len: i32, new_line: *const c_char, new_len: i32, old_ranges: *mut cui_diff_range, old_count: *mut i32, new_ranges: *mut cui_diff_range, new_count: *mut i32, cap: i32) -> bool;
-    pub fn cui_doc_tabs_ex(ui: *mut cui_ctx, id: *const c_char, tabs: *const cui_doc_tab, count: i32, selected: *mut i32, opts: *const cui_doc_tabs_opts) -> cui_doc_tabs_result;
     // one icon per menu item, in the order of the items; `NULL` for none
     pub fn cui_dock_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_dock_opts);
     // Toggle group: a row of toggles (bold, italic...). values[i] is toggled
@@ -2766,6 +3207,7 @@ extern "C" {
     pub fn cui_dock_separator(ui: *mut cui_ctx, );
     pub fn cui_dockspace_begin_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_dockspace_opts);
     pub fn cui_dockspace_end(ui: *mut cui_ctx, );
+    pub fn cui_doc_tabs_ex(ui: *mut cui_ctx, id: *const c_char, tabs: *const cui_doc_tab, count: i32, selected: *mut i32, opts: *const cui_doc_tabs_opts) -> cui_doc_tabs_result;
     // On the editor's next frame: put the caret at a line and column (1 based),
     pub fn cui_draw_emoji(ui: *mut cui_ctx, utf8: *const c_char, len: i32, r: cui_rect);
     // a light travels around the card's edge all the time
@@ -2782,6 +3224,8 @@ extern "C" {
     pub fn cui_emoji_font_load_memory(ui: *mut cui_ctx, data: *const c_void, size: usize, copy: bool) -> bool;
     // with the find bar open: matches, and which one is selected (1 based, 0 none)
     pub fn cui_emoji_font_load_system(ui: *mut cui_ctx, ) -> bool;
+    // ---- Diff viewer ----
+    pub fn cui_emoji_picker_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_emoji_picker_opts) -> *const c_char;
     // with the find bar open: matches, and which one is selected (1 based, 0 none)
     pub fn cui_emoji_supported(ui: *mut cui_ctx, utf8: *const c_char, len: i32) -> bool;
     // the table sets and clears it
@@ -2815,6 +3259,10 @@ extern "C" {
     pub fn cui_gauge(ui: *mut cui_ctx, label: *const c_char, value: f32, size: f32);
     // optional, defaults to malloc/free
     pub fn cui_get_cursor(ui: *mut cui_ctx, ) -> c_int;
+    // Control tile: a large toggle with an icon, a label and a state line.
+    pub fn cui_get_draw_data(ui: *mut cui_ctx, ) -> *const cui_draw_data;
+    // ------------------------------------------------------------------------
+    pub fn cui_get_strings(ui: *mut cui_ctx, ) -> *const cui_strings;
     // linear sample peaks, one per channel, for a level meter beside the track; `NULL` for none
     pub fn cui_gl_create(loader: cui_gl_loader) -> *mut c_void;
     // entries in `meter`, up to 8; a dB fader's range sets the meter's scale
@@ -2847,6 +3295,10 @@ extern "C" {
     pub fn cui_hover_card_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_hover_card_opts) -> bool;
     // ---- Tree table and path bar ----
     pub fn cui_hover_card_end(ui: *mut cui_ctx, );
+    // Activity rings: concentric progress rings; values past 1 keep winding.
+    pub fn cui_http_method_name(method: i32) -> *const c_char;
+    // Activity rings: concentric progress rings; values past 1 keep winding.
+    pub fn cui_http_reason(status: i32) -> *const c_char;
     // number of `annotations`
     pub fn cui_image_compare_ex(ui: *mut cui_ctx, id: *const c_char, before: usize, after: usize, pos: *mut f32, opts: *const cui_compare_opts) -> bool;
     // Elastic slider: the track stretches like rubber when dragged past its ends.
@@ -2901,6 +3353,8 @@ extern "C" {
     pub fn cui_kanban_end(ui: *mut cui_ctx, move_: *mut cui_kanban_move) -> bool;
     // Card stack: a deck where the top card can be flicked away left or right.
     pub fn cui_keymap_ex(ui: *mut cui_ctx, id: *const c_char, bindings: *const cui_keymap_binding, count: i32, opts: *const cui_keymap_opts) -> cui_keymap_result;
+    // path: the folder shown, yours; the browser writes it as you move around.
+    pub fn cui_key_name(key: c_int) -> *const c_char;
     // the bar is showing its text field for typing a path
     pub fn cui_knob_ex(ui: *mut cui_ctx, id: *const c_char, value: *mut f32, min: f32, max: f32, opts: *const cui_knob_opts) -> bool;
     // shows the avatar (others) and status (mine)
@@ -3012,6 +3466,8 @@ extern "C" {
     // hides the previous and next arrows that show on hover
     pub fn cui_query_match(fields: *const cui_query_field, field_count: i32, nodes: *const cui_query_node, count: i32, values: *mut c_char) -> bool;
     // Carousel: slides that you swipe, drag, scroll or page with the arrows
+    pub fn cui_query_op_name(type_: c_int, op: i32) -> *const c_char;
+    // Carousel: slides that you swipe, drag, scroll or page with the arrows
     pub fn cui_query_text(fields: *const cui_query_field, field_count: i32, nodes: *const cui_query_node, count: i32, out: *mut c_char, cap: usize) -> usize;
     // Returns true when the view changed.
     pub fn cui_radar_chart_ex(ui: *mut cui_ctx, id: *const c_char, series: *const cui_series, count: i32, axes: *mut c_char, axis_count: i32, opts: *const cui_radar_opts) -> i32;
@@ -3061,6 +3517,8 @@ extern "C" {
     pub fn cui_set_strings(ui: *mut cui_ctx, strings: *const cui_strings);
     // muted text at the right of the title, e.g. "2h ago"
     pub fn cui_shimmer_text_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_text_fx_opts);
+    // path: the folder shown, yours; the browser writes it as you move around.
+    pub fn cui_shortcut_label(ui: *mut cui_ctx, combo: cui_key_combo) -> *const c_char;
     // the folder could not be read
     pub fn cui_shortcut_recorder_ex(ui: *mut cui_ctx, id: *const c_char, combo: *mut cui_key_combo, opts: *const cui_shortcut_recorder_opts) -> bool;
     // seconds since 1970 (UTC); 0 unknown
@@ -3108,6 +3566,8 @@ extern "C" {
     pub fn cui_sw_destroy(r: *mut c_void);
     // under a vertical fader, before a horizontal one; the id when NULL
     pub fn cui_sw_iface(r: *mut c_void) -> cui_renderer_iface;
+    pub fn cui_swipe_item_begin(ui: *mut cui_ctx, id: *const c_char, left: *const cui_swipe_action, left_count: i32, right: *const cui_swipe_action, right_count: i32);
+    pub fn cui_swipe_item_end(ui: *mut cui_ctx, ) -> i32;
     // double-click value, default 0 (clamped to the range)
     pub fn cui_sw_last_damage(r: *const c_void, x: *mut i32, y: *mut i32, w: *mut i32, h: *mut i32) -> bool;
     // default "%.1f"
@@ -3116,8 +3576,6 @@ extern "C" {
     pub fn cui_sw_set_incremental(r: *mut c_void, on: bool);
     // the track runs left to right, with the label before it, instead of bottom to top
     pub fn cui_sw_set_threads(r: *mut c_void, threads: i32);
-    pub fn cui_swipe_item_begin(ui: *mut cui_ctx, id: *const c_char, left: *const cui_swipe_action, left_count: i32, right: *const cui_swipe_action, right_count: i32);
-    pub fn cui_swipe_item_end(ui: *mut cui_ctx, ) -> i32;
     // items that have an icon show only the icon, with their label as the tooltip
     pub fn cui_tab_bar_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_tab_bar_item, count: i32, selected: *mut i32, opts: *const cui_tab_bar_opts) -> bool;
     // Square/round button with only an icon. Give it a tooltip so it has a name.
@@ -3136,10 +3594,10 @@ extern "C" {
     pub fn cui_terminal_write(t: *mut cui_terminal_buffer, data: *const c_char, len: i32);
     // width of the node bars in points, default 12
     pub fn cui_test_explorer_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_test_item, count: i32, opts: *const cui_test_explorer_opts) -> cui_test_explorer_result;
-    // the final item: no connector line below its dot and no space after it
-    pub fn cui_text_reveal_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_text_fx_opts);
     // user text scale multiplier (default 1)
     pub fn cui_textf(ui: *mut cui_ctx, fmt: *const c_char);
+    // the final item: no connector line below its dot and no space after it
+    pub fn cui_text_reveal_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_text_fx_opts);
     // Popover anchored to the previous component. Toggle it with
     pub fn cui_theme_switcher(ui: *mut cui_ctx, mode: *mut i32, with_system: bool) -> bool;
     // Popover anchored to the previous component. Toggle it with
@@ -3150,10 +3608,10 @@ extern "C" {
     pub fn cui_time_dial(ui: *mut cui_ctx, id: *const c_char, hour: *mut i32, minute: *mut i32, size: f32) -> bool;
     // title under the x axis; also names the x value in the tooltip
     pub fn cui_time_histogram_ex(ui: *mut cui_ctx, id: *const c_char, start: f64, bucket_seconds: f64, buckets: i32, series: *const cui_histogram_series, series_count: i32, sel_start: *mut f64, sel_end: *mut f64, opts: *const cui_time_histogram_opts) -> cui_time_histogram_result;
-    // Sorts every sibling list (stable) by cmp, relinking the nodes. Returns
-    pub fn cui_time_picker_ex(ui: *mut cui_ctx, id: *const c_char, hour: *mut i32, minute: *mut i32, opts: *const cui_time_opts) -> bool;
     // Word marks between two versions of one line, as byte ranges (a length of -1
     pub fn cui_timeline_editor_ex(ui: *mut cui_ctx, id: *const c_char, tracks: *mut cui_timeline_track, count: i32, time: *mut f32, opts: *const cui_timeline_editor_opts) -> cui_timeline_editor_result;
+    // Sorts every sibling list (stable) by cmp, relinking the nodes. Returns
+    pub fn cui_time_picker_ex(ui: *mut cui_ctx, id: *const c_char, hour: *mut i32, minute: *mut i32, opts: *const cui_time_opts) -> bool;
     // -1 when it has none, or none loaded yet
     pub fn cui_toc(ui: *mut cui_ctx, scroll_id: *const c_char, items: *const cui_toc_item, count: i32) -> i32;
     // CUI_TREE_*
@@ -3184,6 +3642,8 @@ extern "C" {
     pub fn cui_tree_clicked(ui: *mut cui_ctx, ) -> bool;
     // Buttons
     pub fn cui_tree_end(ui: *mut cui_ctx, );
+    // Returns true when the view changed.
+    pub fn cui_treemap_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_treemap_opts) -> i32;
     // default 440
     pub fn cui_tree_sort(nodes: *mut cui_tree_node, node_count: i32, root: i32, user: *mut c_void) -> i32;
     // a check mark at the right edge of the item
@@ -3196,8 +3656,6 @@ extern "C" {
     pub fn cui_tree_table_name(ui: *mut cui_ctx, label: *const c_char, icon: *const c_char);
     // ------------------------------------------------------------------------
     pub fn cui_tree_table_row(ui: *mut cui_ctx, ) -> i32;
-    // Returns true when the view changed.
-    pub fn cui_treemap_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_treemap_opts) -> i32;
     // a dashed horizontal line at the value `y`, labelled at its end
     pub fn cui_typing_indicator(ui: *mut cui_ctx, name: *const c_char);
     // Scatter (or bubble) chart: points per series, optional sizes.

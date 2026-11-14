@@ -510,6 +510,12 @@ impl<'a> Ui<'a> {
         ok
     }
 
+    /// The path of one of the files dropped on the window this frame
+    /// (C's `cui_dropped_file`); pairs with `cui_dropped_file_count`.
+    pub fn dropped_file(&mut self, index: i32) -> Option<String> {
+        str_of(unsafe { ffi::cui_dropped_file(self.ctx, index) })
+    }
+
     /// A row of filter fields (C's `cui_filter_bar`). Writes the search text.
     pub fn filter_bar(
         &mut self,
@@ -796,6 +802,53 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_wheel_picker_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, index, o) }
     }
 
+    /// A key/value editor (C's `cui_kv_editor`). `count` tracks the used
+    /// rows; `pairs` is the fixed-capacity table.
+    pub fn kv_editor(&mut self, id: impl AsRef<str>, pairs: &mut [ffi::cui_kv_pair], count: &mut i32, o: &ffi::cui_kv_editor_opts) -> bool {
+        assert!(!pairs.is_empty() && *count >= 0 && (*count as usize) <= pairs.len());
+        unsafe {
+            ffi::cui_kv_editor_ex(self.ctx, self.cs(&id), pairs.as_mut_ptr(), count, pairs.len() as i32, o)
+        }
+    }
+
+    /// A nested filter/query builder (C's `cui_query_builder`). `count`
+    /// tracks the used nodes; `nodes` is the fixed-capacity arena.
+    pub fn query_builder(
+        &mut self,
+        id: impl AsRef<str>,
+        fields: &[ffi::cui_query_field],
+        nodes: &mut [ffi::cui_query_node],
+        count: &mut i32,
+        o: &ffi::cui_query_opts,
+    ) -> bool {
+        assert!(!fields.is_empty() && !nodes.is_empty() && *count >= 0 && (*count as usize) <= nodes.len());
+        unsafe {
+            ffi::cui_query_builder_ex(self.ctx, self.cs(&id), fields.as_ptr(), fields.len() as i32, nodes.as_mut_ptr(), count, nodes.len() as i32, o)
+        }
+    }
+
+    /// A spline editor (C's `cui_curve_editor`). `count` tracks the used
+    /// keys; `keys` is the fixed-capacity array.
+    pub fn curve_editor(
+        &mut self,
+        id: impl AsRef<str>,
+        keys: &mut [ffi::cui_curve_key],
+        count: &mut i32,
+        o: &ffi::cui_curve_opts,
+    ) -> ffi::cui_curve_result {
+        assert!(!keys.is_empty() && *count >= 0 && (*count as usize) <= keys.len());
+        unsafe {
+            ffi::cui_curve_editor_ex(self.ctx, self.cs(&id), keys.as_mut_ptr(), count, keys.len() as i32, o)
+        }
+    }
+
+    /// Uploads an RGBA8 image as a GPU texture (C's `cui_image_create`).
+    /// The handle stays valid until [`Ui::image_destroy`](Self::image_destroy).
+    pub fn image_create(&mut self, w: i32, h: i32, rgba: &[u8]) -> usize {
+        assert_eq!(rgba.len(), (w * h * 4) as usize, "rgba must be w*h*4 bytes");
+        unsafe { ffi::cui_image_create(self.ctx, w, h, rgba.as_ptr().cast()) }
+    }
+
     /// Words fade and rise into place one after another (C's `cui_word_rotate`).
     pub fn word_rotate(&mut self, id: impl AsRef<str>, words: &[&str], interval: f32, o: &crate::TextFx) {
         assert!(!words.is_empty());
@@ -826,6 +879,46 @@ pub fn date_from_days(days: i32) -> Date {
     Date::from_ffi(unsafe { ffi::cui_date_from_days(days) })
 }
 
+/// Converts a borrowed C string from the library into a Rust `String`.
+fn str_of(p: *const c_char) -> Option<String> {
+    if p.is_null() {
+        None
+    } else {
+        Some(unsafe { core::ffi::CStr::from_ptr(p) }.to_string_lossy().into_owned())
+    }
+}
+
+/// The display name of a key, e.g. `"F5"` (C's `cui_key_name`).
+pub fn key_name(key: Key) -> Option<String> {
+    str_of(unsafe { ffi::cui_key_name(key.to_ffi() as i32) })
+}
+
+/// The reason line for an HTTP status, e.g. `"Not Found"` (C's `cui_http_reason`).
+pub fn http_reason(status: i32) -> Option<String> {
+    str_of(unsafe { ffi::cui_http_reason(status) })
+}
+
+/// The name of an HTTP method token, e.g. `"GET"` (C's `cui_http_method_name`).
+pub fn http_method_name(method: i32) -> Option<String> {
+    str_of(unsafe { ffi::cui_http_method_name(method) })
+}
+
+/// The symbol of a query-builder operator (C's `cui_query_op_name`).
+pub fn query_op_name(ty: i32, op: i32) -> Option<String> {
+    str_of(unsafe { ffi::cui_query_op_name(ty, op) })
+}
+
+/// One row of a [`cui_log_buffer`](crate::cui_log_buffer) (C's `cui_log_get`).
+/// Returns the line's metadata and its text.
+pub fn log_get(buf: &ffi::cui_log_buffer, i: i32) -> Option<(ffi::cui_log_line, String)> {
+    let mut text: *const c_char = core::ptr::null();
+    let line = unsafe { *ffi::cui_log_get_raw(buf, i, &mut text) };
+    if line.len == 0 || text.is_null() {
+        return None;
+    }
+    str_of(text).map(|s| (line, s))
+}
+
 /// Days since the CUI epoch (C's `cui_date_to_days`).
 #[allow(dead_code)] // used by the gallery example
 pub fn date_to_days(d: Date) -> i32 {
@@ -836,4 +929,24 @@ pub fn date_to_days(d: Date) -> i32 {
 #[allow(dead_code)] // used by the gallery example
 pub fn date_today() -> Date {
     Date::from_ffi(unsafe { ffi::cui_date_today() })
+}
+
+/// Re-derives a String from a buffer CUI edited (NUL-terminated, UTF-8
+/// re-validated). Used by the generated layer after a call that writes
+/// into a caller-owned buffer.
+pub(crate) fn sync_buffer(value: &mut String) {
+    let cap = value.capacity();
+    if cap == 0 {
+        return;
+    }
+    let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr().cast::<u8>(), cap) };
+    let len = bytes.iter().position(|&b| b == 0).unwrap_or(cap.saturating_sub(1));
+    value.clear();
+    match core::str::from_utf8(&bytes[..len]) {
+        Ok(s) => value.push_str(s),
+        Err(_) => {
+            let s = String::from_utf8_lossy(&bytes[..len]);
+            value.push_str(&s);
+        }
+    }
 }

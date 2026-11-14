@@ -108,39 +108,45 @@ can be followed along in Rust with only syntax changes.
 
 ## What is bound
 
-**Every `cui_` call in the v1.4.0 examples and component gallery (268 unique
-calls) has a callable Rust binding.** 362 extern functions and 234 `#[repr(C)]`
-structs across two layers:
+**Every one of the 500 `CUI_API` functions in the v1.4.0 release has a
+callable Rust binding.** Across two layers:
 
-- **Hand-written safe layer** (~200 methods on `Ui`): the components covered
-  by the 11 ported examples — app lifecycle, layout, text, buttons, selection,
-  input, navigation, overlays, display, charts, canvas painting, conversation,
-  table, identity, input queries, theme, and native file dialogs. String
-  parameters go through a per-frame arena; text fields edit `&mut String`
-  in place; container scopes are closures with panic-safe begin/end guards.
-- **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 179
-  functions + 177 structs): the full second-wave gallery surface — kanban,
-  dock, terminal, data grid (with editing), carousel, card stacks, code
-  blocks, JSON viewer, blame, coverage, API explorer, feature flags,
-  test explorer, stack traces, trace viewer, network waterfall, dependency
-  graph, commit graph, pipeline, problems, key-value editor, query builder,
-  schedule picker, keymap, file browser, file picker, dropzone, emoji picker,
-  color picker, date/time/range pickers, image viewer/comparer/cropper,
-  signature pad, presence, reactions, ticker, now playing, waveform, tab bar,
-  waterfall, waffle, funnel, sankey, treemap, radar, candlestick, gauge,
-  activity rings, bar list, knob, level meter, fader, scrub, money input,
-  inline edit, shortcut recorder, url params, feature flags, theme switcher,
-  spinner, loader, gradient text, spotlight, expandable text/cards, hover
-  card, banner, alert, checklist, countdown, meter, reactions, split button,
-  status button, swipe actions, speed dial, avatar upload, word rotate,
-  shimmer text, text reveal, typing indicator, voice orb, week/month/range
-  calendars, gantt, heatmap, calendar heatmap, filter bar, keymap, url
-  params, and more.
+- **Hand-written safe layer** (~220 methods on `Ui` plus free functions):
+  the components covered by the 12 ported examples — app lifecycle, layout,
+  text, buttons, selection, input, navigation, overlays, display, charts,
+  canvas painting, conversation, table, identity, input queries, theme, and
+  native file dialogs. String parameters go through a per-frame arena; text
+  fields edit `&mut String` in place; container scopes are closures with
+  panic-safe begin/end guards.
+- **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 319
+  extern functions + 233 structs, 276 safe methods): the full second-wave
+  gallery surface — kanban, dock, terminal, data grid (with editing),
+  carousel, card stacks, code blocks, JSON viewer, blame, coverage, API
+  explorer, feature flags, test explorer, stack traces, trace viewer,
+  network waterfall, dependency graph, commit graph, pipeline, problems,
+  key-value editor, query builder, schedule picker, keymap, file browser,
+  file picker, dropzone, emoji picker, color picker, date/time/range
+  pickers, image viewer/comparer/cropper, signature pad, presence,
+  reactions, ticker, now playing, waveform, tab bar, waterfall, waffle,
+  funnel, sankey, treemap, radar, candlestick, gauge, activity rings, bar
+  list, knob, level meter, fader, scrub, money input, inline edit, shortcut
+  recorder, url params, theme switcher, spinner, loader, gradient text,
+  spotlight, expandable text/cards, hover card, banner, alert, checklist,
+  countdown, meter, split button, status button, swipe actions, speed dial,
+  avatar upload, word rotate, shimmer text, text reveal, typing indicator,
+  voice orb, week/month/range calendars, gantt, heatmap, calendar heatmap,
+  filter bar, and more — including the raw name/format helpers
+  (`cui_key_name`, `cui_http_reason`, `cui_shortcut_label`, …) and the
+  renderer introspection (`cui_get_draw_data`).
 
-The renderer SPI (bring your own window) and text shaping are declared in
-the FFI but not yet wrapped. Adding a component is mechanical — extend
-`scripts/ffi-manifest.txt`, re-run `scripts/gen_ffi.py` — see the git
-history for the pattern.
+The generated methods are "thin safe": `impl AsRef<str>` for strings (via
+the frame arena), `&mut String` for editable buffers (UTF-8 re-validated
+after the call), slices for pointer+count pairs, and raw `ffi::*_opts`
+structs for options — construct them with `..Default::default()` and the
+public [`Arena`](cui/src/arena.rs) for any string pointers. The renderer SPI
+(bring your own window) is declared in the FFI. Adding a component is
+mechanical — extend `scripts/ffi-manifest.txt`, re-run `scripts/gen_ffi.py`
+— see the git history for the pattern.
 
 ## Platform notes
 
@@ -159,16 +165,19 @@ window), `text-shaping` (Arabic shaping + bidi).
 
 ## Examples
 
-11 of the 12 upstream examples have Rust twins in
-[`cui/examples/`](cui/examples): `hello`, `todo`, `settings`, `notes`,
-`dashboard`, `mail`, `finance`, `music`, `tracker`, `assistant` and
-`caffeine` — line-for-line ports of the C originals, each verified by the CI
-smoke test (every example runs for a few seconds under Xvfb; a crash or an
-early exit fails the build, and screenshots are uploaded as artifacts).
-The component gallery (the 12th example, ~3,000 lines covering 18
-extended pages) is not yet ported — all 268 `cui_` calls it uses have
-bindings (see `scripts/ffi-manifest.txt`), the example code is the
-remaining work for v0.2.
+All 12 upstream examples have Rust twins in [`cui/examples/`](cui/examples):
+`hello`, `todo`, `settings`, `notes`, `dashboard`, `mail`, `finance`,
+`music`, `tracker`, `assistant`, `caffeine` and the **component gallery** —
+line-for-line ports of the C originals, each verified by the CI smoke test
+(every example runs for a few seconds under Xvfb; a crash or an early exit
+fails the build, and screenshots are uploaded as artifacts).
+
+The gallery ([`cui/examples/gallery/`](cui/examples/gallery)) covers every
+component in the library: the nine base pages plus the eighteen extended
+pages (kanban, data grid, terminal, charts, motion, AI, audio, developer
+tools, instruments, …), ~2,900 lines of Rust across three modules. It also
+doubles as a screenshot tool: `CUI_GALLERY_SHOT=path:page` renders that page
+and writes a PNG, which the smoke test uses to eyeball every page.
 
 ## Repository layout
 
@@ -196,7 +205,7 @@ support is in place: capability cfgs (`cui_ge_1_5` etc.), a C ABI probe per
 pinned release, and per-version layout tables that the tests check against.
 
 **The bound upstream release rides in the build metadata.** Both crates are
-versioned `0.1.0+cui1.4.0`: the `+cui…` suffix — the same convention as
+versioned `0.1.1+cui1.4.0`: the `+cui…` suffix — the same convention as
 `zstd-sys 2.0.9+zstd.1.5.5` or `libgit2-sys 0.16.2+1.7.2` — states which
 upstream release the binding targets. It shows up in `cargo pkgid`, crates.io
 and docs.rs without affecting dependency resolution. When the pin moves to a

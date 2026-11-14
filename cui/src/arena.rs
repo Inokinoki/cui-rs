@@ -13,7 +13,7 @@
 use core::cell::UnsafeCell;
 use core::ffi::c_char;
 
-pub(crate) struct Arena {
+pub struct Arena {
     buf: UnsafeCell<Vec<u8>>,
 }
 
@@ -44,7 +44,7 @@ impl Arena {
     /// Copies `s` and NUL-terminates it. Panics on interior NUL bytes — CUI
     /// strings are NUL-terminated by contract; the `##`/`###` identity
     /// suffixes are plain text and pass through unchanged.
-    pub(crate) fn cstr(&self, s: &str) -> *const c_char {
+    pub fn cstr(&self, s: &str) -> *const c_char {
         assert!(!s.contains('\0'), "CUI strings must not contain NUL bytes: {s:?}");
         let buf = self.buf();
         let start = buf.len();
@@ -54,7 +54,7 @@ impl Arena {
     }
 
     /// Copies a `&[&str]` into an aligned `*const *const c_char` array.
-    pub(crate) fn cstr_array(&self, items: &[&str]) -> *const *const c_char {
+    pub fn cstr_array(&self, items: &[&str]) -> *const *const c_char {
         assert!(!items.is_empty());
         self.align(core::mem::align_of::<*const c_char>());
         let buf = self.buf();
@@ -68,7 +68,7 @@ impl Arena {
     }
 
     /// Copies a slice of fixed-size C structs into an aligned array.
-    pub(crate) fn struct_array<T: Copy>(&self, items: &[T]) -> *const T {
+    pub fn struct_array<T: Copy>(&self, items: &[T]) -> *const T {
         assert!(!items.is_empty());
         self.align(core::mem::align_of::<T>());
         let buf = self.buf();

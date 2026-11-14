@@ -32,3 +32,9 @@ cui_prop_text_ex
 cui_date_from_days
 cui_date_to_days
 cui_date_today
+cui_kv_editor
+cui_query_builder
+cui_curve_editor
+cui_image_create
+cui_log_get
+cui_shortcut_label

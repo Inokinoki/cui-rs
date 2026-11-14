@@ -64,7 +64,10 @@ mod opts;
 mod opts2;
 
 pub use draw::*;
-pub use ext::file_dialog;
+pub use ext::{
+    date_from_days, date_to_days, date_today, file_dialog, http_method_name, http_reason, key_name,
+    log_get, query_op_name,
+};
 pub use icons::*;
 pub use opts::*;
 pub use opts2::*;
@@ -300,6 +303,14 @@ pub struct Ui<'a> {
 impl<'a> Ui<'a> {
     fn new(ctx: *mut ffi::cui_ctx, arena: &'a Arena) -> Ui<'a> {
         Ui { ctx, arena }
+    }
+
+    /// The frame string arena, for building raw `ffi::*_opts` structs whose
+    /// pointer fields (labels, formats, item arrays) must stay valid for one
+    /// frame. Pointers from `cstr`/`cstr_array`/`struct_array` live until the
+    /// frame ends — exactly what a CUI call needs.
+    pub fn arena(&self) -> &'a Arena {
+        self.arena
     }
 
     pub(crate) fn cs(&self, s: &impl AsRef<str>) -> *const c_char {

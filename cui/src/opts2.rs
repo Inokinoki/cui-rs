@@ -555,6 +555,8 @@ pub struct ListItem<'a> {
     pub trailing: Option<&'a str>,
     /// Drawn with the active background.
     pub selected: bool,
+    /// A name: shows that person's avatar (initials) in place of the icon.
+    pub avatar: Option<&'a str>,
 }
 impl ListItem<'_> {
     pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_list_item_opts {
@@ -564,7 +566,7 @@ impl ListItem<'_> {
             subtitle: cstr(a, self.subtitle),
             trailing: cstr(a, self.trailing),
             selected: self.selected,
-            avatar: core::ptr::null(),
+            avatar: cstr(a, self.avatar),
         }
     }
 }

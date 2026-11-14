@@ -57,8 +57,15 @@ impl SizeKind {
     }
 }
 
+impl Size {
+    /// The C ABI form (`cui_size`) — for building raw `ffi::*_opts` structs.
+    pub fn to_ffi(self) -> ffi::cui_size {
+        ffi::cui_size { kind: self.kind.to_ffi(), value: self.value }
+    }
+}
+
 pub(crate) fn size_to_ffi(s: Size) -> ffi::cui_size {
-    ffi::cui_size { kind: s.kind.to_ffi(), value: s.value }
+    s.to_ffi()
 }
 
 /// An RGBA color. Mirrors C's `cui_color`.
@@ -127,6 +134,14 @@ impl Color {
     pub const fn rgba(r: u8, g: u8, b: u8, a: u8) -> Color {
         Color { r, g, b, a }
     }
+    /// Opaque color from a hex literal, `0xRRGGBB` (C's `CUI_RGB`).
+    pub const fn hex(v: u32) -> Color {
+        Color { r: (v >> 16) as u8, g: (v >> 8) as u8, b: v as u8, a: 255 }
+    }
+    /// Color from a hex literal with alpha, `0xRRGGBBAA` (C's `CUI_RGBA`).
+    pub const fn hexa(v: u32) -> Color {
+        Color { r: (v >> 24) as u8, g: (v >> 16) as u8, b: (v >> 8) as u8, a: v as u8 }
+    }
     /// CUI's token encoding: an unresolved semantic color `{ token, 0xC5, 0x1D, 0 }`,
     /// resolved by the library against the active theme.
     const fn token(t: Token) -> Color {
@@ -179,6 +194,13 @@ impl Color {
     }
 }
 
+impl Color {
+    /// The C ABI form (`cui_color`) — for building raw `ffi::*_opts` structs.
+    pub fn to_ffi(self) -> ffi::cui_color {
+        ffi::cui_color { r: self.r, g: self.g, b: self.b, a: self.a }
+    }
+}
+
 pub(crate) fn color_to_ffi(c: Color) -> ffi::cui_color {
     ffi::cui_color { r: c.r, g: c.g, b: c.b, a: c.a }
 }
@@ -225,7 +247,9 @@ macro_rules! ffi_enum {
         }
         impl $name {
             #[allow(dead_code)] // not every enum is passed to C
-            pub(crate) fn to_ffi(self) -> $ffi {
+            /// The C ABI form of this value.
+            #[allow(missing_docs)]
+            pub fn to_ffi(self) -> $ffi {
                 // Same variant values and repr(u32) as the C enum; kept in
                 // sync by construction and by the round-trip tests below.
                 unsafe { core::mem::transmute(self) }
@@ -523,10 +547,12 @@ pub struct Date {
 
 #[allow(dead_code)] // used by the gallery example
 impl Date {
-    pub(crate) fn to_ffi(self) -> ffi::cui_date {
+    /// The C ABI form (`cui_date`) — for building raw `ffi::*_opts` structs.
+    pub fn to_ffi(self) -> ffi::cui_date {
         ffi::cui_date { year: self.year, month: self.month, day: self.day }
     }
-    pub(crate) fn from_ffi(d: ffi::cui_date) -> Date {
+    /// From the C ABI form (`cui_date`).
+    pub fn from_ffi(d: ffi::cui_date) -> Date {
         Date { year: d.year, month: d.month, day: d.day }
     }
 }

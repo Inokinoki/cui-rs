@@ -59,6 +59,7 @@ void gen_probe_all(void) {
     SZ(cui_draw_cmd);
     SZ(cui_draw_data);
     SZ(cui_dropzone_opts);
+    SZ(cui_emoji_picker_opts);
     SZ(cui_expandable_card_opts);
     SZ(cui_expandable_text_opts);
     SZ(cui_fader_opts);

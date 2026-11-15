@@ -17,7 +17,7 @@ enum Opts {
 
 /// The scope-style widgets: their trailing block becomes a closure. Every
 /// other widget with a trailing block becomes `if call { block }`.
-fn container(name: &str) -> Option<(&'static str, Opts)> {
+fn builtin_container(name: &str) -> Option<(&'static str, Opts)> {
     Some(match name {
         "Column" => ("column", Opts::Always),
         "Row" => ("row", Opts::Always),
@@ -57,6 +57,48 @@ fn snake(name: &str) -> String {
 pub struct Ctx<'a> {
     pub ui: &'a Ident,
     pub errs: &'a mut Vec<Error>,
+    /// Names declared with `#![containers(..)]`.
+    pub custom: &'a [Ident],
+}
+
+/// The method name and opts shape of a scope widget: a built-in one, or one
+/// declared in the header (which follows the `name` / `name_with` convention).
+fn container_of(cx: &Ctx, name: &str) -> Option<(String, Opts)> {
+    if let Some((m, k)) = builtin_container(name) {
+        return Some((m.to_string(), k));
+    }
+    cx.custom.iter().any(|c| c == name).then(|| (snake(name), Opts::Optional))
+}
+
+/// Wraps `build(opts)` for a widget that has `key: value` options. The values
+/// are evaluated first, outside the glob import, so user expressions never
+/// see `cui::view`'s names; then the opts struct is built where `Name`
+/// resolves to the built-in opts type of that name, or else to a type of that
+/// name in the caller's scope.
+fn with_opts(w: &Widget, build: impl FnOnce(Option<TokenStream>) -> TokenStream) -> TokenStream {
+    if w.props.is_empty() {
+        return build(None);
+    }
+    let name = &w.name;
+    let keys = w.props.iter().map(|(k, _)| k);
+    let vals = w.props.iter().map(|(_, v)| v);
+    let ids: Vec<Ident> = w
+        .props
+        .iter()
+        .enumerate()
+        .map(|(i, (_, v))| Ident::new(&format!("__cui_p{i}"), syn::spanned::Spanned::span(v)))
+        .collect();
+    let opts = quote!(&__cui_opts);
+    let binding = quote! {
+        #[allow(clippy::needless_update)]
+        let __cui_opts = {
+            #[allow(unused_imports)]
+            use ::cui::view::*;
+            #name { #(#keys: #ids,)* ..::core::default::Default::default() }
+        };
+    };
+    let call = build(Some(opts));
+    quote!(match (#(#vals,)*) { (#(#ids,)*) => { #binding #call } })
 }
 
 pub fn nodes(cx: &mut Ctx, list: &[Node]) -> TokenStream {
@@ -135,14 +177,9 @@ fn widget(cx: &mut Ctx, w: &Widget, as_value: bool) -> TokenStream {
     let has_props = !w.props.is_empty();
     let positional = &w.positional;
 
-    let opts = {
-        let keys = w.props.iter().map(|(k, _)| k);
-        let vals = w.props.iter().map(|(_, v)| v);
-        quote!(&::cui::view::#name { #(#keys: #vals,)* ..::core::default::Default::default() })
-    };
     let ident = |s: &str| Ident::new(s, span);
 
-    if let Some((method, kind)) = container(&name_s) {
+    if let Some((method, kind)) = container_of(cx, &name_s) {
         let Some(body) = &w.block else {
             cx.errs.push(Error::new(span, format!("`{name_s}` is a container: give it a `{{ ... }}` body")));
             return quote!();
@@ -151,20 +188,28 @@ fn widget(cx: &mut Ctx, w: &Widget, as_value: bool) -> TokenStream {
             cx.errs.push(Error::new(span, format!("`{name_s}` takes no options")));
             return quote!();
         }
-        let with_opts = kind == Opts::Always || has_props;
-        let m = if kind == Opts::Optional && has_props { ident(&format!("{method}_with")) } else { ident(method) };
-        let opts: Vec<TokenStream> = with_opts.then_some(opts).into_iter().collect();
+        let takes_opts = kind == Opts::Always || has_props;
+        let m = if kind == Opts::Optional && has_props { ident(&format!("{method}_with")) } else { ident(&method) };
         let children = nodes(cx, body);
         let ui = cx.ui;
-        let call = quote!(#ui.#m(#(#positional,)* #(#opts,)* |#ui| { #children }));
+        let call = if takes_opts {
+            // `Always` containers take opts even when no option was written
+            if has_props {
+                with_opts(w, |o| quote!(#ui.#m(#(#positional,)* #o, |#ui| { #children })))
+            } else {
+                let name = &w.name;
+                quote!(#ui.#m(#(#positional,)* &::cui::view::#name { ..::core::default::Default::default() }, |#ui| { #children }))
+            }
+        } else {
+            quote!(#ui.#m(#(#positional,)* |#ui| { #children }))
+        };
         return if as_value { call } else { quote!(#call;) };
     }
 
     let base = snake(&name_s);
     let m = ident(&if has_props { format!("{base}_with") } else { base });
-    let opts = has_props.then_some(opts);
     // `Name("a", 1, k: v)` -> `ui.name_with("a", 1, &Opts { k: v, .. })`
-    let call = quote!(#ui.#m(#(#positional,)* #opts));
+    let call = with_opts(w, |o| quote!(#ui.#m(#(#positional,)* #o)));
 
     match &w.block {
         None => {

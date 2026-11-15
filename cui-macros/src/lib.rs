@@ -44,16 +44,35 @@ use syn::parse::Parser;
 ///   `let clicked = Card(..) { .. }`).
 /// - `if`/`else`, `for`, `while`, `loop` and `match` have node lists as
 ///   bodies; every other Rust statement is copied as written.
+///
+/// Your own widgets work the same way: define `name` / `name_with` methods
+/// (an extension trait on `Ui`) and an opts type called `Name`. A widget that
+/// takes a closure for children is declared once, right after the handle:
+/// `view! { ui, #![containers(Panel)] Panel("Title") { .. } }`.
 #[proc_macro]
 pub fn view(input: TokenStream) -> TokenStream {
     let mut errs = Vec::new();
     let mut ui: Option<Ident> = None;
     let mut list = Vec::new();
+    let mut custom: Vec<Ident> = Vec::new();
     let parser = |input: syn::parse::ParseStream| -> syn::Result<()> {
         let id = input.parse::<Ident>().map_err(|e| {
             syn::Error::new(e.span(), "view! starts with the name of the Ui handle, e.g. `view! { ui, ... }`")
         })?;
         input.parse::<syn::Token![,]>()?;
+        for attr in input.call(syn::Attribute::parse_inner)? {
+            if attr.path().is_ident("containers") {
+                let names = attr.parse_args_with(
+                    syn::punctuated::Punctuated::<Ident, syn::Token![,]>::parse_terminated,
+                )?;
+                custom.extend(names);
+            } else {
+                return Err(syn::Error::new_spanned(
+                    &attr,
+                    "unknown view! attribute: the only one is `#![containers(A, B)]`",
+                ));
+            }
+        }
         ui = Some(id);
         list = parse::parse_nodes(input, &mut errs);
         Ok(())
@@ -63,7 +82,7 @@ pub fn view(input: TokenStream) -> TokenStream {
     }
     let body = match &ui {
         Some(ui) => {
-            let mut cx = expand::Ctx { ui, errs: &mut errs };
+            let mut cx = expand::Ctx { ui, errs: &mut errs, custom: &custom };
             expand::nodes(&mut cx, &list)
         }
         None => quote!(),

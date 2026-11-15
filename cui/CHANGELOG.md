@@ -9,6 +9,7 @@ Added:
   closures and opts structs you would write by hand. Opts types are also
   reachable as `cui::view::*`. See the `view` module docs and
   `examples/todo_view.rs`.
+- **`view!` and your own widgets**: opts types are looked up in `cui::view`, then in the caller's scope, and `#![containers(..)]` declares custom scope widgets.
 
 Needs the matching unreleased `cui-sys` (publish `cui-sys` first). Soundness fixes —
 each was reachable from safe code — plus the follow-through for the

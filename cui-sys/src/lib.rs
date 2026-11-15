@@ -59,42 +59,8 @@ pub struct cui_color {
 
 /// cui_token — semantic color tokens (CUI_TOKEN_*).
 pub type cui_token = c_int;
-pub const CUI_TOKEN_NONE: cui_token = 0;
-pub const CUI_TOKEN_BACKGROUND: cui_token = 1;
-pub const CUI_TOKEN_SURFACE: cui_token = 2;
-pub const CUI_TOKEN_SURFACE_RAISED: cui_token = 3;
-pub const CUI_TOKEN_SURFACE_MUTED: cui_token = 4;
-pub const CUI_TOKEN_FOREGROUND: cui_token = 5;
-pub const CUI_TOKEN_TEXT_SECONDARY: cui_token = 6;
-pub const CUI_TOKEN_TEXT_MUTED: cui_token = 7;
-pub const CUI_TOKEN_BORDER: cui_token = 8;
-pub const CUI_TOKEN_BORDER_SUBTLE: cui_token = 9;
-pub const CUI_TOKEN_BORDER_STRONG: cui_token = 10;
-pub const CUI_TOKEN_ACCENT: cui_token = 11;
-pub const CUI_TOKEN_ACCENT_STRONG: cui_token = 12;
-pub const CUI_TOKEN_ACCENT_SUBTLE: cui_token = 13;
-pub const CUI_TOKEN_ACCENT_FOREGROUND: cui_token = 14;
-pub const CUI_TOKEN_SUCCESS: cui_token = 15;
-pub const CUI_TOKEN_WARNING: cui_token = 16;
-pub const CUI_TOKEN_DANGER: cui_token = 17;
-pub const CUI_TOKEN_INFO: cui_token = 18;
-pub const CUI_TOKEN_CONTROL_ON: cui_token = 19;
-pub const CUI_TOKEN_CONTROL_GLYPH: cui_token = 20;
-pub const CUI_TOKEN_CONTROL_TRACK: cui_token = 21;
-pub const CUI_TOKEN_CONTROL_TRACK_HOVER: cui_token = 22;
-pub const CUI_TOKEN_CONTROL_THUMB: cui_token = 23;
-pub const CUI_TOKEN_CONTROL_THUMB_ON: cui_token = 24;
-pub const CUI_TOKEN_HOVER: cui_token = 25;
-pub const CUI_TOKEN_ACTIVE: cui_token = 26;
-pub const CUI_TOKEN_SCRIM: cui_token = 27;
-pub const CUI_TOKEN_FOCUS_RING: cui_token = 28;
-pub const CUI_TOKEN_SERIES_1: cui_token = 29;
-pub const CUI_TOKEN_SERIES_2: cui_token = 30;
-pub const CUI_TOKEN_SERIES_3: cui_token = 31;
-pub const CUI_TOKEN_SERIES_4: cui_token = 32;
-pub const CUI_TOKEN_SERIES_5: cui_token = 33;
-pub const CUI_TOKEN_SERIES_6: cui_token = 34;
-pub const CUI_TOKEN_COUNT: cui_token = 35;
+// The CUI_TOKEN_* values live in gen.rs (generated from the header and
+// checked against the C probe table).
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -368,18 +334,12 @@ pub enum cui_key {
 }
 
 /// cui_mod flags.
+/// (`CUI_MOD_*` values: gen.rs.)
 pub type cui_mod = c_int;
-pub const CUI_MOD_SHIFT: c_int = 1 << 0;
-pub const CUI_MOD_CTRL: c_int = 1 << 1;
-pub const CUI_MOD_ALT: c_int = 1 << 2;
-pub const CUI_MOD_SUPER: c_int = 1 << 3;
 
-/// Text input event flags (return value of cui_input_ex and friends).
+/// Text input event flags (return value of cui_input_ex and friends);
+/// `CUI_CHANGED` / `CUI_SUBMITTED` / `CUI_FOCUSED` / `CUI_BLURRED` live in gen.rs.
 pub type cui_input_flags = c_int;
-pub const CUI_CHANGED: c_int = 1;
-pub const CUI_SUBMITTED: c_int = 2;
-pub const CUI_FOCUSED: c_int = 4;
-pub const CUI_BLURRED: c_int = 8;
 
 /* ==== Opts structs (cui.h) ==== */
 
@@ -737,7 +697,6 @@ pub struct cui_chart_opts {
 /* ==== Context and frame (cui.h) ==== */
 
 extern "C" {
-    pub fn cui_create(desc: *const c_void) -> *mut cui_ctx; // cui_ctx_desc
     pub fn cui_destroy(ui: *mut cui_ctx);
     pub fn cui_set_viewport(ui: *mut cui_ctx, width: f32, height: f32, scale: f32);
     pub fn cui_begin_frame(ui: *mut cui_ctx, dt: f32);
@@ -792,11 +751,6 @@ extern "C" {
     pub fn cui_font_add_fallback(ui: *mut cui_ctx, font: cui_font, fallback: cui_font);
 }
 
-pub const CUI_FONT_BODY: cui_font = 0;
-pub const CUI_FONT_MEDIUM: cui_font = 1;
-pub const CUI_FONT_DISPLAY: cui_font = 2;
-pub const CUI_FONT_MONO: cui_font = 3;
-pub const CUI_FONT_ICONS: cui_font = 4;
 
 /* ==== Layout (cui.h) ==== */
 
@@ -1209,12 +1163,6 @@ pub struct cui_source {
     pub snippet: *const c_char,
 }
 
-pub const CUI_RESPONSE_COPY: c_int = 1;
-pub const CUI_RESPONSE_REGENERATE: c_int = 2;
-pub const CUI_RESPONSE_UP: c_int = 4;
-pub const CUI_RESPONSE_DOWN: c_int = 8;
-pub const CUI_RESPONSE_SHARE: c_int = 16;
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_response_actions_opts {
@@ -1256,15 +1204,6 @@ pub struct cui_model_picker_opts {
     pub ghost: bool,
     pub placement: cui_placement,
 }
-
-pub const CUI_COMPOSER_SEND: c_int = 1;
-pub const CUI_COMPOSER_STOP: c_int = 2;
-pub const CUI_COMPOSER_ATTACH: c_int = 4;
-pub const CUI_COMPOSER_REMOVE: c_int = 8;
-pub const CUI_COMPOSER_MODEL: c_int = 16;
-pub const CUI_COMPOSER_RECORD: c_int = 32;
-pub const CUI_COMPOSER_CANCEL: c_int = 64;
-pub const CUI_COMPOSER_VOICE: c_int = 128;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -1567,83 +1506,3 @@ pub type cui_gl_loader = Option<extern "C" fn(name: *const c_char) -> *mut c_voi
 
 mod gen;
 pub use gen::*;
-
-#[cfg(test)]
-extern crate std;
-
-#[cfg(test)]
-mod tests {
-    extern crate std;
-    use super::*;
-    use std::format;
-    use std::string::{String, ToString};
-
-    /// The generated C ABI facts for the compiled version (probe/layout_probe.c
-    /// via vendor.sh). Missing tables or entries mean vendor.sh needs a re-run.
-    fn layout_table() -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>> {
-        use std::collections::BTreeMap;
-        let path = format!("{}/layout/{}.toml", env!("CARGO_MANIFEST_DIR"), CUI_VERSION_STRING);
-        let src = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-            panic!("no layout probe table for CUI {CUI_VERSION_STRING} ({e}); run ./vendor.sh")
-        });
-        let mut table: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
-        let mut section = String::new();
-        for line in src.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-            if line.starts_with('[') && line.ends_with(']') {
-                section = line[1..line.len() - 1].to_string();
-                continue;
-            }
-            let Some((key, value)) = line.split_once('=') else {
-                panic!("bad line in {path}: {line}")
-            };
-            let key = key.trim().trim_matches('"').to_string();
-            if key == "version" {
-                continue; // recorded in the filename; not a number
-            }
-            let value: u64 = value
-                .trim()
-                .parse()
-                .unwrap_or_else(|_| panic!("bad number in {path}: {line}"));
-            table.entry(section.clone()).or_default().insert(key, value);
-        }
-        table
-    }
-
-    fn check(table: &std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>>, section: &str, key: &str, actual: u64) {
-        let expected = table
-            .get(section)
-            .and_then(|s| s.get(key))
-            .unwrap_or_else(|| {
-                panic!("layout table for CUI {CUI_VERSION_STRING} lacks [{section}] {key}; regenerate with ./vendor.sh")
-            });
-        assert_eq!(actual, *expected, "[{section}] {key}: Rust FFI vs C ABI (CUI {CUI_VERSION_STRING})");
-    }
-
-    /// Struct sizes and field offsets are checked exhaustively by the
-    /// generated tests/layout.rs; these spot checks pin the enum values the
-    /// hand-written layer cares about.
-    #[test]
-    fn enum_values_match_c() {
-        let table = layout_table();
-        check(&table, "enum", "CUI_GRID", cui_dir::CUI_GRID as i32 as u64);
-        check(&table, "enum", "CUI_ALIGN_STRETCH", cui_align::CUI_ALIGN_STRETCH as i32 as u64);
-        check(&table, "enum", "CUI_JUSTIFY_BETWEEN", cui_justify::CUI_JUSTIFY_BETWEEN as i32 as u64);
-        check(&table, "enum", "CUI_ELEVATION_FLOATING", cui_elevation::CUI_ELEVATION_FLOATING as i32 as u64);
-        check(&table, "enum", "CUI_DIRECTION_AUTO", cui_direction::CUI_DIRECTION_AUTO as i32 as u64);
-        check(&table, "enum", "CUI_THEME_DARK", cui_theme_mode::CUI_THEME_DARK as i32 as u64);
-        check(&table, "enum", "CUI_ACCENT_ROSE", cui_accent::CUI_ACCENT_ROSE as i32 as u64);
-        check(&table, "enum", "CUI_BUTTON_LINK", cui_button_variant::CUI_BUTTON_LINK as i32 as u64);
-        check(&table, "enum", "CUI_SIZE_LG", cui_control_size::CUI_SIZE_LG as i32 as u64);
-        check(&table, "enum", "CUI_TEXT_END", cui_text_align::CUI_TEXT_END as i32 as u64);
-        check(&table, "enum", "CUI_TONE_ACCENT", cui_tone::CUI_TONE_ACCENT as i32 as u64);
-        check(&table, "enum", "CUI_SIDE_TOP", cui_side::CUI_SIDE_TOP as i32 as u64);
-        check(&table, "enum", "CUI_MOUSE_MIDDLE", cui_mouse_button::CUI_MOUSE_MIDDLE as i32 as u64);
-        check(&table, "enum", "CUI_RENDERER_SOFTWARE", cui_renderer_kind::CUI_RENDERER_SOFTWARE as i32 as u64);
-        check(&table, "enum", "CUI_KEY_9", cui_key::CUI_KEY_9 as i32 as u64);
-        check(&table, "enum", "CUI_KEY_F12", cui_key::CUI_KEY_F12 as i32 as u64);
-    }
-}

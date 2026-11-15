@@ -11,6 +11,69 @@ use cui_sys as ffi;
 use core::ffi::{c_char, c_void};
 
 impl<'a> crate::Ui<'a> {
+    // ------------------------------------------- printf-style text (variadic)
+
+    /// Text (C's `cui_textf`). `text` is shown verbatim: it is passed as the
+    /// argument of a `"%s"` format, never as a format string, so `%` in it is
+    /// ordinary text. Format in Rust with `format!` first.
+    pub fn textf(&self, text: impl AsRef<str>) {
+        unsafe { ffi::cui_textf(self.ctx, c"%s".as_ptr(), self.arena.cstr(text.as_ref())) }
+    }
+
+    /// Table cell text (C's `cui_table_cell_textf`), shown verbatim like
+    /// [`Ui::textf`].
+    pub fn table_cell_textf(&self, text: impl AsRef<str>) {
+        unsafe { ffi::cui_table_cell_textf(self.ctx, c"%s".as_ptr(), self.arena.cstr(text.as_ref())) }
+    }
+
+    // ------------------------------------------------------------- one-time code
+
+    /// One time code input (C's `cui_otp_input`): `length` boxes (C caps it
+    /// at 12; zero or less shows nothing and returns false). `code` is edited
+    /// in place; its buffer is grown here to the `min(length, 12) + 1` bytes
+    /// C may write, so any `String` is safe to pass.
+    pub fn otp_input(&self, id: impl AsRef<str>, code: &mut String, length: i32) -> bool {
+        if length <= 0 {
+            return false; // what C does, before touching the buffer
+        }
+        let need = length.min(12) as usize + 1;
+        code.reserve(need.saturating_sub(code.len()));
+        begin_c_string(code, need);
+        let r = unsafe {
+            ffi::cui_otp_input(self.ctx, self.arena.cstr(id.as_ref()), code.as_mut_ptr() as *mut c_char, length)
+        };
+        sync_buffer(code);
+        r
+    }
+
+    // ---------------------------------------------------------- signature pad
+
+    /// What a signature pad (`cui_signature_ex`) with this id holds now:
+    /// every point of every stroke, and for each stroke the index one past
+    /// its last point (C's `cui_signature_points`). Both are copies, so they
+    /// outlive the frame.
+    pub fn signature_points(&self, id: impl AsRef<str>) -> (Vec<ffi::cui_vec2>, Vec<i32>) {
+        let mut points: *const ffi::cui_vec2 = core::ptr::null();
+        let mut ends: *const i32 = core::ptr::null();
+        let mut strokes: i32 = 0;
+        let n = unsafe {
+            ffi::cui_signature_points(self.ctx, self.arena.cstr(id.as_ref()), &mut points, &mut ends, &mut strokes)
+        };
+        // C hands out its own storage (the points live in widget state, the
+        // stroke ends in a static buffer): copy before anything can touch it.
+        let pts = if points.is_null() || n <= 0 {
+            Vec::new()
+        } else {
+            unsafe { core::slice::from_raw_parts(points, n as usize) }.to_vec()
+        };
+        let ends = if ends.is_null() || strokes <= 0 {
+            Vec::new()
+        } else {
+            unsafe { core::slice::from_raw_parts(ends, strokes as usize) }.to_vec()
+        };
+        (pts, ends)
+    }
+
     // ---------------------------------------------------------------- menus
 
     /// A dropdown menu (C's `cui_menu` scope). The closure runs only while
@@ -420,12 +483,14 @@ impl<'a> Ui<'a> {
         o: &ffi::cui_blame_opts,
     ) -> ffi::cui_blame_result {
         assert!(!lines.is_empty());
+        // C indexes both arrays with one line count
+        assert_eq!(lines.len(), line_commit.len(), "blame: `lines` and `line_commit` must have one entry per line");
         let ids = self.arena.cstr_array(lines);
         unsafe {
             ffi::cui_blame_ex(
                 self.ctx,
                 self.cs(&id),
-                ids as *mut c_char,
+                ids,
                 line_commit.as_ptr(),
                 line_commit.len() as i32,
                 if commits.is_empty() { core::ptr::null() } else { commits.as_ptr() },
@@ -461,7 +526,7 @@ impl<'a> Ui<'a> {
                 self.cs(&id),
                 flags.as_mut_ptr(),
                 flags.len() as i32,
-                env_ids as *mut c_char,
+                env_ids,
                 envs.len() as i32,
                 o,
             )
@@ -566,7 +631,7 @@ impl<'a> Ui<'a> {
         assert!(!items.is_empty() && selected.len() >= items.len());
         let ids = self.arena.cstr_array(items);
         unsafe {
-            ffi::cui_multi_select_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, selected.as_mut_ptr(), o)
+            ffi::cui_multi_select_ex(self.ctx, self.cs(&id), ids, items.len() as i32, selected.as_mut_ptr(), o)
         }
     }
 
@@ -584,7 +649,7 @@ impl<'a> Ui<'a> {
             ffi::cui_pipeline_ex(
                 self.ctx,
                 self.cs(&id),
-                ids as *mut c_char,
+                ids,
                 stages.len() as i32,
                 jobs.as_ptr(),
                 jobs.len() as i32,
@@ -623,7 +688,7 @@ impl<'a> Ui<'a> {
         let ids = self.arena.cstr_array(axes);
         let flat: Vec<ffi::cui_series> = series.iter().map(|s| s.flatten(self.arena)).collect();
         unsafe {
-            ffi::cui_radar_chart_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, ids as *mut c_char, axes.len() as i32, o)
+            ffi::cui_radar_chart_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, ids, axes.len() as i32, o)
         }
     }
 
@@ -676,7 +741,7 @@ impl<'a> Ui<'a> {
         assert!(!nodes.is_empty() && !links.is_empty());
         let ids = self.arena.cstr_array(nodes);
         unsafe {
-            ffi::cui_sankey_ex(self.ctx, self.cs(&id), ids as *mut c_char, nodes.len() as i32, links.as_ptr(), links.len() as i32, o)
+            ffi::cui_sankey_ex(self.ctx, self.cs(&id), ids, nodes.len() as i32, links.as_ptr(), links.len() as i32, o)
         }
     }
 
@@ -693,14 +758,14 @@ impl<'a> Ui<'a> {
     pub fn split_button(&mut self, label: impl AsRef<str>, items: &[&str], o: &ffi::cui_split_button_opts) -> i32 {
         assert!(!items.is_empty());
         let ids = self.arena.cstr_array(items);
-        unsafe { ffi::cui_split_button_ex(self.ctx, self.cs(&label), ids as *mut c_char, items.len() as i32, o) }
+        unsafe { ffi::cui_split_button_ex(self.ctx, self.cs(&label), ids, items.len() as i32, o) }
     }
 
     /// Process steps (C's `cui_stepper`).
     pub fn stepper(&mut self, steps: &[&str], current: i32) {
         assert!(!steps.is_empty());
         let ids = self.arena.cstr_array(steps);
-        unsafe { ffi::cui_stepper(self.ctx, ids as *mut c_char, steps.len() as i32, current) }
+        unsafe { ffi::cui_stepper(self.ctx, ids, steps.len() as i32, current) }
     }
 
     /// Tag input (C's `cui_tag_input`). Tags are comma separated in `value`.
@@ -731,7 +796,7 @@ impl<'a> Ui<'a> {
         assert!(!labels.is_empty() && values.len() >= labels.len());
         let ids = self.arena.cstr_array(labels);
         unsafe {
-            ffi::cui_toggle_group_ex(self.ctx, self.cs(&id), ids as *mut c_char, labels.len() as i32, values.as_mut_ptr(), o)
+            ffi::cui_toggle_group_ex(self.ctx, self.cs(&id), ids, labels.len() as i32, values.as_mut_ptr(), o)
         }
     }
 
@@ -751,7 +816,7 @@ impl<'a> Ui<'a> {
     pub fn wheel_picker(&mut self, id: impl AsRef<str>, items: &[&str], index: &mut i32, o: &ffi::cui_wheel_opts) -> bool {
         assert!(!items.is_empty());
         let ids = self.arena.cstr_array(items);
-        unsafe { ffi::cui_wheel_picker_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, index, o) }
+        unsafe { ffi::cui_wheel_picker_ex(self.ctx, self.cs(&id), ids, items.len() as i32, index, o) }
     }
 
     /// A key/value editor (C's `cui_kv_editor`). `count` tracks the used
@@ -806,7 +871,7 @@ impl<'a> Ui<'a> {
         assert!(!words.is_empty());
         let ids = self.arena.cstr_array(words);
         let fo = o.flatten(self.arena);
-        unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids as *mut c_char, words.len() as i32, interval, &fo) }
+        unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids, words.len() as i32, interval, &fo) }
     }
 }
 

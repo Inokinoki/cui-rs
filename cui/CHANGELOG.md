@@ -1,5 +1,58 @@
 # Changelog — `cui` (the safe layer; package `cui-rs`)
 
+## Unreleased
+
+Needs the matching unreleased `cui-sys` (publish `cui-sys` first). Soundness fixes —
+each was reachable from safe code — plus the follow-through for the
+corrected `cui-sys` signatures (see its changelog).
+
+Fixed:
+
+- **`Arena` is chunked.** It was one growable `Vec`, so any growth moved
+  every pointer already handed out in the frame: `cstr_array` wrote through
+  its own freed base pointer, and every `*_with` method that combines
+  arena strings (`Button::flatten` + the label, `chart_impl`, `blame`, …)
+  could hand C a dangling pointer once a frame outgrew 8 KiB. Chunks never
+  move now.
+- **`Ui::state`** returned `&'a mut T` not tied to `&mut self`, so two calls
+  gave two live `&mut` to the same memory, and it trusted zero bits to be a
+  valid `T`. It now borrows `self`, starts from `T::default()`, and panics
+  when an id is reused with a different `T` (the check lives in C's
+  allocation, so it survives CUI's garbage collection). **API change**:
+  `T` must be `'static`, and the returned reference's lifetime is shorter.
+- **`signature_points`** passed `&cui_vec2` / `&i32` where C writes a
+  pointer (an 8-byte write into 4 bytes). It is hand-written now and returns
+  owned copies: `(Vec<cui_vec2>, Vec<i32>)`. **API change**: it no longer
+  returns the point count.
+- **`otp_input`** now grows the `String` to the `min(length, 12) + 1` bytes
+  C writes (a short buffer was a heap overflow). `begin_c_string` leaves
+  room for the NUL when a `String` is exactly full (C's `strlen` ran off
+  the end).
+- **`TableSort`** is `#[repr(C)]` (C writes `column`/`descending` through a
+  pointer cast from it) with compile-time layout assertions.
+- **`textf` / `table_cell_textf`** passed their text as a printf format, so
+  a `%` read variadic arguments that do not exist. The text is now the
+  argument of a `"%s"` format and shown verbatim.
+- **`blame`** asserts `lines.len() == line_commit.len()` (C indexes both
+  with one count).
+- **`App` has a `Drop`** that destroys the window and GL context (an early
+  return or panic in a manual loop leaked them); `App::destroy` is now just
+  `drop`.
+- **`screenshot_rgba`** truncated the DPI scale, so 125% / 150% displays
+  got `None` (and the logical size was used for the buffer). It uses the
+  framebuffer size C uses; new `App::framebuffer_size()` gives it, and the
+  gallery's PNG writer uses it.
+- The gallery passed NUL-packed bytes for `options` / `choices` where C
+  indexes a `const char *const *` (the corrected types exposed it).
+
+Removed:
+
+- `Ui::state_on_free`: it passed no callback, so C called garbage when the
+  state was freed; there is no sound closure story yet.
+
+Also: `scripts/check_png.py` now requires IHDR first, IEND last and a
+pixel-data length that matches the dimensions.
+
 ## 0.1.3+cui1.4.0
 
 The crate is published to crates.io as **`cui-rs`** (crates.io's `cui` name

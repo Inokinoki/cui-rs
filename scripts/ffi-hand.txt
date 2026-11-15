@@ -38,3 +38,4 @@ cui_curve_editor
 cui_image_create
 cui_log_get
 cui_shortcut_label
+cui_otp_input

@@ -62,6 +62,8 @@ run_probe() {
     cc -std=c99 -I "$upstream_dir" "$out/probe_all.c" -o "$out/probe"
     "$out/probe" > "cui-sys/layout/$v.toml"
     echo "layout probe table written: cui-sys/layout/$v.toml"
+    # every Rust extern vs the header's prototype (scripts/gen_ffi.py -> sigcheck.c)
+    scripts/sigcheck.sh
 }
 
 fetch_into() {

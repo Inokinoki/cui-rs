@@ -64,6 +64,18 @@ fn supported_list(src: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// How to name a `vendor.sh` invocation in an error message. The script lives
+/// at the repository root, outside this crate, so a build from the published
+/// package has no such file: say where it can be found instead.
+fn vendor(args: &str) -> String {
+    let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    if manifest.join("../vendor.sh").is_file() {
+        format!("`./vendor.sh {args}`")
+    } else {
+        format!("`vendor.sh {args}` (it is only in the git repository, not in the published crate)")
+    }
+}
+
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let pin_src = fs::read_to_string(manifest.join("UPSTREAM.toml"))
@@ -83,8 +95,10 @@ fn main() {
         if version != pin.version {
             panic!(
                 "cui-sys/c/ holds CUI {version} but UPSTREAM.toml pins {}.\n\
-                 Re-run `./vendor.sh --pin {}` or `./vendor.sh --fetch`, or remove cui-sys/c/.",
-                pin.version, pin.tag
+                 Re-run {} or {}, or remove cui-sys/c/.",
+                pin.version,
+                vendor(&format!("--pin {}", pin.tag)),
+                vendor("--fetch")
             );
         }
         for (name, expected) in [(HEADER, &pin.sha256_h), (SOURCE, &pin.sha256_c)] {
@@ -149,8 +163,11 @@ fn main() {
             // Cocoa -> PrintCore -> CUPS -> netinet/ip.h needs them, so ask
             // for the full Darwin namespace explicitly.
             b.define("_DARWIN_C_SOURCE", None);
-            for fw in ["Cocoa", "QuartzCore", "OpenGL"] {
-                println!("cargo:rustc-link-lib=framework={fw}");
+            // the window backend (cui_app_*) is the only user of these
+            if cfg!(feature = "app") {
+                for fw in ["Cocoa", "QuartzCore", "OpenGL"] {
+                    println!("cargo:rustc-link-lib=framework={fw}");
+                }
             }
         }
         t if t.contains("windows") => {
@@ -160,7 +177,11 @@ fn main() {
         }
         // Linux/BSD (X11 backend; SDL2/GLFW builds are not wired up here yet).
         _ => {
-            println!("cargo:rustc-link-lib=dylib=X11");
+            // X11 is only the window backend's (cui_app_*, compiled out
+            // without the `app` feature)
+            if cfg!(feature = "app") {
+                println!("cargo:rustc-link-lib=dylib=X11");
+            }
             println!("cargo:rustc-link-lib=dylib=dl");
             println!("cargo:rustc-link-lib=dylib=m");
         }
@@ -196,8 +217,8 @@ fn fetch_and_verify(pin: &Pin) -> PathBuf {
             panic!(
                 "SHA-256 mismatch for {url}:\n  expected {expected}\n  got      {got}\n\
                  Refusing to compile. If upstream re-published this asset, refresh the\n\
-                 pin with `./vendor.sh --pin {}`.",
-                pin.tag
+                 pin with {}.",
+                vendor(&format!("--pin {}", pin.tag))
             );
         }
     }
@@ -207,8 +228,10 @@ fn fetch_and_verify(pin: &Pin) -> PathBuf {
     if version != pin.version {
         panic!(
             "the header for {} says CUI {version}, but UPSTREAM.toml pins {}.\n\
-             Refresh the pin with `./vendor.sh --pin {}`.",
-            pin.tag, pin.version, pin.tag
+             Refresh the pin with {}.",
+            pin.tag,
+            pin.version,
+            vendor(&format!("--pin {}", pin.tag))
         );
     }
 
@@ -229,13 +252,15 @@ fn download(url: &str, dest: &Path) {
         .unwrap_or_else(|e| {
             panic!(
                 "could not run curl ({e}). Install curl, or pre-populate the offline\n\
-                 cache while online: `./vendor.sh --fetch`"
+                 cache while online: {}",
+                vendor("--fetch")
             )
         });
     if !status.success() {
         panic!(
             "downloading {url} failed — check your network connection, or run\n\
-             `./vendor.sh --fetch` while online"
+             {} while online",
+            vendor("--fetch")
         );
     }
 }

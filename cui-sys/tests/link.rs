@@ -11,7 +11,6 @@ use cui_sys::*;
 
 #[test]
 fn every_extern_symbol_resolves() {
-    let _: unsafe extern "C" fn(*const c_void) -> *mut cui_ctx = cui_create;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_destroy;
     let _: unsafe extern "C" fn(*mut cui_ctx, f32, f32, f32) = cui_set_viewport;
     let _: unsafe extern "C" fn(*mut cui_ctx, f32) = cui_begin_frame;
@@ -217,7 +216,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const c_char, *mut usize, f32) -> i32 = cui_avatar_upload;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut bool, *const cui_banner_opts) -> bool = cui_banner_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_viz_item, i32, *const cui_bar_list_opts) -> i32 = cui_bar_list_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, *const i32, i32, *const cui_blame_commit, i32, *const cui_blame_opts) -> cui_blame_result = cui_blame_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, *const i32, i32, *const cui_blame_commit, i32, *const cui_blame_opts) -> cui_blame_result = cui_blame_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_button_group_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_button_group_end;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_date) -> bool = cui_calendar;
@@ -247,6 +246,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, f64, *const cui_countdown_opts) = cui_countdown_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, f64, *const cui_counter_opts) = cui_counter_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_coverage_file, i32, *const cui_coverage_opts) -> cui_coverage_result = cui_coverage_ex;
+    let _: unsafe extern "C" fn(*const cui_ctx_desc) -> *mut cui_ctx = cui_create;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) -> *const c_char = cui_cron_describe;
     let _: unsafe extern "C" fn(*const c_char, i64, i32, *mut i64) -> bool = cui_cron_next;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, usize, i32, i32, *mut cui_rect, *const cui_cropper_opts) -> bool = cui_cropper_ex;
@@ -293,7 +293,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_expandable_card_end;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const c_char, *const cui_expandable_text_opts) -> bool = cui_expandable_text_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f32, f32, f32, *const cui_fader_opts) -> bool = cui_fader_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_feature_flag, i32, *mut c_char, i32, *const cui_feature_flags_opts) -> cui_feature_flags_result = cui_feature_flags_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_feature_flag, i32, *const *const c_char, i32, *const cui_feature_flags_opts) -> cui_feature_flags_result = cui_feature_flags_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, usize, *const cui_file_browser_opts) -> cui_file_browser_result = cui_file_browser_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx) -> bool = cui_file_drag_active;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut bool, *mut c_char, usize, *const cui_file_picker_opts) -> bool = cui_file_picker_ex;
@@ -334,7 +334,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut i32, *mut i32) -> usize = cui_image_load;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, usize, i32, i32, *mut cui_image_view, *const cui_image_viewer_opts) -> bool = cui_image_viewer_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, usize, *const cui_inline_edit_opts) -> i32 = cui_inline_edit_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *mut c_char, i32, f32, f32) = cui_input_file_drop;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const *const c_char, i32, f32, f32) = cui_input_file_drop;
     let _: unsafe extern "C" fn(*mut cui_ctx, bool, f32, f32) = cui_input_file_hover;
     let _: unsafe extern "C" fn(*mut cui_ctx, bool) = cui_input_focus;
     let _: unsafe extern "C" fn(*mut cui_ctx, c_int, bool, i32) = cui_input_key;
@@ -359,9 +359,8 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_kv_pair, *mut i32, i32, *const cui_kv_editor_opts) -> bool = cui_kv_editor_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const f32, i32, *const cui_level_meter_opts) -> bool = cui_level_meter_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const cui_loader_opts) = cui_loader_ex;
-    let _: unsafe extern "C" fn(*mut cui_log_buffer, c_int, *const c_char) = cui_log_append;
+    let _: unsafe extern "C" fn(*mut cui_log_buffer, c_int, *const c_char, ...) = cui_log_append;
     let _: unsafe extern "C" fn(*mut cui_log_buffer, c_int, f64, *const c_char, i32) = cui_log_append_text;
-    let _: unsafe extern "C" fn(*mut cui_log_buffer, c_int, *const c_char, c_void) = cui_log_appendv;
     let _: unsafe extern "C" fn(*mut cui_log_buffer) = cui_log_clear;
     let _: unsafe extern "C" fn(*mut cui_log_buffer, *mut cui_log_line, i32, *mut c_char, usize) = cui_log_init;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_log_buffer, *const cui_log_view_opts) = cui_log_view_ex;
@@ -375,7 +374,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, f32, f32, *const c_char) = cui_meter;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f64, *const cui_money_opts) -> bool = cui_money_input_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_date, *const cui_month_event, i32, *const cui_month_opts) -> cui_month_result = cui_month_calendar_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *mut bool, *const cui_multi_select_opts) -> bool = cui_multi_select_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *mut bool, *const cui_multi_select_opts) -> bool = cui_multi_select_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx) -> f32 = cui_next_wakeup;
     let _: unsafe extern "C" fn(*mut cui_ctx, i32, *mut f32, *mut f32, *const c_char, *const cui_node_opts) -> bool = cui_node_begin_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_node_content_begin;
@@ -392,11 +391,11 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_now_playing, *const cui_now_playing_opts) -> i32 = cui_now_playing_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32) -> bool = cui_otp_input;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) -> i32 = cui_password_strength;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *const cui_path_bar_opts) -> cui_path_bar_result = cui_path_bar_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *const cui_path_bar_opts) -> cui_path_bar_result = cui_path_bar_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut i32) -> bool = cui_path_bar_menu_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_path_bar_menu_end;
     let _: unsafe extern "C" fn(*const c_char, *const c_char) -> bool = cui_path_has_extension;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *const cui_pipeline_job, i32, *const cui_pipeline_opts) -> cui_pipeline_result = cui_pipeline_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *const cui_pipeline_job, i32, *const cui_pipeline_opts) -> cui_pipeline_result = cui_pipeline_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_popover_opts) -> bool = cui_popover_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) = cui_popover_close;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_popover_end;
@@ -407,23 +406,23 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_diagnostic, i32, *const cui_problems_opts) -> cui_problems_result = cui_problems_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut bool, *const cui_prop_opts) -> bool = cui_prop_bool_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_color, *const cui_prop_opts) -> bool = cui_prop_color_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *mut i32, *const cui_prop_opts) -> bool = cui_prop_enum_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *mut i32, *const cui_prop_opts) -> bool = cui_prop_enum_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f32, *const cui_prop_opts) -> bool = cui_prop_float_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut i32, *const cui_prop_opts) -> bool = cui_prop_int_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, usize, *const cui_prop_opts) -> bool = cui_prop_text_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f32, i32, *const cui_prop_opts) -> bool = cui_prop_vec_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_query_field, i32, *mut cui_query_node, *mut i32, i32, *const cui_query_opts) -> bool = cui_query_builder_ex;
-    let _: unsafe extern "C" fn(*const cui_query_field, i32, *const cui_query_node, i32, *mut c_char) -> bool = cui_query_match;
+    let _: unsafe extern "C" fn(*const cui_query_field, i32, *const cui_query_node, i32, *const *const c_char) -> bool = cui_query_match;
     let _: unsafe extern "C" fn(c_int, i32) -> *const c_char = cui_query_op_name;
     let _: unsafe extern "C" fn(*const cui_query_field, i32, *const cui_query_node, i32, *mut c_char, usize) -> usize = cui_query_text;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_series, i32, *mut c_char, i32, *const cui_radar_opts) -> i32 = cui_radar_chart_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_series, i32, *const *const c_char, i32, *const cui_radar_opts) -> i32 = cui_radar_chart_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, f32, f32, f32, *const cui_radial_gauge_opts) = cui_radial_gauge_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_choice, i32, *mut i32, *const cui_radio_cards_opts) -> bool = cui_radio_cards_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_date_range, i32) -> bool = cui_range_calendar;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f32, *mut f32, f32, f32) -> bool = cui_range_slider;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut i32, i32) -> bool = cui_rating;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_reaction, i32) -> i32 = cui_reactions;
-    let _: unsafe extern "C" fn(*const c_char, i32, *const c_char, i32, i32, *mut cui_regex_match, *const c_char) -> i32 = cui_regex_search;
+    let _: unsafe extern "C" fn(*const c_char, i32, *const c_char, i32, i32, *mut cui_regex_match, *mut *const c_char) -> i32 = cui_regex_search;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, usize, *mut c_char, usize, *const cui_regex_tester_opts) -> cui_regex_tester_result = cui_regex_tester_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut i32, i32) = cui_reorder_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx) -> bool = cui_reorder_end;
@@ -433,7 +432,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, f32) = cui_request_wakeup;
     let _: unsafe extern "C" fn(*mut cui_ctx, i32, f64, f64) = cui_response_status;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f32, f32, f32, *const cui_ruler_opts) -> bool = cui_ruler_slider_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *const cui_sankey_link, i32, *const cui_sankey_opts) -> i32 = cui_sankey_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *const cui_sankey_link, i32, *const cui_sankey_opts) -> i32 = cui_sankey_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_scatter_series, i32, *const cui_scatter_opts) -> i32 = cui_scatter_chart_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, usize, *const cui_schedule_opts) -> cui_schedule_result = cui_schedule_picker_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut f32, f32, f32, *const cui_scrub_opts) -> bool = cui_scrub_ex;
@@ -445,16 +444,16 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_key_combo, *const cui_shortcut_recorder_opts) -> bool = cui_shortcut_recorder_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) = cui_signature_clear;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_signature_opts) -> bool = cui_signature_pad_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_vec2, *const i32, *mut i32) -> i32 = cui_signature_points;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut *const cui_vec2, *mut *const i32, *mut i32) -> i32 = cui_signature_points;
     let _: unsafe extern "C" fn(*mut cui_ctx, cui_size, f32) = cui_skeleton;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_speed_action, i32, *const cui_speed_dial_opts) -> i32 = cui_speed_dial_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, f32) = cui_spinner;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_viz_item, i32, *const cui_split_bar_opts) -> i32 = cui_split_bar_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *const cui_split_button_opts) -> i32 = cui_split_button_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *const cui_split_button_opts) -> i32 = cui_split_button_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_spotlight_opts) = cui_spotlight_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_spotlight_end;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_stack_frame, i32, *const cui_stack_trace_opts) -> cui_stack_trace_result = cui_stack_trace_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, u32) = cui_state_on_free;
+    let _: unsafe extern "C" fn(*mut cui_ctx, u32, Option<unsafe extern "C" fn(*mut cui_ctx, *mut c_void)>) = cui_state_on_free;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_status_bar_opts) = cui_status_bar_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_status_bar_end;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_status_item_opts) -> bool = cui_status_bar_item_ex;
@@ -462,7 +461,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_status_bar_spacer;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_status_item_opts) = cui_status_bar_text_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, c_int, *const cui_status_button_opts) -> bool = cui_status_button_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *mut c_char, i32, i32) = cui_stepper;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const *const c_char, i32, i32) = cui_stepper;
     let _: unsafe extern "C" fn() -> *mut c_void = cui_sw_create;
     let _: unsafe extern "C" fn(*mut c_void) = cui_sw_destroy;
     let _: unsafe extern "C" fn(*mut c_void) -> cui_renderer_iface = cui_sw_iface;
@@ -473,15 +472,15 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut c_void, bool) = cui_sw_set_incremental;
     let _: unsafe extern "C" fn(*mut c_void, i32) = cui_sw_set_threads;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_tab_bar_item, i32, *mut i32, *const cui_tab_bar_opts) -> bool = cui_tab_bar_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) = cui_table_cell_textf;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, ...) = cui_table_cell_textf;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, usize, *const cui_tag_opts) -> bool = cui_tag_input_ex;
     let _: unsafe extern "C" fn(*mut cui_terminal_buffer) = cui_terminal_clear;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut cui_terminal_buffer, *const cui_terminal_opts) -> cui_terminal_result = cui_terminal_ex;
     let _: unsafe extern "C" fn(*mut cui_terminal_buffer, *mut c_char, usize, *mut cui_terminal_line, i32) = cui_terminal_init;
-    let _: unsafe extern "C" fn(*mut cui_terminal_buffer, *const c_char) = cui_terminal_printf;
+    let _: unsafe extern "C" fn(*mut cui_terminal_buffer, *const c_char, ...) = cui_terminal_printf;
     let _: unsafe extern "C" fn(*mut cui_terminal_buffer, *const c_char, i32) = cui_terminal_write;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_test_item, i32, *const cui_test_explorer_opts) -> cui_test_explorer_result = cui_test_explorer_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) = cui_textf;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, ...) = cui_textf;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const c_char, *const cui_text_fx_opts) = cui_text_reveal_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *mut i32, bool) -> bool = cui_theme_switcher;
     let _: unsafe extern "C" fn(*mut cui_ctx) -> bool = cui_theme_toggle;
@@ -492,7 +491,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut i32, *mut i32, *const cui_time_opts) -> bool = cui_time_picker_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_toc_item, i32) -> i32 = cui_toc;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char) = cui_toc_anchor;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *mut bool, *const cui_toggle_group_opts) -> bool = cui_toggle_group_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *mut bool, *const cui_toggle_group_opts) -> bool = cui_toggle_group_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_toolbar_opts) = cui_toolbar_begin;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_tool_opts) -> bool = cui_toolbar_button_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_toolbar_end;
@@ -506,7 +505,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx) -> bool = cui_tree_clicked;
     let _: unsafe extern "C" fn(*mut cui_ctx) = cui_tree_end;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_viz_item, i32, *const cui_treemap_opts) -> i32 = cui_treemap_ex;
-    let _: unsafe extern "C" fn(*mut cui_tree_node, i32, i32, *mut c_void) -> i32 = cui_tree_sort;
+    let _: unsafe extern "C" fn(*mut cui_tree_node, i32, i32, Option<unsafe extern "C" fn(*mut c_void, i32, i32) -> i32>, *mut c_void) -> i32 = cui_tree_sort;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_grid_column, i32, *mut cui_tree_node, i32, *const cui_tree_table_opts) = cui_tree_table_begin_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx) -> i32 = cui_tree_table_depth;
     let _: unsafe extern "C" fn(*mut cui_ctx) -> cui_tree_table_events = cui_tree_table_end;
@@ -523,7 +522,7 @@ fn every_extern_symbol_resolves() {
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const cui_net_request, i32, *const cui_waterfall_opts) -> cui_waterfall_result = cui_waterfall_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const f32, i32, *mut f32, *const cui_waveform_opts) -> bool = cui_waveform_ex;
     let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, cui_date, *mut cui_cal_event, i32, *const cui_week_opts) -> i32 = cui_week_calendar_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, *mut i32, *const cui_wheel_opts) -> bool = cui_wheel_picker_ex;
-    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *mut c_char, i32, f32, *const cui_text_fx_opts) = cui_word_rotate_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, *mut i32, *const cui_wheel_opts) -> bool = cui_wheel_picker_ex;
+    let _: unsafe extern "C" fn(*mut cui_ctx, *const c_char, *const *const c_char, i32, f32, *const cui_text_fx_opts) = cui_word_rotate_ex;
     let _: unsafe extern "C" fn(*const c_char, *const c_void, i32, i32, i32) -> bool = cui_write_png;
 }

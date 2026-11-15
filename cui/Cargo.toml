@@ -13,7 +13,9 @@ categories.workspace = true
 name = "cui"
 
 [features]
-default = ["app", "default-fonts", "stb-image"]
+default = ["app", "default-fonts", "stb-image", "macros"]
+# The view! declarative UI macro (pulls in syn; turn it off to avoid that).
+macros = ["dep:cui-rs-macros"]
 # The window/event layer (cui_app_*). Off = CUI_NO_APP: bring your own window.
 app = ["cui-sys/app"]
 # Embed the Inter / Geist / Lucide fonts (about 180 KB).
@@ -25,3 +27,12 @@ text-shaping = ["cui-sys/text-shaping"]
 
 [dependencies]
 cui-sys = { path = "../cui-sys", version = "0.1.3", default-features = false }
+cui-rs-macros = { path = "../cui-macros", version = "0.1.0", optional = true }
+
+[[example]]
+name = "todo_view"
+required-features = ["macros"]
+
+[[test]]
+name = "view"
+required-features = ["macros"]

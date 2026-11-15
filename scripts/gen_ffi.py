@@ -412,6 +412,506 @@ def c_field_names(header, tname):
     return names
 
 
+def pascal(n):
+    return "".join(w[:1].upper() + w[1:] for w in n.split("_") if w)
+
+
+# Scope pairs whose begin hands values to the body, so a closure cannot also
+# hold the `&mut` borrows: they stay begin/end pairs.
+SKIP_SCOPES = {"virtual_list"}
+
+# Raw opts structs that already have a hand-written safe twin (declared in
+# cui-sys by hand, so not in gen.rs): C name -> (safe type, has a lifetime).
+HAND_OPTS = {"cui_text_fx_opts": ("TextFx", False)}
+
+# A read-only array field whose length is another field: (struct, array) ->
+# count field. `x` + `x_count`-style neighbours pair up by themselves.
+COUNT_OF = {("cui_fader_opts", "meter"): "meter_channels"}
+
+# Array fields whose length C takes from somewhere else. A number is a fixed
+# length (the type carries it); a string is an expression over the method's
+# own parameters, asserted before the call.
+#   candlestick labels: one per candle; heatmap labels: one per row / column
+#   (cui.c reads `row_labels[i]` for i < rows without a count of its own);
+#   grid `selected`: one bool per row.
+LEN_RULES = {
+    ("cui_month_opts", "month_names"): 12,
+    ("cui_month_opts", "day_names"): 7,
+    ("cui_candlestick_opts", "labels"): "candles.len()",
+    ("cui_heatmap_opts", "row_labels"): "rows.max(0) as usize",
+    ("cui_heatmap_opts", "col_labels"): "cols.max(0) as usize",
+    ("cui_grid_opts", "selected"): "row_count.max(0) as usize",
+}
+
+# Fields left out of the safe struct (C gets NULL / none):
+#   tree_table `label` + `user`: a callback for type-ahead;
+#   hex_view `edit`: may alias `data`, see `Ui::hex_edit` in ext.rs.
+OMIT_FIELDS = {("cui_tree_table_opts", "label"), ("cui_tree_table_opts", "user"),
+               ("cui_hex_view_opts", "edit")}
+
+# Opts that stay hand-written (ext.rs): a read/write text buffer.
+HAND_ONLY = {"cui_emoji_picker_opts"}
+
+# Safe twins of C structs used as array elements or behind `&mut`.
+HAND_ELEMS = {"cui_series": "Series<'a>"}
+# Element structs the hand-written wrappers in ext.rs take (data_grid's and
+# tree_table's columns): generated like the array elements above.
+EXTRA_ELEMS = ["cui_grid_column"]
+MUT_TWINS = {"cui_date": "Date", "cui_table_sort": "TableSort"}
+
+OUT_OPTS = ROOT / "cui/src/gen_opts.rs"
+OUT_VIEW = ROOT / "cui-macros/src/generated.rs"
+
+
+def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
+    """Everything that makes generated widgets usable from `view!`:
+
+    * `cui/src/gen_opts.rs`: a safe opts struct (string fields as `&str`,
+      enums, sizes, colors) for every generated `cui_*_opts` whose fields
+      are plain data, with `flatten` into the raw struct;
+    * `name_with(.., &Opts)` methods beside the generated `name(.., &raw)`;
+    * closure scope methods for every `CUI__SCOPE` / `CUI__SCOPE_IF` macro
+      whose begin/end pair was generated (the macro says whether `end`
+      always runs or only when `begin` returned true);
+    * `cui-macros/src/generated.rs`: the names `view!` needs.
+    """
+    existing = set()
+    for f in sorted((ROOT / "cui/src").glob("*.rs")):
+        if f.name in ("gen_safe.rs", "gen_opts.rs"):
+            continue
+        existing |= set(re.findall(r"pub (?:struct|enum|type) (\w+)", f.read_text()))
+    taken = set(existing)
+
+    # -- field plans --
+    # A planned field is (rust name, rust type, C initialisers, is_mut); the
+    # initialisers are `c_field: expr` strings (an array sets its count too).
+    enums_needed = {}
+    elem_plans = {}   # C element struct -> (safe name, plan)
+    FIXED = {"uint64_t": "u64", "int64_t": "i64", "uint32_t": "u32", "int32_t": "i32",
+             "uint8_t": "u8", "uint16_t": "u16", "double": "f64"}
+
+    class Blocked(Exception):
+        pass
+
+    def scalar_plan(ctype, n):
+        if ctype == "cui_size":
+            return ("Size", f"sz(self.{n})")
+        if ctype == "cui_color":
+            return ("Color", f"col(self.{n})")
+        if ctype == "cui_date":
+            return ("Date", f"self.{n}.to_ffi()")
+        if ctype == "char":
+            return ("char", f"ascii(self.{n})")
+        if ctype in h.enums:
+            en = pascal(ctype[4:])
+            if en in existing:
+                return (en, f"self.{n}.to_ffi() as c_int")
+            if en in taken:
+                raise SystemExit(f"gen_ffi: enum name {en} for {ctype} is taken by another "
+                                 "generated type; give the fields a hand-written twin")
+            enums_needed[ctype] = en
+            return (en, f"self.{n} as c_int")
+        if ctype in PRIM:
+            return (PRIM[ctype], f"self.{n}")
+        if ctype in FIXED:
+            return (FIXED[ctype], f"self.{n}")
+        return None
+
+    def elem_type(ctype):
+        """Safe element type of a read-only array of C structs."""
+        if ctype in HAND_ELEMS:
+            return HAND_ELEMS[ctype]
+        if ctype not in elem_plans:
+            if ctype not in needed:
+                raise Blocked(f"array of {ctype}")
+            name = pascal(ctype[len("cui_"):])
+            if name in taken:
+                raise Blocked(f"element name `{name}` is taken")
+            taken.add(name)
+            elem_plans[ctype] = (name, plan_struct(ctype))
+        name, (fields, _pad, _mut, _rules) = elem_plans[ctype]
+        return name + ("<'a>" if any("'a" in ty for _n, ty, _i, _m in fields) else "")
+
+    def plan_struct(tname):
+        cfields, _pos = needed[tname]
+        flat = []
+        for cf in cfields:
+            for f in expand_field(cf):
+                flat.append(must_param(f, f"field of {tname}"))
+        fields, pad, rules = [], False, []
+        counts = set()  # count fields consumed by an array before them
+        for i, p in enumerate(flat):
+            ctype, cname, ptr = p
+            n = rust_field_name(cname)
+            if cname == "_":
+                pad = True
+                continue
+            if cname in counts:
+                continue
+            if (tname, cname) in OMIT_FIELDS:
+                zero = "None" if ptr == "fnptr" else ("ptr::null_mut()" if ptr == "mut_ptr" else "ptr::null()")
+                fields.append((None, None, [f"{n}: {zero}"], False))
+                continue
+            if ptr == "fnptr":
+                raise Blocked(cname)
+            rule = LEN_RULES.get((tname, cname))
+            # the count field of a read-only array: named in COUNT_OF, or the
+            # next field when it is an int called `*_count`
+            cnt = COUNT_OF.get((tname, cname))
+            if cnt is None and i + 1 < len(flat) and flat[i + 1][2] == "value" \
+                    and flat[i + 1][0] == "int" and flat[i + 1][1].endswith("_count"):
+                cnt = flat[i + 1][1]
+            is_strs = ptr == "multi" and re.sub(r"\s+", " ", p.ctext.strip()) == "const char *const *"
+            if is_strs:
+                if isinstance(rule, int):
+                    fields.append((n, f"Option<&'a [&'a str; {rule}]>",
+                                   [f"{n}: self.{n}.map_or(ptr::null(), |s| a.cstr_array(s))"], False))
+                elif rule is not None:
+                    fields.append((n, "&'a [&'a str]", [f"{n}: cstr_array(a, self.{n})"], False))
+                    rules.append((n, rule, "slice"))
+                elif cnt:
+                    counts.add(cnt)
+                    fields.append((n, "&'a [&'a str]", [f"{n}: cstr_array(a, self.{n})",
+                                                        f"{rust_field_name(cnt)}: self.{n}.len() as c_int"], False))
+                else:
+                    raise Blocked(f"{cname}: string array of unknown length")
+                continue
+            if ptr == "multi":
+                raise Blocked(cname)
+            if ptr == "const_ptr":
+                if ctype == "char":
+                    fields.append((n, "Option<&'a str>", [f"{n}: cstr(a, self.{n})"], False))
+                    continue
+                if not cnt:
+                    raise Blocked(f"{cname}: array of unknown length")
+                counts.add(cnt)
+                cn = rust_field_name(cnt)
+                if ctype.startswith("cui_"):
+                    et = elem_type(ctype)
+                    fields.append((n, f"&'a [{et}]",
+                                   [f"{n}: arr(a, &self.{n}.iter().map(|e| e.flatten(a)).collect::<Vec<_>>())",
+                                    f"{cn}: self.{n}.len() as c_int"], False))
+                else:
+                    et = PRIM.get(ctype) or FIXED.get(ctype)
+                    if et is None:
+                        raise Blocked(cname)
+                    fields.append((n, f"&'a [{et}]", [f"{n}: arr(a, self.{n})",
+                                                      f"{cn}: self.{n}.len() as c_int"], False))
+                continue
+            if ptr == "mut_ptr":
+                if rule is not None:  # one element per row: a mutable slice
+                    et = PRIM.get(ctype)
+                    if et is None:
+                        raise Blocked(cname)
+                    fields.append((n, f"Option<&'a mut [{et}]>",
+                                   [f"{n}: self.{n}.as_deref_mut().map_or(ptr::null_mut(), |s| s.as_mut_ptr())"], True))
+                    rules.append((n, rule, "opt_slice"))
+                    continue
+                if ctype in MUT_TWINS:
+                    rt, cast = MUT_TWINS[ctype], f" as *mut {MUT_TWINS[ctype]} as *mut ffi::{ctype}"
+                elif ctype in PRIM and ctype not in ("cui_font", "cui_id", "cui_texture"):
+                    rt, cast = PRIM[ctype], f" as *mut {PRIM[ctype]}"
+                elif ctype.startswith("cui_") and ctype in h.structs:
+                    rt, cast = f"ffi::{ctype}", f" as *mut ffi::{ctype}"
+                else:
+                    raise Blocked(cname)
+                fields.append((n, f"Option<&'a mut {rt}>",
+                               [f"{n}: self.{n}.as_deref_mut().map_or(ptr::null_mut(), |v| v{cast})"], True))
+                continue
+            sp = scalar_plan(ctype, n)
+            if sp is None:
+                raise Blocked(cname)
+            fields.append((n, sp[0], [f"{n}: {sp[1]}"], False))
+        is_mut = any(m for _n, _t, _i, m in fields)
+        return (fields, pad, is_mut, rules)
+
+    wanted = {}  # raw opts struct -> safe name, for every struct a method takes
+    for fn, (mname, sig, ret) in emitted_info.items():
+        if sig and sig[-1].startswith("opts: &ffi::"):
+            wanted.setdefault(sig[-1][len("opts: &ffi::"):], None)
+
+    plans, blocked = {}, {}
+    for tname in sorted(wanted):
+        if tname in HAND_OPTS:
+            plans[tname] = (HAND_OPTS[tname][0], None)
+            continue
+        if tname not in needed or not tname.endswith("_opts"):
+            blocked[tname] = "not a generated opts struct"
+            continue
+        name = pascal(tname[len("cui_"):-len("_opts")])
+        if name in taken:
+            name += "Opts"  # `Date` is a type already: `DateOpts`
+        if name in taken:
+            blocked[tname] = f"name `{name}` is taken"
+            continue
+        if tname in HAND_ONLY:
+            blocked[tname] = "hand-written in ext.rs"
+            continue
+        try:
+            plan = plan_struct(tname)
+        except Blocked as why:
+            # fail loudly: an upstream change must not silently drop a widget
+            raise SystemExit(f"gen_ffi: no safe form for {tname}: field `{why}`; "
+                             "add a rule (COUNT_OF / LEN_RULES / OMIT_FIELDS / HAND_ONLY)")
+        plans[tname] = (name, plan)
+        taken.add(name)
+
+    # generated enums for C enums with no hand-written twin
+    enum_src = []
+    for ctype, en in sorted(enums_needed.items()):
+        members = h.enum_vals[ctype]
+        if not any(v == 0 for _m, v in members):
+            # a planned field already names this enum; skipping it here would
+            # surface as a compile error in gen_opts.rs instead of this message
+            raise SystemExit(f"gen_ffi: C enum {ctype} has no zero-valued member, so the "
+                             f"generated {en} cannot derive Default; give the fields a "
+                             "hand-written twin or omit them (OMIT_FIELDS)")
+        if en in taken:
+            raise SystemExit(f"gen_ffi: enum name {en} for {ctype} is taken by another "
+                             "generated type; give the fields a hand-written twin")
+        prefix = members[0][0]
+        for m, _v in members:
+            while not m.startswith(prefix):
+                prefix = prefix[:-1]
+        prefix = prefix[:prefix.rfind("_") + 1]  # `CUI_LOADER_` from DOTS/BARS/..
+        if len(prefix) <= len("CUI_"):
+            prefix = "CUI_"
+        enum_src += [f"/// C's `{ctype}`.", "#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]",
+                     "#[repr(i32)]", f"pub enum {en} {{"]
+        for m, v in members:
+            vn = pascal((m[len(prefix):] if m.startswith(prefix) else m[len("CUI_"):]).lower())
+            if not vn[:1].isalpha():
+                vn = "N" + vn
+            enum_src.append(("    #[default]\n" if v == 0 else "") + f"    {vn} = {v},")
+        enum_src += ["}", ""]
+        taken.add(en)
+
+    # -- gen_opts.rs --
+    out = ["//! Generated by scripts/gen_ffi.py: safe opts structs for the generated",
+           "//! `cui_*_opts` whose fields are plain data, used as `cui::view::Name`.",
+           "//! Do not edit by hand.",
+           "#![allow(missing_docs, unused_variables)]",
+           "use crate::opts::{col, cstr, cstr_array, sz};",
+           "use crate::*;",
+           "use core::ffi::{c_char, c_int};",
+           "use core::ptr;",
+           "use cui_sys as ffi;", ""]
+    out += enum_src
+    out += ["fn arr<T: Copy>(a: &Arena, items: &[T]) -> *const T {",
+            "    if items.is_empty() { ptr::null() } else { a.struct_array(items) }",
+            "}",
+            "/// A C `char` option: ASCII only, `'\\0'` for none.",
+            "fn ascii(c: char) -> c_char {",
+            "    assert!(c.is_ascii(), \"this option takes an ASCII character\");",
+            "    c as u8 as c_char",
+            "}", ""]
+    # `&mut Date` is handed to C as a `*mut cui_date`: same layout, checked here
+    out += ["const _: () = {",
+            "    use core::mem::{align_of, offset_of, size_of};",
+            "    assert!(size_of::<Date>() == size_of::<ffi::cui_date>());",
+            "    assert!(align_of::<Date>() == align_of::<ffi::cui_date>());",
+            "    assert!(offset_of!(Date, year) == offset_of!(ffi::cui_date, year));",
+            "    assert!(offset_of!(Date, month) == offset_of!(ffi::cui_date, month));",
+            "    assert!(offset_of!(Date, day) == offset_of!(ffi::cui_date, day));",
+            "};", ""]
+
+    def lt_of(fields):
+        return any("'a" in ty for n, ty, _i, _m in fields if n)
+
+    def emit_struct(tname, name, plan, what):
+        fields, pad, is_mut, _rules = plan
+        lt = lt_of(fields)
+        doc = doc_before(h.comments, needed[tname][1], h.text)
+        out.append(f"/// {doc_first_line(doc) or what + ' `' + name + '`.'}")
+        out.append(f"/// Safe form of C's `{tname}`.")
+        out.append("#[derive(Debug, Default)]" if is_mut else "#[derive(Clone, Copy, Debug, Default)]")
+        out.append(f"pub struct {name}{'<' + chr(39) + 'a>' if lt else ''} {{")
+        out.extend(f"    pub {n}: {ty}," for n, ty, _i, _m in fields if n)
+        out.append("}")
+        out.append(f"impl {name}{'<' + chr(39) + '_>' if lt else ''} {{")
+        recv = "&mut self" if is_mut else "&self"
+        out.append(f"    pub(crate) fn flatten({recv}, a: &Arena) -> ffi::{tname} {{")
+        inits = (["_pad: 0"] if pad else []) + [x for _n, _t, i, _m in fields for x in i]
+        out.append(f"        ffi::{tname} {{ {', '.join(inits)} }}")
+        out.append("    }")
+        out.append("}")
+        out.append("")
+
+    for ctype in EXTRA_ELEMS:
+        elem_type(ctype)
+    for ctype in sorted(elem_plans):
+        emit_struct(ctype, elem_plans[ctype][0], elem_plans[ctype][1], "An element for")
+    for tname in sorted(plans):
+        if plans[tname][1] is None:
+            continue  # hand-written twin
+        emit_struct(tname, plans[tname][0], plans[tname][1], "Options for")
+
+    def is_mut_opts(tname):
+        return plans[tname][1] is not None and plans[tname][1][2]
+
+    def opts_param(tname):
+        return ("&mut " if is_mut_opts(tname) else "&") + f"crate::view::{plans[tname][0]}"
+
+    def len_asserts(tname, mname, sig):
+        """Bounds the C side takes on trust, checked before the call."""
+        if plans[tname][1] is None:
+            return []
+        lines = []
+        names = {x.split(":")[0].strip() for x in sig}
+        for n, expr, kind in plans[tname][1][3]:
+            var = re.match(r"\w+", expr).group(0)
+            if var not in names:
+                raise SystemExit(f"gen_ffi: LEN_RULES for {tname}.{n} names `{var}`, "
+                                 f"which is not a parameter of {mname}")
+            ok = f"opts.{n}.is_empty() || opts.{n}.len() >= need" if kind == "slice" \
+                else f"!opts.{n}.as_ref().is_some_and(|s| s.len() < need)"
+            lines.append(f"        {{ let need: usize = {expr}; assert!({ok}, "
+                         f"\"{mname}: `{n}` holds fewer elements than the call needs\"); }}")
+        return lines
+
+    mut_names = []
+
+    leaf_always, scopes, skipped = [], [], []
+
+    def widget_alias(wname, tname):
+        """`Name` for a widget whose opts struct has another name."""
+        sname, plan = plans[tname]
+        if is_mut_opts(tname) and wname not in mut_names:
+            mut_names.append(wname)
+        if wname == sname:
+            return True
+        if wname in taken:
+            return False
+        lt = HAND_OPTS[tname][1] if plan is None else lt_of(plan[0])
+        out.append(f"/// Options of `{wname}`: [`{sname}`].")
+        out.append(f"pub type {wname}{'<' + chr(39) + 'a>' if lt else ''} = {sname}{'<' + chr(39) + 'a>' if lt else ''};")
+        taken.add(wname)
+        return True
+
+    # -- closure scopes from the C macros --
+    scope_pairs = set()
+    methods = []
+    for m, v in sorted(h.macros.items()):
+        v2 = re.sub(r"\\\n", " ", v).strip()
+        mm = re.match(r"CUI__SCOPE(_IF)?\(\s*(cui_\w+)\(.*,\s*(cui_\w+)\(ui\)\s*\)\s*$", v2)
+        if not mm:
+            continue
+        b, e = mm.group(2), mm.group(3)
+        mname = re.sub(r"^cui_", "", m)
+        if b not in emitted_info or e not in emitted_info:
+            continue
+        scope_pairs |= {b, e}
+        if mname in SKIP_SCOPES:
+            skipped.append((mname, "begin yields values the body needs"))
+            continue
+        if mname in hand_methods or mname in emitted_methods:
+            skipped.append((mname, "name already taken"))
+            continue
+        eret, eparams, _ = h.functions[e]
+        if eret.strip() != "void" or [x.strip() for x in split_params(eparams)] != ["cui_ctx *ui"]:
+            skipped.append((mname, "end returns a value or takes arguments"))
+            continue
+        bn, sig, bret = emitted_info[b]
+        is_if = bool(mm.group(1))
+        if is_if and "bool" not in bret:
+            skipped.append((mname, "SCOPE_IF begin returns no bool"))
+            continue
+        opts_t = None
+        if sig and sig[-1].startswith("opts: &ffi::"):
+            opts_t = sig[-1][len("opts: &ffi::"):]
+            sig = sig[:-1]
+        fwd = ", ".join(x.split(":")[0].strip() for x in sig)
+        params = "".join(x + ", " for x in sig)
+        doc = doc_before(h.comments, h.functions[b][2], h.text)
+        end_call = f"self.scope(ffi::{e}, f);"
+
+        def body(call):
+            if is_if:
+                return [f"        let shown = {call};", f"        if shown {{ {end_call} }}"]
+            return [f"        {call};", f"        {end_call}"]
+
+        sc = []
+        sc.append(f"    /// {doc_first_line(doc) or mname} Runs `f` as the body.")
+        sc.append(f"    pub fn {mname}(&mut self, {params}f: impl FnOnce(&mut Ui<'a>)) {{")
+        dflt = f", &ffi::{opts_t}::default()" if opts_t else ""
+        sc += body(f"self.{bn}({fwd}{dflt})" if fwd or dflt else f"self.{bn}()")
+        sc.append("    }")
+        sc.append("")
+        if opts_t:
+            if opts_t in plans:
+                sname = plans[opts_t][0]
+                sc.append(f"    /// Like [`Ui::{mname}`] with options (`view::{sname}`).")
+                sc.append(f"    pub fn {mname}_with(&mut self, {params}opts: {opts_param(opts_t)}, f: impl FnOnce(&mut Ui<'a>)) {{")
+                sc += len_asserts(opts_t, mname, sig)
+                sc.append("        let fo = opts.flatten(self.arena);")
+                sc += body(f"self.{bn}({fwd}{', ' if fwd else ''}&fo)")
+            else:
+                sc.append(f"    /// Like [`Ui::{mname}`] with raw options.")
+                sc.append(f"    pub fn {mname}_with(&mut self, {params}opts: &ffi::{opts_t}, f: impl FnOnce(&mut Ui<'a>)) {{")
+                sc += body(f"self.{bn}({fwd}{', ' if fwd else ''}opts)")
+            sc.append("    }")
+            sc.append("")
+        methods += sc
+        wname = pascal(mname)
+        if opts_t in plans:
+            widget_alias(wname, opts_t)
+        scopes.append(wname)
+    safe.extend(methods)
+
+    # -- `_with` for leaf methods that take a raw opts struct --
+    for fn, (mname, sig, ret) in sorted(emitted_info.items()):
+        if fn in scope_pairs or mname.endswith("_end"):
+            continue
+        if not (sig and sig[-1].startswith("opts: &ffi::")):
+            continue
+        tname = sig[-1][len("opts: &ffi::"):]
+        if tname not in plans:
+            continue
+        wname = pascal(mname)
+        if mname.endswith("_begin") and is_mut_opts(tname):
+            # C keeps the write-back pointers until the matching `_end`: only
+            # a closure form can hold the borrows that long (ext.rs)
+            skipped.append((mname, "write-back options outlive begin: closure form in ext.rs"))
+            continue
+        if f"{mname}_with" in hand_methods or f"{mname}_with" in emitted_methods:
+            skipped.append((mname, "`_with` name already taken"))
+            continue
+        if not widget_alias(wname, tname):
+            skipped.append((mname, f"widget name `{wname}` is taken"))
+            continue
+        sname = plans[tname][0]
+        rest = sig[:-1]
+        fwd = ", ".join(x.split(":")[0].strip() for x in rest)
+        params = "".join(x + ", " for x in rest)
+        safe.append(f"    /// Like [`Ui::{mname}`] with safe options (`view::{sname}`).")
+        safe.append(f"    pub fn {mname}_with(&self, {params}opts: {opts_param(tname)}){ret} {{")
+        safe.extend(len_asserts(tname, mname, rest))
+        safe.append("        let fo = opts.flatten(self.arena);")
+        safe.append(f"        self.{mname}({fwd}{', ' if fwd else ''}&fo)")
+        safe.append("    }")
+        safe.append("")
+        leaf_always.append(wname)
+
+    OUT_OPTS.write_text("\n".join(out).rstrip() + "\n")
+    OUT_VIEW.write_text(
+        "//! Generated by scripts/gen_ffi.py. Do not edit by hand.\n\n"
+        "/// Scope widgets with a children closure: `name(args, |ui| ..)` and,\n"
+        "/// when they take options, `name_with(args, &Opts, |ui| ..)`.\n"
+        "pub const SCOPES: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(scopes)) + "];\n\n"
+        "/// Leaf widgets whose only form takes options: `view!` always calls\n"
+        "/// `name_with`, with default options when none are written.\n"
+        "pub const LEAF_OPTS: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(leaf_always)) + "];\n\n"
+        "/// Widgets whose options hold `&mut` borrows CUI writes through: `view!`\n"
+        "/// passes them as `&mut`.\n"
+        "pub const MUT_OPTS: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(mut_names)) + "];\n")
+    print(f"view!: {len(scopes)} closure scopes, {len(leaf_always)} leaf widgets with safe opts, "
+          f"{len(plans)} safe opts structs, {len(enum_src and enums_needed)} generated enums", file=sys.stderr)
+    for t, why in sorted(blocked.items()):
+        print(f"view!: no safe opts for {t}: {why}", file=sys.stderr)
+    for n, why in skipped:
+        print(f"view!: skipped {n}: {why}", file=sys.stderr)
+
+
 def main():
     h = Header(HEADER.read_text())
     sys_src = (ROOT / "cui-sys/src/lib.rs").read_text()
@@ -688,17 +1188,6 @@ def main():
         n = re.sub(r"^cui_", "", n)
         return snake_to_camel(n)
 
-    # scope classification from the macros
-    def scope_kind(entry):
-        if entry not in h.macros:
-            return None
-        exp = re.sub(r"\\\n", " ", h.macros[entry])
-        if "CUI__SCOPE_IF" in exp:
-            return "if"
-        if "CUI__SCOPE" in exp:
-            return "scope"
-        return None
-
     # map manifest entry -> method name (avoid collisions with hand-written methods)
     hand_methods = set(re.findall(r"pub fn (\w+)\(", (ROOT / "cui/src/lib.rs").read_text()))
     hand_methods |= set(re.findall(r"pub fn (\w+)\(", (ROOT / "cui/src/ext.rs").read_text()))
@@ -719,6 +1208,7 @@ def main():
     safe.append("")
 
     emitted_methods = set()
+    emitted_info = {}  # ffi fn -> (method name, [param decls], return text)
     used_fns = set()
     not_auto_wrapped = []
 
@@ -752,99 +1242,6 @@ def main():
             fns.append((entry, f"{entry}_ex"))
         fns = [(e, f) for e, f in fns if f in new_fns]
         if not fns:
-            continue
-        kind = scope_kind(entry)
-        if kind:
-            begin = next((f for e, f in fns if f.endswith("_begin")), None)
-            end = next((f for e, f in fns if f.endswith("_end")), None)
-            if not begin or not end:
-                continue
-            if begin in hand_bound or end in hand_bound or entry in hand_bound:
-                continue
-            if not (autowrap_ok(begin) and autowrap_ok(end)):
-                continue
-            mname = re.sub(r"^cui_", "", begin)
-            mname = re.sub(r"_begin$", "", mname)
-            if mname in hand_methods or mname in emitted_methods:
-                continue
-            emitted_methods.add(mname)
-            used_fns.update([begin, end])
-            ret, params, pos = h.functions[begin]
-            doc = doc_before(h.comments, pos, h.text)
-            safe.append("    /// " + (doc_first_line(doc) or entry))
-            sig = []
-            begin_args = []
-            skip_next = False
-            dropped_len = ""
-            dropped_ctype = "int"
-            plist_all = [(parse_param(p) or (None, None, None)) for p in split_params(params)]
-            for i, p in enumerate(split_params(params)):
-                parsed = parse_param(p)
-                if parsed is None:
-                    continue
-                ctype, pname, ptr = parsed
-                if pname == "ui" and ctype == "cui_ctx":
-                    continue
-                if pname in ("in", "loop", "type", "fn", "match", "ref", "box", "move", "impl"):
-                    pname = pname + "_"
-                if skip_next:
-                    skip_next = False
-                    if dropped_ctype == "size_t":
-                        begin_args.append(f"{dropped_len}.len()")
-                    else:
-                        begin_args.append(f"{dropped_len}.len() as c_int")
-                    continue
-                pair = array_pair_at(plist_all, i)
-                if pair == "drop":
-                    skip_next = True
-                    dropped_len = pname
-                    dropped_ctype = plist_all[i + 1][0]
-                rt = ffi_type(ctype)
-                if pair is not None:
-                    elem = f"ffi::{rt}" if rt.startswith("cui_") or rt.startswith("cui__") else rt
-                    sig.append(f"{pname}: &[{elem}]" if ptr == "const_ptr" else f"{pname}: &mut [{elem}]")
-                    begin_args.append(f"{pname}.as_ptr()" if ptr == "const_ptr" else f"{pname}.as_mut_ptr()")
-                    continue
-                if ptr == "const_ptr" and rt == "c_char":
-                    sig.append(f"{pname}: impl AsRef<str>")
-                    begin_args.append(f"self.arena.cstr({pname}.as_ref())")
-                elif ptr == "mut_ptr" and rt == "*mut bool":
-                    sig.append(f"{pname}: &mut bool")
-                    begin_args.append(pname)
-                elif ptr == "mut_ptr" and rt == "*mut f32":
-                    sig.append(f"{pname}: &mut f32")
-                    begin_args.append(pname)
-                elif ptr == "mut_ptr" and rt == "*mut i32":
-                    sig.append(f"{pname}: &mut i32")
-                    begin_args.append(pname)
-                elif ptr == "mut_ptr" and rt.startswith("cui_"):
-                    sig.append(f"{pname}: &mut ffi::{rt}")
-                    begin_args.append(pname)
-                elif ptr == "const_ptr" and rt.startswith("cui_"):
-                    sig.append(f"{pname}: &ffi::{rt}")
-                    begin_args.append(pname)
-                elif ptr == "const_ptr":
-                    sig.append(f"{pname}: &{rt}")
-                    begin_args.append(pname)
-                elif ptr == "mut_ptr":
-                    sig.append(f"{pname}: &mut {rt}")
-                    begin_args.append(pname)
-                else:
-                    if rt.startswith("cui_"):
-                        sig.append(f"{pname}: ffi::{rt}")
-                    else:
-                        sig.append(f"{pname}: {rt}")
-                    begin_args.append(pname)
-            cond = "let shown = unsafe {" if kind == "if" else "unsafe {"
-            safe.append(f"    pub fn {mname}(&self{', ' + ', '.join(sig) if sig else ''}, f: impl FnOnce(&mut Ui)) {{")
-            safe.append(f"        {cond} ffi::{begin}(self.ctx{', ' if begin_args else ''}{', '.join(begin_args)}) }};")
-            if kind == "if":
-                safe.append("        if shown {")
-            safe.append(f"            self.scope(ffi::{end}, f);")
-            if kind == "if":
-                safe.append("        }")
-            safe.append("    }")
-            safe.append("")
             continue
         # plain / _ex function -> one method
         for entry_name, fn in fns:
@@ -991,6 +1388,7 @@ def main():
                 else:
                     ret_rust = f" -> {rrt}"
             joiner = ", " if sig else ""
+            emitted_info[fn] = (mname, list(sig), ret_rust)
             safe.append(f"    pub fn {mname}(&self{joiner}{', '.join(sig)}){ret_rust} {{")
             safe.extend(f"        {line}" for line in prelude)
             body_call = f"ffi::{fn}(self.ctx{', ' if call else ''}{', '.join(call)}){ret_call}"
@@ -1012,6 +1410,11 @@ def main():
                 safe.append(f"        unsafe {{ {body_call} }}")
             safe.append("    }")
             safe.append("")
+
+
+    # ---- safe opts structs, `_with` methods and closure scopes ----
+    # (see gen_views below: everything here feeds the view! macro)
+    gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe)
 
     body = "\n".join(safe)
     body = (

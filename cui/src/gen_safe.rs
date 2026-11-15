@@ -1203,4 +1203,789 @@ impl<'a> Ui<'a> {
     pub fn week_calendar(&self, id: impl AsRef<str>, week_start: ffi::cui_date, events: &mut [ffi::cui_cal_event], opts: &ffi::cui_week_opts) -> i32 {
         unsafe { ffi::cui_week_calendar_ex(self.ctx, self.arena.cstr(id.as_ref()), week_start, events.as_mut_ptr(), events.len() as c_int, opts) }
     }
+
+    /// Accordion / disclosure. Content animates its height. Runs `f` as the body.
+    pub fn accordion(&mut self, title: impl AsRef<str>, open: &mut bool, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.accordion_begin(title, open);
+        if shown { self.scope(ffi::cui_accordion_end, f); }
+    }
+
+    /// Connected buttons. Put buttons between begin and end. Runs `f` as the body.
+    pub fn button_group(&mut self, f: impl FnOnce(&mut Ui<'a>)) {
+        self.button_group_begin();
+        self.scope(ffi::cui_button_group_end, f);
+    }
+
+    /// card_stack_item Runs `f` as the body.
+    pub fn card_stack_item(&mut self, depth: i32, f: impl FnOnce(&mut Ui<'a>)) {
+        self.card_stack_item_begin(depth);
+        self.scope(ffi::cui_card_stack_item_end, f);
+    }
+
+    /// carousel Runs `f` as the body.
+    pub fn carousel(&mut self, id: impl AsRef<str>, count: i32, index: &mut i32, f: impl FnOnce(&mut Ui<'a>)) {
+        self.carousel_begin(id, count, index, &ffi::cui_carousel_opts::default());
+        self.scope(ffi::cui_carousel_end, f);
+    }
+
+    /// Like [`Ui::carousel`] with options (`view::Carousel`).
+    pub fn carousel_with(&mut self, id: impl AsRef<str>, count: i32, index: &mut i32, opts: &crate::view::Carousel, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.carousel_begin(id, count, index, &fo);
+        self.scope(ffi::cui_carousel_end, f);
+    }
+
+    /// carousel_slide Runs `f` as the body.
+    pub fn carousel_slide(&mut self, f: impl FnOnce(&mut Ui<'a>)) {
+        self.carousel_slide_begin();
+        self.scope(ffi::cui_carousel_slide_end, f);
+    }
+
+    /// dock Runs `f` as the body.
+    pub fn dock(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.dock_begin(id, &ffi::cui_dock_opts::default());
+        self.scope(ffi::cui_dock_end, f);
+    }
+
+    /// Like [`Ui::dock`] with options (`view::Dock`).
+    pub fn dock_with(&mut self, id: impl AsRef<str>, opts: &crate::view::Dock, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.dock_begin(id, &fo);
+        self.scope(ffi::cui_dock_end, f);
+    }
+
+    /// dock_panel Runs `f` as the body.
+    pub fn dock_panel(&mut self, title: impl AsRef<str>, open: &mut bool, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.dock_panel_begin(title, open, &ffi::cui_dock_panel_opts::default());
+        if shown { self.scope(ffi::cui_dock_panel_end, f); }
+    }
+
+    /// Like [`Ui::dock_panel`] with options (`view::DockPanel`).
+    pub fn dock_panel_with(&mut self, title: impl AsRef<str>, open: &mut bool, opts: &crate::view::DockPanel, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.dock_panel_begin(title, open, &fo);
+        if shown { self.scope(ffi::cui_dock_panel_end, f); }
+    }
+
+    /// dockspace Runs `f` as the body.
+    pub fn dockspace(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.dockspace_begin(id, &ffi::cui_dockspace_opts::default());
+        self.scope(ffi::cui_dockspace_end, f);
+    }
+
+    /// Like [`Ui::dockspace`] with options (`view::Dockspace`).
+    pub fn dockspace_with(&mut self, id: impl AsRef<str>, opts: &crate::view::Dockspace, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.dockspace_begin(id, &fo);
+        self.scope(ffi::cui_dockspace_end, f);
+    }
+
+    /// expandable_card Runs `f` as the body.
+    pub fn expandable_card(&mut self, title: impl AsRef<str>, open: &mut bool, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.expandable_card_begin(title, open, &ffi::cui_expandable_card_opts::default());
+        if shown { self.scope(ffi::cui_expandable_card_end, f); }
+    }
+
+    /// Like [`Ui::expandable_card`] with options (`view::ExpandableCard`).
+    pub fn expandable_card_with(&mut self, title: impl AsRef<str>, open: &mut bool, opts: &crate::view::ExpandableCard, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.expandable_card_begin(title, open, &fo);
+        if shown { self.scope(ffi::cui_expandable_card_end, f); }
+    }
+
+    /// hover_card Runs `f` as the body.
+    pub fn hover_card(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.hover_card_begin(id, &ffi::cui_hover_card_opts::default());
+        if shown { self.scope(ffi::cui_hover_card_end, f); }
+    }
+
+    /// Like [`Ui::hover_card`] with options (`view::HoverCard`).
+    pub fn hover_card_with(&mut self, id: impl AsRef<str>, opts: &crate::view::HoverCard, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.hover_card_begin(id, &fo);
+        if shown { self.scope(ffi::cui_hover_card_end, f); }
+    }
+
+    /// inspector Runs `f` as the body.
+    pub fn inspector(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.inspector_begin(id, &ffi::cui_inspector_opts::default());
+        if shown { self.scope(ffi::cui_inspector_end, f); }
+    }
+
+    /// Like [`Ui::inspector`] with options (`view::Inspector`).
+    pub fn inspector_with(&mut self, id: impl AsRef<str>, opts: &crate::view::Inspector, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.inspector_begin(id, &fo);
+        if shown { self.scope(ffi::cui_inspector_end, f); }
+    }
+
+    /// menu_bar Runs `f` as the body.
+    pub fn menu_bar(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.menu_bar_begin(id, &ffi::cui_menu_bar_opts::default());
+        self.scope(ffi::cui_menu_bar_end, f);
+    }
+
+    /// Like [`Ui::menu_bar`] with options (`view::MenuBar`).
+    pub fn menu_bar_with(&mut self, id: impl AsRef<str>, opts: &crate::view::MenuBar, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.menu_bar_begin(id, &fo);
+        self.scope(ffi::cui_menu_bar_end, f);
+    }
+
+    /// menu_bar_menu Runs `f` as the body.
+    pub fn menu_bar_menu(&mut self, label: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.menu_bar_menu_begin(label, &ffi::cui_menu_bar_menu_opts::default());
+        if shown { self.scope(ffi::cui_menu_bar_menu_end, f); }
+    }
+
+    /// Like [`Ui::menu_bar_menu`] with options (`view::MenuBarMenu`).
+    pub fn menu_bar_menu_with(&mut self, label: impl AsRef<str>, opts: &crate::view::MenuBarMenu, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.menu_bar_menu_begin(label, &fo);
+        if shown { self.scope(ffi::cui_menu_bar_menu_end, f); }
+    }
+
+    /// A row for ordinary components. They are laid out at 100% and scaled with Runs `f` as the body.
+    pub fn node_content(&mut self, f: impl FnOnce(&mut Ui<'a>)) {
+        self.node_content_begin();
+        self.scope(ffi::cui_node_content_end, f);
+    }
+
+    /// popover Runs `f` as the body.
+    pub fn popover(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.popover_begin(id, &ffi::cui_popover_opts::default());
+        if shown { self.scope(ffi::cui_popover_end, f); }
+    }
+
+    /// Like [`Ui::popover`] with options (`view::Popover`).
+    pub fn popover_with(&mut self, id: impl AsRef<str>, opts: &crate::view::Popover, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.popover_begin(id, &fo);
+        if shown { self.scope(ffi::cui_popover_end, f); }
+    }
+
+    /// reorder_item Runs `f` as the body.
+    pub fn reorder_item(&mut self, position: i32, f: impl FnOnce(&mut Ui<'a>)) {
+        self.reorder_item_begin(position);
+        self.scope(ffi::cui_reorder_item_end, f);
+    }
+
+    /// spotlight Runs `f` as the body.
+    pub fn spotlight(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.spotlight_begin(id, &ffi::cui_spotlight_opts::default());
+        self.scope(ffi::cui_spotlight_end, f);
+    }
+
+    /// Like [`Ui::spotlight`] with options (`view::Spotlight`).
+    pub fn spotlight_with(&mut self, id: impl AsRef<str>, opts: &crate::view::Spotlight, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.spotlight_begin(id, &fo);
+        self.scope(ffi::cui_spotlight_end, f);
+    }
+
+    /// status_bar Runs `f` as the body.
+    pub fn status_bar(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.status_bar_begin(id, &ffi::cui_status_bar_opts::default());
+        self.scope(ffi::cui_status_bar_end, f);
+    }
+
+    /// Like [`Ui::status_bar`] with options (`view::StatusBar`).
+    pub fn status_bar_with(&mut self, id: impl AsRef<str>, opts: &crate::view::StatusBar, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.status_bar_begin(id, &fo);
+        self.scope(ffi::cui_status_bar_end, f);
+    }
+
+    /// toolbar Runs `f` as the body.
+    pub fn toolbar(&mut self, id: impl AsRef<str>, f: impl FnOnce(&mut Ui<'a>)) {
+        self.toolbar_begin(id, &ffi::cui_toolbar_opts::default());
+        self.scope(ffi::cui_toolbar_end, f);
+    }
+
+    /// Like [`Ui::toolbar`] with options (`view::Toolbar`).
+    pub fn toolbar_with(&mut self, id: impl AsRef<str>, opts: &crate::view::Toolbar, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        self.toolbar_begin(id, &fo);
+        self.scope(ffi::cui_toolbar_end, f);
+    }
+
+    /// tree Runs `f` as the body.
+    pub fn tree(&mut self, label: impl AsRef<str>, open: &mut bool, f: impl FnOnce(&mut Ui<'a>)) {
+        let shown = self.tree_begin(label, open, &ffi::cui_tree_opts::default());
+        if shown { self.scope(ffi::cui_tree_end, f); }
+    }
+
+    /// Like [`Ui::tree`] with options (`view::Tree`).
+    pub fn tree_with(&mut self, label: impl AsRef<str>, open: &mut bool, opts: &crate::view::Tree, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.tree_begin(label, open, &fo);
+        if shown { self.scope(ffi::cui_tree_end, f); }
+    }
+
+    /// Like [`Ui::activity_rings`] with safe options (`view::Rings`).
+    pub fn activity_rings_with(&self, id: impl AsRef<str>, rings: &[ffi::cui_viz_item], opts: &crate::view::Rings) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.activity_rings(id, rings, &fo)
+    }
+
+    /// Like [`Ui::alert`] with safe options (`view::Alert`).
+    pub fn alert_with(&self, title: impl AsRef<str>, opts: &crate::view::Alert) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.alert(title, &fo)
+    }
+
+    /// Like [`Ui::api_explorer`] with safe options (`view::ApiExplorer`).
+    pub fn api_explorer_with(&self, id: impl AsRef<str>, endpoints: &[ffi::cui_api_endpoint], opts: &mut crate::view::ApiExplorer) -> ffi::cui_api_explorer_result {
+        let fo = opts.flatten(self.arena);
+        self.api_explorer(id, endpoints, &fo)
+    }
+
+    /// Like [`Ui::banner`] with safe options (`view::Banner`).
+    pub fn banner_with(&self, text: impl AsRef<str>, open: &mut bool, opts: &crate::view::Banner) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.banner(text, open, &fo)
+    }
+
+    /// Like [`Ui::bar_list`] with safe options (`view::BarList`).
+    pub fn bar_list_with(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &crate::view::BarList) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.bar_list(id, items, &fo)
+    }
+
+    /// Like [`Ui::calendar_heatmap`] with safe options (`view::CalendarHeatmap`).
+    pub fn calendar_heatmap_with(&self, id: impl AsRef<str>, start: ffi::cui_date, values: &[f32], days: i32, opts: &crate::view::CalendarHeatmap) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.calendar_heatmap(id, start, values, days, &fo)
+    }
+
+    /// Like [`Ui::candlestick`] with safe options (`view::Candlestick`).
+    pub fn candlestick_with(&self, id: impl AsRef<str>, candles: &[ffi::cui_candle], opts: &crate::view::Candlestick) -> i32 {
+        { let need: usize = candles.len(); assert!(opts.labels.is_empty() || opts.labels.len() >= need, "candlestick: `labels` holds fewer elements than the call needs"); }
+        let fo = opts.flatten(self.arena);
+        self.candlestick(id, candles, &fo)
+    }
+
+    /// Like [`Ui::card_stack_begin`] with safe options (`view::CardStack`).
+    pub fn card_stack_begin_with(&self, id: impl AsRef<str>, count: i32, opts: &crate::view::CardStack) {
+        let fo = opts.flatten(self.arena);
+        self.card_stack_begin(id, count, &fo)
+    }
+
+    /// Like [`Ui::checklist`] with safe options (`view::Checklist`).
+    pub fn checklist_with(&self, id: impl AsRef<str>, steps: &mut [ffi::cui_check_step], opts: &crate::view::Checklist) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.checklist(id, steps, &fo)
+    }
+
+    /// Like [`Ui::code_block`] with safe options (`view::Code`).
+    pub fn code_block_with(&self, id: impl AsRef<str>, code: impl AsRef<str>, opts: &crate::view::Code) {
+        let fo = opts.flatten(self.arena);
+        self.code_block(id, code, &fo)
+    }
+
+    /// Like [`Ui::comment`] with safe options (`view::Comment`).
+    pub fn comment_with(&self, id: impl AsRef<str>, author: impl AsRef<str>, text: impl AsRef<str>, opts: &mut crate::view::Comment) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.comment(id, author, text, &fo)
+    }
+
+    /// Like [`Ui::commit_graph`] with safe options (`view::CommitGraph`).
+    pub fn commit_graph_with(&self, id: impl AsRef<str>, commits: &[ffi::cui_commit], opts: &mut crate::view::CommitGraph) -> ffi::cui_commit_graph_result {
+        let fo = opts.flatten(self.arena);
+        self.commit_graph(id, commits, &fo)
+    }
+
+    /// Like [`Ui::confirm_button`] with safe options (`view::Confirm`).
+    pub fn confirm_button_with(&self, label: impl AsRef<str>, opts: &crate::view::Confirm) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.confirm_button(label, &fo)
+    }
+
+    /// Like [`Ui::confirm_popover`] with safe options (`view::ConfirmPopover`).
+    pub fn confirm_popover_with(&self, id: impl AsRef<str>, opts: &crate::view::ConfirmPopover) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.confirm_popover(id, &fo)
+    }
+
+    /// Like [`Ui::control_tile`] with safe options (`view::Tile`).
+    pub fn control_tile_with(&self, label: impl AsRef<str>, on: &mut bool, opts: &crate::view::Tile) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.control_tile(label, on, &fo)
+    }
+
+    /// Like [`Ui::countdown`] with safe options (`view::Countdown`).
+    pub fn countdown_with(&self, id: impl AsRef<str>, seconds_left: f64, opts: &crate::view::Countdown) {
+        let fo = opts.flatten(self.arena);
+        self.countdown(id, seconds_left, &fo)
+    }
+
+    /// Like [`Ui::counter`] with safe options (`view::Counter`).
+    pub fn counter_with(&self, id: impl AsRef<str>, value: f64, opts: &crate::view::Counter) {
+        let fo = opts.flatten(self.arena);
+        self.counter(id, value, &fo)
+    }
+
+    /// Like [`Ui::coverage`] with safe options (`view::Coverage`).
+    pub fn coverage_with(&self, id: impl AsRef<str>, files: &[ffi::cui_coverage_file], opts: &crate::view::Coverage) -> ffi::cui_coverage_result {
+        let fo = opts.flatten(self.arena);
+        self.coverage(id, files, &fo)
+    }
+
+    /// Like [`Ui::cropper`] with safe options (`view::Cropper`).
+    pub fn cropper_with(&self, id: impl AsRef<str>, tex: usize, image_w: i32, image_h: i32, crop: &mut ffi::cui_rect, opts: &crate::view::Cropper) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.cropper(id, tex, image_w, image_h, crop, &fo)
+    }
+
+    /// Like [`Ui::date_picker`] with safe options (`view::DateOpts`).
+    pub fn date_picker_with(&self, id: impl AsRef<str>, value: &mut ffi::cui_date, opts: &crate::view::DateOpts) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.date_picker(id, value, &fo)
+    }
+
+    /// Like [`Ui::date_range_picker`] with safe options (`view::DateRange`).
+    pub fn date_range_picker_with(&self, id: impl AsRef<str>, range: &mut ffi::cui_date_range, opts: &crate::view::DateRange) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.date_range_picker(id, range, &fo)
+    }
+
+    /// Like [`Ui::diff_view`] with safe options (`view::Diff`).
+    pub fn diff_view_with(&self, id: impl AsRef<str>, old_text: impl AsRef<str>, new_text: impl AsRef<str>, opts: &mut crate::view::Diff) -> ffi::cui_diff_result {
+        let fo = opts.flatten(self.arena);
+        self.diff_view(id, old_text, new_text, &fo)
+    }
+
+    /// Like [`Ui::doc_tabs`] with safe options (`view::DocTabs`).
+    pub fn doc_tabs_with(&self, id: impl AsRef<str>, tabs: &[ffi::cui_doc_tab], selected: &mut i32, opts: &crate::view::DocTabs) -> ffi::cui_doc_tabs_result {
+        let fo = opts.flatten(self.arena);
+        self.doc_tabs(id, tabs, selected, &fo)
+    }
+
+    /// Like [`Ui::dock_item`] with safe options (`view::DockItem`).
+    pub fn dock_item_with(&self, icon: impl AsRef<str>, label: impl AsRef<str>, opts: &crate::view::DockItem) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.dock_item(icon, label, &fo)
+    }
+
+    /// Like [`Ui::dropzone`] with safe options (`view::Dropzone`).
+    pub fn dropzone_with(&self, id: impl AsRef<str>, opts: &crate::view::Dropzone) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.dropzone(id, &fo)
+    }
+
+    /// Like [`Ui::expandable_text`] with safe options (`view::ExpandableText`).
+    pub fn expandable_text_with(&self, id: impl AsRef<str>, text: impl AsRef<str>, opts: &crate::view::ExpandableText) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.expandable_text(id, text, &fo)
+    }
+
+    /// Like [`Ui::fader`] with safe options (`view::Fader`).
+    pub fn fader_with(&self, id: impl AsRef<str>, value: &mut f32, min: f32, max: f32, opts: &crate::view::Fader) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.fader(id, value, min, max, &fo)
+    }
+
+    /// Like [`Ui::flame_graph`] with safe options (`view::Flame`).
+    pub fn flame_graph_with(&self, id: impl AsRef<str>, spans: &[ffi::cui_flame_span], view: &mut ffi::cui_flame_view, selected: &mut i32, opts: &crate::view::Flame) -> ffi::cui_flame_result {
+        let fo = opts.flatten(self.arena);
+        self.flame_graph(id, spans, view, selected, &fo)
+    }
+
+    /// Like [`Ui::funnel`] with safe options (`view::Funnel`).
+    pub fn funnel_with(&self, id: impl AsRef<str>, stages: &[ffi::cui_viz_item], opts: &crate::view::Funnel) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.funnel(id, stages, &fo)
+    }
+
+    /// Like [`Ui::gantt`] with safe options (`view::Gantt`).
+    pub fn gantt_with(&self, id: impl AsRef<str>, tasks: &mut [ffi::cui_gantt_task], origin: ffi::cui_date, days: i32, opts: &crate::view::Gantt) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.gantt(id, tasks, origin, days, &fo)
+    }
+
+    /// Like [`Ui::gradient_editor`] with safe options (`view::Gradient`).
+    pub fn gradient_editor_with(&self, id: impl AsRef<str>, stops: &mut [ffi::cui_gradient_stop], count: &mut i32, opts: &mut crate::view::Gradient) -> ffi::cui_gradient_result {
+        let fo = opts.flatten(self.arena);
+        self.gradient_editor(id, stops, count, &fo)
+    }
+
+    /// Like [`Ui::gradient_text`] with safe options (`view::GradientText`).
+    pub fn gradient_text_with(&self, text: impl AsRef<str>, opts: &crate::view::GradientText) {
+        let fo = opts.flatten(self.arena);
+        self.gradient_text(text, &fo)
+    }
+
+    /// Like [`Ui::graph_view`] with safe options (`view::Graph`).
+    pub fn graph_view_with(&self, id: impl AsRef<str>, nodes: &[ffi::cui_graph_node], edges: &[ffi::cui_graph_edge], opts: &mut crate::view::Graph) -> ffi::cui_graph_result {
+        let fo = opts.flatten(self.arena);
+        self.graph_view(id, nodes, edges, &fo)
+    }
+
+    /// Like [`Ui::heatmap`] with safe options (`view::Heatmap`).
+    pub fn heatmap_with(&self, id: impl AsRef<str>, values: &[f32], rows: i32, cols: i32, opts: &crate::view::Heatmap) -> i32 {
+        { let need: usize = rows.max(0) as usize; assert!(opts.row_labels.is_empty() || opts.row_labels.len() >= need, "heatmap: `row_labels` holds fewer elements than the call needs"); }
+        { let need: usize = cols.max(0) as usize; assert!(opts.col_labels.is_empty() || opts.col_labels.len() >= need, "heatmap: `col_labels` holds fewer elements than the call needs"); }
+        let fo = opts.flatten(self.arena);
+        self.heatmap(id, values, rows, cols, &fo)
+    }
+
+    /// Like [`Ui::hex_view`] with safe options (`view::HexView`).
+    pub fn hex_view_with(&self, id: impl AsRef<str>, data: &[u8], sel: &mut ffi::cui_hex_selection, opts: &crate::view::HexView) -> ffi::cui_hex_result {
+        let fo = opts.flatten(self.arena);
+        self.hex_view(id, data, sel, &fo)
+    }
+
+    /// Like [`Ui::histogram_slider`] with safe options (`view::Histogram`).
+    pub fn histogram_slider_with(&self, label: impl AsRef<str>, bins: &[f32], lo: &mut f32, hi: &mut f32, min: f32, max: f32, opts: &crate::view::Histogram) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.histogram_slider(label, bins, lo, hi, min, max, &fo)
+    }
+
+    /// Like [`Ui::hold_button`] with safe options (`view::Hold`).
+    pub fn hold_button_with(&self, label: impl AsRef<str>, opts: &crate::view::Hold) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.hold_button(label, &fo)
+    }
+
+    /// Like [`Ui::image_compare`] with safe options (`view::Compare`).
+    pub fn image_compare_with(&self, id: impl AsRef<str>, before: usize, after: usize, pos: &mut f32, opts: &crate::view::Compare) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.image_compare(id, before, after, pos, &fo)
+    }
+
+    /// Like [`Ui::image`] with safe options (`view::Image`).
+    pub fn image_with(&self, tex: usize, opts: &crate::view::Image) {
+        let fo = opts.flatten(self.arena);
+        self.image(tex, &fo)
+    }
+
+    /// Like [`Ui::image_viewer`] with safe options (`view::ImageViewer`).
+    pub fn image_viewer_with(&self, id: impl AsRef<str>, tex: usize, image_w: i32, image_h: i32, view: &mut ffi::cui_image_view, opts: &crate::view::ImageViewer) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.image_viewer(id, tex, image_w, image_h, view, &fo)
+    }
+
+    /// Like [`Ui::json_view`] with safe options (`view::Json`).
+    pub fn json_view_with(&self, id: impl AsRef<str>, json: impl AsRef<str>, opts: &crate::view::Json) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.json_view(id, json, &fo)
+    }
+
+    /// Like [`Ui::kanban_column_begin`] with safe options (`view::KanbanColumn`).
+    pub fn kanban_column_begin_with(&self, title: impl AsRef<str>, card_count: i32, opts: &crate::view::KanbanColumn) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.kanban_column_begin(title, card_count, &fo)
+    }
+
+    /// Like [`Ui::keymap`] with safe options (`view::Keymap`).
+    pub fn keymap_with(&self, id: impl AsRef<str>, bindings: &[ffi::cui_keymap_binding], opts: &mut crate::view::Keymap) -> ffi::cui_keymap_result {
+        let fo = opts.flatten(self.arena);
+        self.keymap(id, bindings, &fo)
+    }
+
+    /// Like [`Ui::knob`] with safe options (`view::Knob`).
+    pub fn knob_with(&self, id: impl AsRef<str>, value: &mut f32, min: f32, max: f32, opts: &crate::view::Knob) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.knob(id, value, min, max, &fo)
+    }
+
+    /// Like [`Ui::level_meter`] with safe options (`view::LevelMeter`).
+    pub fn level_meter_with(&self, id: impl AsRef<str>, levels: &[f32], channels: i32, opts: &crate::view::LevelMeter) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.level_meter(id, levels, channels, &fo)
+    }
+
+    /// Like [`Ui::loader`] with safe options (`view::Loader`).
+    pub fn loader_with(&self, opts: &crate::view::Loader) {
+        let fo = opts.flatten(self.arena);
+        self.loader(&fo)
+    }
+
+    /// Like [`Ui::log_view`] with safe options (`view::LogView`).
+    pub fn log_view_with(&self, id: impl AsRef<str>, buf: &mut ffi::cui_log_buffer, opts: &crate::view::LogView) {
+        let fo = opts.flatten(self.arena);
+        self.log_view(id, buf, &fo)
+    }
+
+    /// Like [`Ui::markdown`] with safe options (`view::Markdown`).
+    pub fn markdown_with(&self, id: impl AsRef<str>, text: impl AsRef<str>, opts: &crate::view::Markdown) -> ffi::cui_markdown_result {
+        let fo = opts.flatten(self.arena);
+        self.markdown(id, text, &fo)
+    }
+
+    /// Like [`Ui::money_input`] with safe options (`view::Money`).
+    pub fn money_input_with(&self, id: impl AsRef<str>, value: &mut f64, opts: &crate::view::Money) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.money_input(id, value, &fo)
+    }
+
+    /// Like [`Ui::month_calendar`] with safe options (`view::Month`).
+    pub fn month_calendar_with(&self, id: impl AsRef<str>, month: &mut ffi::cui_date, events: &[ffi::cui_month_event], opts: &mut crate::view::Month) -> ffi::cui_month_result {
+        let fo = opts.flatten(self.arena);
+        self.month_calendar(id, month, events, &fo)
+    }
+
+    /// Like [`Ui::node_begin`] with safe options (`view::Node`).
+    pub fn node_begin_with(&self, node_id: i32, x: &mut f32, y: &mut f32, title: impl AsRef<str>, opts: &crate::view::Node) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.node_begin(node_id, x, y, title, &fo)
+    }
+
+    /// Like [`Ui::node_editor_begin`] with safe options (`view::NodeEditor`).
+    pub fn node_editor_begin_with(&self, id: impl AsRef<str>, view: &mut ffi::cui_node_view, opts: &crate::view::NodeEditor) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.node_editor_begin(id, view, &fo)
+    }
+
+    /// Like [`Ui::node_input`] with safe options (`view::Pin`).
+    pub fn node_input_with(&self, pin_id: i32, label: impl AsRef<str>, opts: &crate::view::Pin) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.node_input(pin_id, label, &fo)
+    }
+
+    /// Like [`Ui::node_output`] with safe options (`view::Pin`).
+    pub fn node_output_with(&self, pin_id: i32, label: impl AsRef<str>, opts: &crate::view::Pin) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.node_output(pin_id, label, &fo)
+    }
+
+    /// Like [`Ui::now_playing`] with safe options (`view::NowPlaying`).
+    pub fn now_playing_with(&self, id: impl AsRef<str>, np: &mut ffi::cui_now_playing, opts: &crate::view::NowPlaying) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.now_playing(id, np, &fo)
+    }
+
+    /// Like [`Ui::problems`] with safe options (`view::Problems`).
+    pub fn problems_with(&self, id: impl AsRef<str>, diags: &[ffi::cui_diagnostic], opts: &crate::view::Problems) -> ffi::cui_problems_result {
+        let fo = opts.flatten(self.arena);
+        self.problems(id, diags, &fo)
+    }
+
+    /// Like [`Ui::prop_bool`] with safe options (`view::Prop`).
+    pub fn prop_bool_with(&self, label: impl AsRef<str>, value: &mut bool, opts: &crate::view::Prop) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.prop_bool(label, value, &fo)
+    }
+
+    /// Like [`Ui::prop_color`] with safe options (`view::Prop`).
+    pub fn prop_color_with(&self, label: impl AsRef<str>, value: &mut ffi::cui_color, opts: &crate::view::Prop) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.prop_color(label, value, &fo)
+    }
+
+    /// Like [`Ui::prop_float`] with safe options (`view::Prop`).
+    pub fn prop_float_with(&self, label: impl AsRef<str>, value: &mut f32, opts: &crate::view::Prop) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.prop_float(label, value, &fo)
+    }
+
+    /// Like [`Ui::prop_int`] with safe options (`view::Prop`).
+    pub fn prop_int_with(&self, label: impl AsRef<str>, value: &mut i32, opts: &crate::view::Prop) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.prop_int(label, value, &fo)
+    }
+
+    /// Like [`Ui::prop_vec`] with safe options (`view::Prop`).
+    pub fn prop_vec_with(&self, label: impl AsRef<str>, value: &mut [f32], components: i32, opts: &crate::view::Prop) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.prop_vec(label, value, components, &fo)
+    }
+
+    /// Like [`Ui::radial_gauge`] with safe options (`view::RadialGauge`).
+    pub fn radial_gauge_with(&self, id: impl AsRef<str>, value: f32, min: f32, max: f32, opts: &crate::view::RadialGauge) {
+        let fo = opts.flatten(self.arena);
+        self.radial_gauge(id, value, min, max, &fo)
+    }
+
+    /// Like [`Ui::radio_cards`] with safe options (`view::RadioCards`).
+    pub fn radio_cards_with(&self, id: impl AsRef<str>, choices: &[ffi::cui_choice], index: &mut i32, opts: &crate::view::RadioCards) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.radio_cards(id, choices, index, &fo)
+    }
+
+    /// Like [`Ui::ruler_slider`] with safe options (`view::Ruler`).
+    pub fn ruler_slider_with(&self, label: impl AsRef<str>, value: &mut f32, min: f32, max: f32, opts: &crate::view::Ruler) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.ruler_slider(label, value, min, max, &fo)
+    }
+
+    /// Like [`Ui::scatter_chart`] with safe options (`view::Scatter`).
+    pub fn scatter_chart_with(&self, id: impl AsRef<str>, series: &[ffi::cui_scatter_series], opts: &crate::view::Scatter) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.scatter_chart(id, series, &fo)
+    }
+
+    /// Like [`Ui::scrub`] with safe options (`view::Scrub`).
+    pub fn scrub_with(&self, label: impl AsRef<str>, value: &mut f32, min: f32, max: f32, opts: &crate::view::Scrub) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.scrub(label, value, min, max, &fo)
+    }
+
+    /// Like [`Ui::shimmer_text`] with safe options (`view::TextFx`).
+    pub fn shimmer_text_with(&self, text: impl AsRef<str>, opts: &crate::view::TextFx) {
+        let fo = opts.flatten(self.arena);
+        self.shimmer_text(text, &fo)
+    }
+
+    /// Like [`Ui::shortcut_recorder`] with safe options (`view::ShortcutRecorder`).
+    pub fn shortcut_recorder_with(&self, id: impl AsRef<str>, combo: &mut ffi::cui_key_combo, opts: &crate::view::ShortcutRecorder) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.shortcut_recorder(id, combo, &fo)
+    }
+
+    /// Like [`Ui::signature_pad`] with safe options (`view::Signature`).
+    pub fn signature_pad_with(&self, id: impl AsRef<str>, opts: &crate::view::Signature) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.signature_pad(id, &fo)
+    }
+
+    /// Like [`Ui::speed_dial`] with safe options (`view::SpeedDial`).
+    pub fn speed_dial_with(&self, id: impl AsRef<str>, actions: &[ffi::cui_speed_action], opts: &crate::view::SpeedDial) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.speed_dial(id, actions, &fo)
+    }
+
+    /// Like [`Ui::split_bar`] with safe options (`view::SplitBar`).
+    pub fn split_bar_with(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &crate::view::SplitBar) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.split_bar(id, items, &fo)
+    }
+
+    /// Like [`Ui::stack_trace`] with safe options (`view::StackTrace`).
+    pub fn stack_trace_with(&self, id: impl AsRef<str>, frames: &[ffi::cui_stack_frame], opts: &crate::view::StackTrace) -> ffi::cui_stack_trace_result {
+        let fo = opts.flatten(self.arena);
+        self.stack_trace(id, frames, &fo)
+    }
+
+    /// Like [`Ui::status_bar_item`] with safe options (`view::StatusItem`).
+    pub fn status_bar_item_with(&self, label: impl AsRef<str>, opts: &crate::view::StatusItem) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.status_bar_item(label, &fo)
+    }
+
+    /// Like [`Ui::status_bar_progress`] with safe options (`view::StatusProgress`).
+    pub fn status_bar_progress_with(&self, value: f32, opts: &crate::view::StatusProgress) {
+        let fo = opts.flatten(self.arena);
+        self.status_bar_progress(value, &fo)
+    }
+
+    /// Like [`Ui::status_bar_text`] with safe options (`view::StatusItem`).
+    pub fn status_bar_text_with(&self, text: impl AsRef<str>, opts: &crate::view::StatusItem) {
+        let fo = opts.flatten(self.arena);
+        self.status_bar_text(text, &fo)
+    }
+
+    /// Like [`Ui::status_button`] with safe options (`view::StatusButton`).
+    pub fn status_button_with(&self, label: impl AsRef<str>, status: c_int, opts: &crate::view::StatusButton) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.status_button(label, status, &fo)
+    }
+
+    /// Like [`Ui::tab_bar`] with safe options (`view::TabBar`).
+    pub fn tab_bar_with(&self, id: impl AsRef<str>, items: &[ffi::cui_tab_bar_item], selected: &mut i32, opts: &crate::view::TabBar) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.tab_bar(id, items, selected, &fo)
+    }
+
+    /// Like [`Ui::terminal`] with safe options (`view::Terminal`).
+    pub fn terminal_with(&self, id: impl AsRef<str>, t: &mut ffi::cui_terminal_buffer, opts: &crate::view::Terminal) -> ffi::cui_terminal_result {
+        let fo = opts.flatten(self.arena);
+        self.terminal(id, t, &fo)
+    }
+
+    /// Like [`Ui::test_explorer`] with safe options (`view::TestExplorer`).
+    pub fn test_explorer_with(&self, id: impl AsRef<str>, items: &[ffi::cui_test_item], opts: &crate::view::TestExplorer) -> ffi::cui_test_explorer_result {
+        let fo = opts.flatten(self.arena);
+        self.test_explorer(id, items, &fo)
+    }
+
+    /// Like [`Ui::text_reveal`] with safe options (`view::TextFx`).
+    pub fn text_reveal_with(&self, id: impl AsRef<str>, text: impl AsRef<str>, opts: &crate::view::TextFx) {
+        let fo = opts.flatten(self.arena);
+        self.text_reveal(id, text, &fo)
+    }
+
+    /// Like [`Ui::ticker`] with safe options (`view::Ticker`).
+    pub fn ticker_with(&self, id: impl AsRef<str>, items: &[ffi::cui_ticker_item], opts: &crate::view::Ticker) {
+        let fo = opts.flatten(self.arena);
+        self.ticker(id, items, &fo)
+    }
+
+    /// Like [`Ui::time_histogram`] with safe options (`view::TimeHistogram`).
+    pub fn time_histogram_with(&self, id: impl AsRef<str>, start: f64, bucket_seconds: f64, buckets: i32, series: &[ffi::cui_histogram_series], sel_start: &mut f64, sel_end: &mut f64, opts: &crate::view::TimeHistogram) -> ffi::cui_time_histogram_result {
+        let fo = opts.flatten(self.arena);
+        self.time_histogram(id, start, bucket_seconds, buckets, series, sel_start, sel_end, &fo)
+    }
+
+    /// Like [`Ui::time_picker`] with safe options (`view::Time`).
+    pub fn time_picker_with(&self, id: impl AsRef<str>, hour: &mut i32, minute: &mut i32, opts: &crate::view::Time) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.time_picker(id, hour, minute, &fo)
+    }
+
+    /// Like [`Ui::timeline_editor`] with safe options (`view::TimelineEditor`).
+    pub fn timeline_editor_with(&self, id: impl AsRef<str>, tracks: &mut [ffi::cui_timeline_track], time: &mut f32, opts: &mut crate::view::TimelineEditor) -> ffi::cui_timeline_editor_result {
+        let fo = opts.flatten(self.arena);
+        self.timeline_editor(id, tracks, time, &fo)
+    }
+
+    /// Like [`Ui::toolbar_button`] with safe options (`view::Tool`).
+    pub fn toolbar_button_with(&self, icon: impl AsRef<str>, opts: &mut crate::view::Tool) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.toolbar_button(icon, &fo)
+    }
+
+    /// Like [`Ui::tour`] with safe options (`view::Tour`).
+    pub fn tour_with(&self, id: impl AsRef<str>, steps: &[ffi::cui_tour_step], step: &mut i32, opts: &crate::view::Tour) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.tour(id, steps, step, &fo)
+    }
+
+    /// Like [`Ui::trace_view`] with safe options (`view::Trace`).
+    pub fn trace_view_with(&self, id: impl AsRef<str>, tracks: &mut [ffi::cui_trace_track], spans: &[ffi::cui_trace_span], view: &mut ffi::cui_trace_view, selected: &mut i32, opts: &crate::view::Trace) -> ffi::cui_trace_result {
+        let fo = opts.flatten(self.arena);
+        self.trace_view(id, tracks, spans, view, selected, &fo)
+    }
+
+    /// Like [`Ui::treemap`] with safe options (`view::Treemap`).
+    pub fn treemap_with(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &crate::view::Treemap) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.treemap(id, items, &fo)
+    }
+
+    /// Like [`Ui::uptime`] with safe options (`view::Uptime`).
+    pub fn uptime_with(&self, id: impl AsRef<str>, services: &[ffi::cui_uptime_service], opts: &crate::view::Uptime) -> ffi::cui_uptime_result {
+        let fo = opts.flatten(self.arena);
+        self.uptime(id, services, &fo)
+    }
+
+    /// Like [`Ui::voice_orb`] with safe options (`view::VoiceOrb`).
+    pub fn voice_orb_with(&self, id: impl AsRef<str>, state: c_int, level: f32, opts: &crate::view::VoiceOrb) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.voice_orb(id, state, level, &fo)
+    }
+
+    /// Like [`Ui::waffle`] with safe options (`view::Waffle`).
+    pub fn waffle_with(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &crate::view::Waffle) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.waffle(id, items, &fo)
+    }
+
+    /// Like [`Ui::waterfall`] with safe options (`view::Waterfall`).
+    pub fn waterfall_with(&self, id: impl AsRef<str>, requests: &[ffi::cui_net_request], opts: &mut crate::view::Waterfall) -> ffi::cui_waterfall_result {
+        let fo = opts.flatten(self.arena);
+        self.waterfall(id, requests, &fo)
+    }
+
+    /// Like [`Ui::waveform`] with safe options (`view::Waveform`).
+    pub fn waveform_with(&self, id: impl AsRef<str>, peaks: &[f32], progress: &mut f32, opts: &crate::view::Waveform) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.waveform(id, peaks, progress, &fo)
+    }
+
+    /// Like [`Ui::week_calendar`] with safe options (`view::Week`).
+    pub fn week_calendar_with(&self, id: impl AsRef<str>, week_start: ffi::cui_date, events: &mut [ffi::cui_cal_event], opts: &crate::view::Week) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.week_calendar(id, week_start, events, &fo)
+    }
 }

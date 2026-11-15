@@ -18,7 +18,7 @@ jobs:
       - name: Generated files are current
         run: |
           python3 scripts/gen_ffi.py
-          git diff --exit-code -- cui cui-sys scripts
+          git diff --exit-code -- cui cui-sys cui-macros scripts
       - name: Every extern declaration matches its C prototype
         run: scripts/sigcheck.sh
       - run: cargo test
@@ -30,7 +30,7 @@ jobs:
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Doc links
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p cui-rs -p cui-sys
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p cui-rs -p cui-sys -p cui-rs-macros
       - run: cargo build --release --examples
       - name: Smoke test every example under Xvfb
         run: xvfb-run -a -s "-screen 0 1280x800x24" scripts/smoke.sh target/release/examples
@@ -79,7 +79,7 @@ jobs:
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Doc links
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p cui-rs -p cui-sys
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps -p cui-rs -p cui-sys -p cui-rs-macros
       # ... and without it: the bring-your-own-window path.
       - run: cargo build --lib -p cui-rs -p cui-sys --no-default-features
       - run: cargo test -p cui-sys --no-default-features

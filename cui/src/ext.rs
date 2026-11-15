@@ -947,3 +947,258 @@ pub(crate) fn sync_buffer(value: &mut String) {
     }
     crate::sync_c_string(value)
 }
+
+// ------------------------------------------------------- row-style scopes
+//
+// Scopes whose body runs once per row, or whose options hold borrows CUI
+// writes through until the matching `_end`. The closure forms keep those
+// borrows alive for the whole scope and end it on unwind too.
+
+/// Ends a scope whose `_end` returns a value: on the normal path the caller
+/// takes the value and disarms this; on unwind it still balances CUI's stack.
+struct EndOnUnwind<F: FnMut()>(Option<F>);
+impl<F: FnMut()> Drop for EndOnUnwind<F> {
+    fn drop(&mut self) {
+        if let Some(mut f) = self.0.take() {
+            f()
+        }
+    }
+}
+
+/// What a tree table reported this frame (C's `cui_tree_table_events`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TreeTableEvents {
+    /// The node chosen with Enter or a double click.
+    pub activated: Option<i32>,
+    /// A node opened this frame.
+    pub expanded: Option<i32>,
+    /// A node closed this frame.
+    pub collapsed: Option<i32>,
+    /// Nodes to load children for (each now has `CUI_TREE_LOADING`).
+    pub load: Vec<i32>,
+    /// A node's `CUI_TREE_SELECTED` flag changed this frame.
+    pub selection_changed: bool,
+    /// Re-sort every sibling list by the `sort` option.
+    pub sort_changed: bool,
+}
+
+/// Options for [`Ui::emoji_picker_with`] (C's `cui_emoji_picker_opts`).
+#[derive(Debug, Default)]
+pub struct EmojiPicker<'a> {
+    /// Default: up to 360.
+    pub width: Size,
+    /// Height of the grid; default 280.
+    pub height: f32,
+    /// Emoji size; default 26.
+    pub size: f32,
+    /// The recent emoji, newest first, space separated: read and updated
+    /// here so the app can save it. `None` keeps them in the picker.
+    pub recent: Option<&'a mut String>,
+    /// Skin tone, 0 (none) to 5 (dark), kept by the app.
+    pub tone: Option<&'a mut i32>,
+    /// Default "Search emoji".
+    pub placeholder: Option<&'a str>,
+    /// Default "No emoji found".
+    pub empty_text: Option<&'a str>,
+    /// The preview with nothing to show; default "Pick an emoji".
+    pub hint: Option<&'a str>,
+    /// Ten names: recent, then Unicode's nine groups.
+    pub group_names: Option<&'a [&'a str; 10]>,
+    /// Hides the search field.
+    pub no_search: bool,
+    /// Hides the row that shows the hovered emoji and its name.
+    pub no_preview: bool,
+    /// Hides the skin tone button.
+    pub no_tone: bool,
+}
+
+impl<'a> crate::Ui<'a> {
+    /// A table (C's `cui_table` scope): `f` builds the rows with
+    /// [`Ui::table_row`] / [`Ui::table_cell`]. Runs only while the table is
+    /// shown; `o.sort` stays borrowed for the whole scope.
+    pub fn table(&mut self, id: impl AsRef<str>, columns: &[crate::TableColumn], o: &mut crate::Table, f: impl FnOnce(&mut Ui<'a>)) {
+        if self.table_begin(id, columns, o) {
+            let _end = EndOnUnwind(Some(|| unsafe { ffi::cui_table_end(self.ctx) }));
+            f(&mut Ui { ctx: self.ctx, arena: self.arena });
+        }
+    }
+
+    /// A virtual list (C's `cui_virtual_list` scope): only the visible rows
+    /// are built. `row` runs once for each visible row index.
+    pub fn virtual_list(&mut self, id: impl AsRef<str>, count: i32, row_height: f32, height: Size, mut row: impl FnMut(&mut Ui<'a>, i32)) {
+        let (mut first, mut last) = (0, 0);
+        self.virtual_list_begin(id, count, row_height, crate::opts::sz(height), &mut first, &mut last);
+        let _end = EndOnUnwind(Some(|| unsafe { ffi::cui_virtual_list_end(self.ctx) }));
+        let mut ui = Ui { ctx: self.ctx, arena: self.arena };
+        // C clamps the range to 0..count; clamp again rather than trust it
+        for i in first.max(0)..last.min(count) {
+            row(&mut ui, i);
+        }
+    }
+
+    /// A data grid with default options: see [`Ui::data_grid_with`].
+    pub fn data_grid(&mut self, id: impl AsRef<str>, columns: &[crate::view::GridColumn], row_count: i32, row: impl FnMut(&mut Ui<'a>, i32, bool)) {
+        self.data_grid_with(id, columns, row_count, &mut crate::view::Grid::default(), row)
+    }
+
+    /// A virtualized table for large data (C's `cui_data_grid` scope). `row`
+    /// runs once for each visible row with the row index and whether the row
+    /// was clicked; build its cells with [`Ui::data_grid_cell`] /
+    /// [`Ui::data_grid_cell_text`]. The borrows in `opts` (`selected`,
+    /// `sort`, `cursor`, `anchor`) are written until the grid ends, which is
+    /// why this is a closure and not a begin/end pair.
+    pub fn data_grid_with(
+        &mut self,
+        id: impl AsRef<str>,
+        columns: &[crate::view::GridColumn],
+        row_count: i32,
+        opts: &mut crate::view::Grid,
+        mut row: impl FnMut(&mut Ui<'a>, i32, bool),
+    ) {
+        assert!(!columns.is_empty(), "data_grid: no columns");
+        let rows = row_count.max(0);
+        assert!(
+            !opts.selected.as_ref().is_some_and(|s| s.len() < rows as usize),
+            "data_grid: `selected` holds fewer elements than there are rows"
+        );
+        let cols: Vec<ffi::cui_grid_column> = columns.iter().map(|c| c.flatten(self.arena)).collect();
+        let fo = opts.flatten(self.arena);
+        let (mut first, mut last) = (0, 0);
+        if !self.data_grid_begin(id, &cols, rows, &mut first, &mut last, &fo) {
+            return;
+        }
+        let _end = EndOnUnwind(Some(|| unsafe { ffi::cui_data_grid_end(self.ctx) }));
+        let mut ui = Ui { ctx: self.ctx, arena: self.arena };
+        for r in first.max(0)..last.min(rows) {
+            let clicked = ui.data_grid_row(r);
+            row(&mut ui, r, clicked);
+        }
+    }
+
+    /// A tree table with default options: see [`Ui::tree_table_with`].
+    pub fn tree_table(
+        &mut self,
+        id: impl AsRef<str>,
+        columns: &[crate::view::GridColumn],
+        nodes: &mut [ffi::cui_tree_node],
+        row: impl FnMut(&mut Ui<'a>, i32),
+    ) -> TreeTableEvents {
+        self.tree_table_with(id, columns, nodes, &mut crate::view::TreeTable::default(), row)
+    }
+
+    /// An expandable tree with columns (C's `cui_tree_table` scope). `row`
+    /// runs once for each visible node with its index in `nodes`; name it
+    /// with [`Ui::tree_table_name`] and add cells with
+    /// [`Ui::data_grid_cell_text`]. `nodes` and the borrows in `opts` stay
+    /// borrowed until the table ends.
+    pub fn tree_table_with(
+        &mut self,
+        id: impl AsRef<str>,
+        columns: &[crate::view::GridColumn],
+        nodes: &mut [ffi::cui_tree_node],
+        opts: &mut crate::view::TreeTable,
+        mut row: impl FnMut(&mut Ui<'a>, i32),
+    ) -> TreeTableEvents {
+        assert!(!columns.is_empty(), "tree_table: no columns");
+        // C walks the links without a bounds check: reject any that leave the slice
+        let n = nodes.len() as i64;
+        let ok = |i: i32| (-1..n).contains(&(i as i64));
+        assert!(
+            nodes.iter().all(|x| ok(x.parent) && ok(x.first_child) && ok(x.next_sibling)),
+            "tree_table: a node links outside `nodes`"
+        );
+        assert!((0..n.max(1)).contains(&(opts.root as i64)), "tree_table: `root` is outside `nodes`");
+        let cols: Vec<ffi::cui_grid_column> = columns.iter().map(|c| c.flatten(self.arena)).collect();
+        let fo = opts.flatten(self.arena);
+        self.tree_table_begin(id, &cols, nodes, &fo);
+        let ctx = self.ctx;
+        let mut end = EndOnUnwind(Some(move || unsafe {
+            ffi::cui_tree_table_end(ctx);
+        }));
+        let mut ui = Ui { ctx: self.ctx, arena: self.arena };
+        loop {
+            let node = ui.tree_table_row();
+            if node < 0 {
+                break;
+            }
+            row(&mut ui, node);
+        }
+        end.0 = None; // the normal path takes end's value itself
+        let ev = unsafe { ffi::cui_tree_table_end(self.ctx) };
+        let some = |v: i32| (v >= 0).then_some(v);
+        let load = if ev.load.is_null() || ev.load_count <= 0 {
+            Vec::new()
+        } else {
+            // SAFETY: C returns `load_count` ints, valid for this frame
+            unsafe { core::slice::from_raw_parts(ev.load, ev.load_count as usize) }.to_vec()
+        };
+        TreeTableEvents {
+            activated: some(ev.activated),
+            expanded: some(ev.expanded),
+            collapsed: some(ev.collapsed),
+            load,
+            selection_changed: ev.selection_changed,
+            sort_changed: ev.sort_changed,
+        }
+    }
+
+    /// An emoji picker (C's `cui_emoji_picker`). Returns the emoji picked
+    /// this frame.
+    pub fn emoji_picker_with(&mut self, id: impl AsRef<str>, opts: &mut EmojiPicker) -> Option<String> {
+        let a = self.arena;
+        let mut fo = ffi::cui_emoji_picker_opts {
+            width: crate::opts::sz(opts.width),
+            height: opts.height,
+            size: opts.size,
+            tone: opts.tone.as_deref_mut().map_or(core::ptr::null_mut(), |t| t as *mut i32),
+            placeholder: cstr(a, opts.placeholder),
+            empty_text: cstr(a, opts.empty_text),
+            hint: cstr(a, opts.hint),
+            group_names: opts.group_names.map_or(core::ptr::null(), |g| a.cstr_array(g)),
+            no_search: opts.no_search,
+            no_preview: opts.no_preview,
+            no_tone: opts.no_tone,
+            ..Default::default()
+        };
+        if let Some(recent) = opts.recent.as_deref_mut() {
+            // C reads the buffer with strlen and writes it back bounded by
+            // its capacity
+            begin_c_string(recent, 255);
+            fo.recent = recent.as_mut_ptr() as *mut c_char;
+            fo.recent_cap = recent.capacity();
+        }
+        let picked = unsafe { ffi::cui_emoji_picker_ex(self.ctx, a.cstr(id.as_ref()), &fo) };
+        if let Some(recent) = opts.recent.as_deref_mut() {
+            sync_c_string(recent);
+        }
+        if picked.is_null() {
+            None
+        } else {
+            // SAFETY: a NUL-terminated string valid until the next frame
+            Some(unsafe { core::ffi::CStr::from_ptr(picked) }.to_string_lossy().into_owned())
+        }
+    }
+
+    /// A hex editor with default options: see [`Ui::hex_edit_with`].
+    pub fn hex_edit(&mut self, id: impl AsRef<str>, data: &mut [u8], sel: &mut ffi::cui_hex_selection) -> ffi::cui_hex_result {
+        self.hex_edit_with(id, data, sel, &crate::view::HexView::default())
+    }
+
+    /// A hex view whose bytes can be overwritten in place (C's
+    /// `cui_hex_view` with `.edit` set to the data itself). For a read-only
+    /// view use `hex_view_with`.
+    pub fn hex_edit_with(
+        &mut self,
+        id: impl AsRef<str>,
+        data: &mut [u8],
+        sel: &mut ffi::cui_hex_selection,
+        opts: &crate::view::HexView,
+    ) -> ffi::cui_hex_result {
+        let mut fo = opts.flatten(self.arena);
+        // one pointer for both views of the bytes: C shows and overwrites
+        // `edit` instead of `data`
+        let p = data.as_mut_ptr();
+        fo.edit = if data.is_empty() { core::ptr::null_mut() } else { p };
+        unsafe { ffi::cui_hex_view_ex(self.ctx, self.arena.cstr(id.as_ref()), p, data.len(), sel, &fo) }
+    }
+}

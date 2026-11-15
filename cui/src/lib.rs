@@ -59,16 +59,23 @@ mod types;
 mod arena;
 mod draw;
 mod ext;
+mod gen_opts;
 mod gen_safe;
 mod icons;
 mod opts;
 mod opts2;
 
+/// Opts types under the names the `view!` macro uses.
+#[cfg_attr(feature = "macros", doc = include_str!("view.md"))]
+pub mod view;
+#[cfg(feature = "macros")]
+pub use cui_rs_macros::view;
+
 pub use arena::Arena;
 pub use draw::*;
 pub use ext::{
     date_from_days, date_to_days, date_today, file_dialog, http_method_name, http_reason, key_name,
-    log_get, query_op_name,
+    log_get, query_op_name, EmojiPicker, TreeTableEvents,
 };
 pub use icons::*;
 pub use opts::*;

@@ -103,7 +103,8 @@ guards pop the scope automatically:
 theme-aware. Icons are `ICON_*` constants (`cui::ICON_PLUS`).
 
 A working port of every example above is in [`cui/examples/`](cui/examples):
-[`hello.rs`](cui/examples/hello.rs) and [`todo.rs`](cui/examples/todo.rs),
+[`hello.rs`](cui/examples/hello.rs) and [`todo.rs`](cui/examples/todo.rs)
+(with [`todo_view.rs`](cui/examples/todo_view.rs), the same app written with the `view!` macro),
 line-for-line ports of the C originals — including the filter, the
 confirmation dialog and saving to `todo.txt`. The C docs
 ([docs/tutorial.md](https://github.com/yappologistic/CUI/blob/master/docs/tutorial.md))

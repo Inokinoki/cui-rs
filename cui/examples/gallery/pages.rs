@@ -756,18 +756,15 @@ pub fn page_data(ui: &mut Ui, g: &mut Gallery) {
     });
     section(ui, "Accordion", None);
     ui.card(&Card { pad_y: 4., gap: 0., ..Default::default() }, |ui| {
-        if ui.accordion_begin("Is it really dependency free?", &mut g.acc[0]) {
+        ui.accordion("Is it really dependency free?", &mut g.acc[0], |ui| {
             ui.secondary("Yes. The core is plain C99. Windows uses Win32, macOS uses Cocoa and Linux uses X11. Fonts and icons are embedded.");
-            ui.accordion_end();
-        }
-        if ui.accordion_begin("Can I use my own renderer?", &mut g.acc[1]) {
+        });
+        ui.accordion("Can I use my own renderer?", &mut g.acc[1], |ui| {
             ui.secondary("CUI outputs vertices and draw commands. Port the 60 line shader to Vulkan, Metal or Direct3D and you are done.");
-            ui.accordion_end();
-        }
-        if ui.accordion_begin("Does it respect reduced motion?", &mut g.acc[2]) {
+        });
+        ui.accordion("Does it respect reduced motion?", &mut g.acc[2], |ui| {
             ui.secondary("Every animation has a reduced motion path that keeps the final state and feedback.");
-            ui.accordion_end();
-        }
+        });
     });
     section(ui, "Virtual list", Some("Ten thousand rows. Only the visible ones are built."));
     ui.card(&Card { pad: 6., ..Default::default() }, |ui| {

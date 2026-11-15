@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+Added:
+
+- **`view!`**, a declarative front end (new crate `cui-rs-macros`, behind the
+  default `macros` feature; publish it first). It expands to the nested
+  closures and opts structs you would write by hand. Opts types are also
+  reachable as `cui::view::*`. See the `view` module docs and
+  `examples/todo_view.rs`.
+- **`view!` and your own widgets**: opts types are looked up in `cui::view`, then in the caller's scope, and `#![containers(..)]` declares custom scope widgets.
+- **Generated widgets work in `view!`.** `scripts/gen_ffi.py` now emits closure
+  methods for the 20 begin/end pairs the C header defines as scope macros
+  (`accordion`, `popover`, `toolbar`, `dock_panel`, ...), safe opts structs
+  (`cui::view::Alert`, ...) and `name_with` methods for the generated widgets
+  whose opts hold plain data. The begin/end methods stay.
+- **Safe options for the rest of the generated widgets.** Values CUI writes
+  back are `Option<&mut T>` (the options go in as `&mut`), arrays are slices
+  that carry their length, and lengths C takes from the call are asserted.
+  New hand-written closure scopes hold those borrows until the scope ends:
+  `Ui::table`, `virtual_list`, `data_grid` / `data_grid_with`,
+  `tree_table` / `tree_table_with` (returns `TreeTableEvents`), plus
+  `emoji_picker_with` and `hex_edit` / `hex_edit_with`.
+- `view!`: `|row|` parameters before a scope's body, `&mut` options, and the
+  hand-written widgets whose method always takes options (`Typewriter`,
+  `ChatComposer`, `ToolCall`, ...).
+
 Needs the matching unreleased `cui-sys` (publish `cui-sys` first). Soundness fixes —
 each was reachable from safe code — plus the follow-through for the
 corrected `cui-sys` signatures (see its changelog).
@@ -100,3 +124,11 @@ Fixed:
 
 - First release: safe bindings for the 11 base examples, digest-checked
   vendored sources, per-version layout tables, CI on all three desktop OSes.
+
+Fixed (view!):
+
+- The `view!` module docs gained a "Sharp edges" section (dropped `Card`
+  click results, evaluation order, uppercase-call capture, error recovery,
+  struct-literal conditions, the `::cui` path). `gen_ffi.py` now fails loudly
+  on a C enum it cannot turn into a Rust enum, instead of emitting a struct
+  that would not compile.

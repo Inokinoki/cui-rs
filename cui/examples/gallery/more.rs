@@ -1787,12 +1787,12 @@ fn page_viz(ui: &mut Ui, g: &mut Gallery) {
         ui.column(&Column { width: Size::grow(1.), gap: 10., ..Default::default() }, |ui| {
             section(ui, "Heatmap", Some("Requests by weekday and hour."));
             ui.card(&Card { pad: 18., width: Size::FILL, ..Default::default() }, |ui| {
-                ui.heatmap(
+                ui.heatmap_with(
                     "traffic",
                     &traffic,
                     7,
                     24,
-                    &cui_sys::cui_heatmap_opts { row_labels: ui.arena().cstr_array(&wd) as *mut _, col_labels: ui.arena().cstr_array(&hours) as *mut _, format: s(ui, "%.0f req"), ..Default::default() },
+                    &cui::view::Heatmap { row_labels: &wd, col_labels: &hours, format: Some("%.0f req"), ..Default::default() },
                 );
             });
         });
@@ -1890,16 +1890,16 @@ fn page_viz(ui: &mut Ui, g: &mut Gallery) {
         );
     });
     let bands = [
-        cui_sys::cui_gauge_band { to: 60., tone: Tone::Success as i32 },
-        cui_sys::cui_gauge_band { to: 85., tone: Tone::Warning as i32 },
-        cui_sys::cui_gauge_band { to: 100., tone: Tone::Danger as i32 },
+        cui::view::GaugeBand { to: 60., tone: Tone::Success },
+        cui::view::GaugeBand { to: 85., tone: Tone::Warning },
+        cui::view::GaugeBand { to: 100., tone: Tone::Danger },
     ];
     ui.card(
         &Card { pad: 18., width: Size::FILL, dir: Dir::Row, wrap: true, gap: 24., align: Align::Center, ..Default::default() },
         |ui| {
-            ui.radial_gauge("cpu", 64., 0., 100., &cui_sys::cui_radial_gauge_opts { unit: s(ui, "%"), label: s(ui, "CPU"), bands: bands.as_ptr(), band_count: 3, size: 180., ..Default::default() });
-            ui.radial_gauge("temp", 71., 20., 100., &cui_sys::cui_radial_gauge_opts { unit: s(ui, "C"), label: s(ui, "GPU temperature"), show_target: true, target: 85., size: 180., ..Default::default() });
-            ui.radial_gauge("mem", 0.62 * 32., 0., 32., &cui_sys::cui_radial_gauge_opts { format: s(ui, "%.1f"), unit: s(ui, "GB"), label: s(ui, "Memory"), no_needle: true, ticks: -1, size: 150., ..Default::default() });
+            ui.radial_gauge_with("cpu", 64., 0., 100., &cui::view::RadialGauge { unit: Some("%"), label: Some("CPU"), bands: &bands, size: 180., ..Default::default() });
+            ui.radial_gauge_with("temp", 71., 20., 100., &cui::view::RadialGauge { unit: Some("C"), label: Some("GPU temperature"), show_target: true, target: 85., size: 180., ..Default::default() });
+            ui.radial_gauge_with("mem", 0.62 * 32., 0., 32., &cui::view::RadialGauge { format: Some("%.1f"), unit: Some("GB"), label: Some("Memory"), no_needle: true, ticks: -1, size: 150., ..Default::default() });
         },
     );
     let mut candles = Vec::with_capacity(2000);

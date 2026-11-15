@@ -212,6 +212,15 @@ pub struct App {
     arena: Arena,
 }
 
+impl Drop for App {
+    /// Destroys the window, the GL context and the CUI context, so an early
+    /// return or a panic in a manual `new`/`frame` loop does not leak them.
+    /// (Fields drop afterwards: the arena outlives the C teardown.)
+    fn drop(&mut self) {
+        unsafe { ffi::cui_app_destroy(self.ptr) }
+    }
+}
+
 // A cui_app is used from one thread; several apps may live on several threads,
 // exactly like C's cui_app (see docs/integration.md, "Threads").
 unsafe impl Send for App {}
@@ -284,11 +293,10 @@ impl App {
         unsafe { ffi::cui_app_quit(self.ptr) }
     }
 
-    /// Destroys the window. [`App::run`] does this for you; call this only in
-    /// manual `new`/`frame` loops. Afterwards the app must not be used.
+    /// Destroys the window now. Dropping the `App` does the same, so this is
+    /// only a way to say so explicitly (and [`App::run`] needs neither).
     pub fn destroy(self) {
-        unsafe { ffi::cui_app_destroy(self.ptr) }
-        // self.arena drops here
+        drop(self);
     }
 
     /// Sets the window title.
@@ -324,17 +332,27 @@ impl App {
         unsafe { ffi::cui_app_open_url(u.as_ptr() as *const c_char) }
     }
 
-    /// Renders the current UI into an RGBA8 buffer (any backend). Handy for
-    /// screenshots and tests. Returns `None` when the window size is unknown.
-    pub fn screenshot_rgba(&mut self) -> Option<Vec<u8>> {
+    /// The framebuffer size in physical pixels: the window's logical size
+    /// times the DPI scale, rounded the way CUI rounds it (so it is right on
+    /// 125% and 150% displays, not just whole scale factors). `None` when
+    /// the window size is unknown.
+    pub fn framebuffer_size(&mut self) -> Option<(u32, u32)> {
         let size = self.size();
-        let scale = unsafe { ffi::cui_dpi_scale(ffi::cui_app_ui(self.ptr)) } as i32;
-        let (w, h) = (size.x as i32 * scale, size.y as i32 * scale);
-        if w <= 0 || h <= 0 {
-            return None;
-        }
-        let mut buf = vec![0u8; (w * h * 4) as usize];
-        let ok = unsafe { ffi::cui_app_screenshot(self.ptr, buf.as_mut_ptr() as *mut c_void, w, h) };
+        let scale = unsafe { ffi::cui_dpi_scale(ffi::cui_app_ui(self.ptr)) };
+        let (w, h) = ((size.x * scale + 0.5) as i32, (size.y * scale + 0.5) as i32);
+        // NaN and absurd sizes fall out here too (`as` saturates)
+        (w > 0 && h > 0 && w <= 1 << 15 && h <= 1 << 15).then_some((w as u32, h as u32))
+    }
+
+    /// Renders the current UI into an RGBA8 buffer of
+    /// [`framebuffer_size`](App::framebuffer_size) pixels, rows top to
+    /// bottom with no padding (any backend). Handy for screenshots and tests.
+    /// Returns `None` when the window size is unknown or CUI cannot render.
+    pub fn screenshot_rgba(&mut self) -> Option<Vec<u8>> {
+        let (w, h) = self.framebuffer_size()?;
+        let len = (w as usize).checked_mul(h as usize)?.checked_mul(4)?;
+        let mut buf = vec![0u8; len];
+        let ok = unsafe { ffi::cui_app_screenshot(self.ptr, buf.as_mut_ptr() as *mut c_void, w as i32, h as i32) };
         ok.then_some(buf)
     }
 }

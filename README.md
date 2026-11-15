@@ -111,8 +111,10 @@ can be followed along in Rust with only syntax changes.
 
 ## What is bound
 
-**Every one of the 500 `CUI_API` functions in the v1.4.0 release has a
-callable Rust binding.** Across two layers:
+**499 of the 500 `CUI_API` functions in the v1.4.0 release have a callable
+Rust binding.** The exception is `cui_log_appendv`: it takes a C `va_list`,
+which has no portable Rust spelling (use `cui_log_append` or
+`cui_log_append_text`). Across two layers:
 
 - **Hand-written safe layer** (~220 methods on `Ui` plus free functions):
   the components covered by the 12 ported examples — app lifecycle, layout,
@@ -124,7 +126,7 @@ callable Rust binding.** Across two layers:
   discipline C's `char buf[96]` gives; container scopes are closures with
   panic-safe begin/end guards.
 - **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 319
-  extern functions + 233 structs, 242 safe methods): the full second-wave
+  extern functions + 235 structs, 237 safe methods): the full second-wave
   gallery surface — kanban, dock, terminal, data grid (with editing),
   carousel, card stacks, code blocks, JSON viewer, blame, coverage, API
   explorer, feature flags, test explorer, stack traces, trace viewer,
@@ -193,14 +195,20 @@ and writes a PNG, which the smoke test uses to eyeball every page.
 cui-sys/           raw FFI + the vendored C amalgamation (cui.h, cui.c), built by cc
   src/gen.rs       generated FFI: structs, enum constants, extern decls
   tests/link.rs    generated: forces every extern symbol to resolve at link
-  tests/layout.rs  generated: checks every size/offset against the C probe
+  tests/layout.rs  generated: checks every size/offset and every enum value
+                   (header members and hand-written #[repr] variants) against
+                   the C probe
   layout/          the C ABI facts per pinned release (written by vendor.sh)
-  probe/           the C probe that prints them
+  probe/           the C probe that prints them, and sigcheck.c (generated):
+                   every Rust extern assigned to a C function pointer, so the
+                   C compiler checks parameter counts, pointer levels, consts
+                   and variadics against cui.h
 cui/               the safe API (App, Ui, options structs, icons)
   src/gen_safe.rs  generated safe methods for the generated FFI
   examples/        12 ported C examples (the 11 base ones + the gallery)
 scripts/
   gen_ffi.py       header-to-Rust generator (extends the manifest, re-run)
+  sigcheck.sh      compiles probe/sigcheck.c with -Werror (CI runs it)
   check_png.py     PNG decoder check CI runs over the gallery screenshots
   smoke.sh         Xvfb smoke test for every example
 vendor.sh          pins/fetches the upstream release (--pin, --fetch) or
@@ -213,8 +221,9 @@ vendor.sh          pins/fetches the upstream release (--pin, --fetch) or
 normal semver for their *binding* API; breaking a Rust signature bumps
 `cui-rs`'s minor version. One exception: fixing a signature that could not
 have had a working caller (a generated form that passed a single reference
-where C indexes a buffer — undefined behaviour by construction) lands in a
-patch release and is called out in the changelog.
+where C indexes a buffer, dropped a callback or variadic parameter, or lost
+a pointer level — undefined behaviour by construction) lands in a patch
+release and is called out in the changelog.
 
 The crates.io package is named `cui-rs` — crates.io's `cui` name has
 belonged to an unrelated, yanked 2017 crate since before this binding
@@ -231,7 +240,7 @@ versioned `0.1.3+cui1.4.0`: the `+cui…` suffix — the same convention as
 `zstd-sys 2.0.9+zstd.1.5.5` or `libgit2-sys 0.16.2+1.7.2` — states which
 upstream release the binding targets. It shows up in `cargo pkgid`, crates.io
 and docs.rs without affecting dependency resolution. When the pin moves to a
-new upstream release, the crates re-release as e.g. `0.1.4+cui1.5.0`: one
+new upstream release, the crates re-release as e.g. `0.1.3+cui1.5.0`: one
 binding release per upstream release, so a crate version always names the
 exact CUI it was written for.
 

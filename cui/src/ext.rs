@@ -500,6 +500,70 @@ impl<'a> Ui<'a> {
         }
     }
 
+    /// Begins a virtualized data grid (C's `cui_data_grid_begin_ex`); pair
+    /// with `data_grid_end`. `columns` is copied for the frame: C reads it
+    /// again in every `data_grid_cell`.
+    pub fn data_grid_begin(
+        &self,
+        id: impl AsRef<str>,
+        columns: &[ffi::cui_grid_column],
+        row_count: i32,
+        first: &mut i32,
+        last: &mut i32,
+        opts: &ffi::cui_grid_opts,
+    ) -> bool {
+        let cols = frame_copy(self.arena, columns);
+        unsafe {
+            ffi::cui_data_grid_begin_ex(self.ctx, self.cs(&id), cols, columns.len() as i32, row_count, first, last, opts)
+        }
+    }
+
+    /// Reorderable list: drag rows to reorder (C's `cui_reorder_begin`).
+    /// `order` holds your item indices in display order and is updated here
+    /// when a drag finished; pair with `reorder_end`.
+    pub fn reorder_begin(&self, id: impl AsRef<str>, order: &mut [i32]) {
+        // C keeps the pointer and reads it in every `reorder_item_begin`, but
+        // only writes it during this call: hand it a frame-lived copy and
+        // copy the result back.
+        let copy = frame_copy(self.arena, order) as *mut i32;
+        unsafe {
+            ffi::cui_reorder_begin(self.ctx, self.cs(&id), copy, order.len() as i32);
+            if !copy.is_null() {
+                core::ptr::copy_nonoverlapping(copy, order.as_mut_ptr(), order.len());
+            }
+        }
+    }
+
+    /// Begins a tree table (C's `cui_tree_table_begin_ex`); pair with
+    /// `tree_table_end`. `columns` is copied for the frame.
+    ///
+    /// # Safety
+    ///
+    /// C keeps the `nodes` pointer and reads and writes the nodes (their
+    /// open and selected flags) in every tree-table call up to and including
+    /// `tree_table_end`. Until then `nodes` must stay alive, must not move,
+    /// and must not be read or written through any other reference.
+    pub unsafe fn tree_table_begin(
+        &self,
+        id: impl AsRef<str>,
+        columns: &[ffi::cui_grid_column],
+        nodes: *mut [ffi::cui_tree_node],
+        opts: &ffi::cui_tree_table_opts,
+    ) {
+        let cols = frame_copy(self.arena, columns);
+        unsafe {
+            ffi::cui_tree_table_begin_ex(
+                self.ctx,
+                self.cs(&id),
+                cols,
+                columns.len() as i32,
+                nodes as *mut ffi::cui_tree_node,
+                nodes.len() as i32,
+                opts,
+            )
+        }
+    }
+
     /// Inline data-grid edit box (C's `cui_data_grid_edit`). Edits `value`.
     pub fn data_grid_edit(&mut self, value: &mut String) -> bool {
         begin_c_string(value, 127);
@@ -778,7 +842,15 @@ impl<'a> Ui<'a> {
 
     /// Terminal emulator state (C's `cui_terminal_init`). `text` is the
     /// scrollback buffer, `lines` the row cache.
-    pub fn terminal_init(
+    ///
+    /// # Safety
+    ///
+    /// `t` keeps pointers to `text`'s buffer (all of its capacity) and to
+    /// `lines`, and every later use of `t` (`Ui::terminal`, the
+    /// `cui_terminal_*` functions) reads and writes through them. For as long
+    /// as `t` is used, `text` and `lines` must stay alive and must not be
+    /// moved, grown, shrunk or otherwise touched.
+    pub unsafe fn terminal_init(
         &mut self,
         t: &mut ffi::cui_terminal_buffer,
         text: &mut String,
@@ -946,4 +1018,90 @@ pub(crate) fn sync_buffer(value: &mut String) {
         return; // the caller never sized a buffer for CUI to write into
     }
     crate::sync_c_string(value)
+}
+
+/// A frame-lived copy of `items` in the arena, for arrays C keeps a pointer
+/// to after the call returns; null for an empty slice.
+fn frame_copy<T: Copy>(arena: &Arena, items: &[T]) -> *const T {
+    if items.is_empty() {
+        core::ptr::null()
+    } else {
+        arena.struct_array(items)
+    }
+}
+
+#[cfg(test)]
+mod retained_pointer_tests {
+    use crate::arena::Arena;
+    use crate::{Table, TableColumn, Ui};
+    use cui_sys as ffi;
+
+    /// One headless frame around `f`.
+    fn frame(f: impl FnOnce(&mut Ui)) {
+        let ctx = unsafe { ffi::cui_create(&ffi::cui_ctx_desc::default()) };
+        assert!(!ctx.is_null());
+        let arena = Arena::new();
+        unsafe {
+            ffi::cui_set_viewport(ctx, 800., 600., 1.);
+            ffi::cui_begin_frame(ctx, 1. / 60.);
+        }
+        f(&mut Ui { ctx, arena: &arena });
+        unsafe {
+            ffi::cui_end_frame(ctx);
+            ffi::cui_destroy(ctx);
+        }
+    }
+
+    #[test]
+    fn frame_copies_live_in_the_arena() {
+        let arena = Arena::new();
+        let items = vec![3i32, 1, 2];
+        let p = super::frame_copy(&arena, &items);
+        drop(items); // the copy must not depend on the caller's slice
+        assert_eq!(unsafe { core::slice::from_raw_parts(p, 3) }, &[3, 1, 2]);
+        assert!(super::frame_copy::<i32>(&arena, &[]).is_null());
+    }
+
+    #[test]
+    fn table_cells_after_begin_read_live_columns() {
+        frame(|ui| {
+            let cols = [TableColumn { title: "Name", ..Default::default() }, TableColumn { title: "Qty", ..Default::default() }];
+            if ui.table_begin("t", &cols, &mut Table::default()) {
+                for _ in 0..50 {
+                    ui.table_row(false);
+                    ui.table_cell_text("a");
+                    ui.table_cell_text(format!("{}", 1)); // heap churn between cells
+                }
+                ui.table_end();
+            }
+        });
+    }
+
+    #[test]
+    fn reorder_and_data_grid_take_temporaries() {
+        frame(|ui| {
+            let mut order = vec![2, 0, 1];
+            ui.reorder_begin("r", &mut order);
+            assert_eq!(order, [2, 0, 1], "no drag: the order comes back unchanged");
+            for i in 0..3 {
+                ui.reorder_item_begin(i);
+                ui.text("row");
+                ui.reorder_item_end();
+            }
+            assert!(!ui.reorder_end());
+            ui.reorder_begin("empty", &mut []);
+            ui.reorder_end();
+
+            let (mut first, mut last) = (0, 0);
+            let title = ui.cstr("Name");
+            // the column array is a temporary: gone when begin returns
+            if ui.data_grid_begin("g", &[ffi::cui_grid_column { title, ..Default::default() }], 3, &mut first, &mut last, &Default::default()) {
+                for row in first..last {
+                    ui.data_grid_row(row);
+                    ui.data_grid_cell_text("x");
+                }
+                ui.data_grid_end();
+            }
+        });
+    }
 }

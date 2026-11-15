@@ -906,7 +906,10 @@ impl<'a> Ui<'a> {
         assert!(!columns.is_empty());
         let flat: Vec<ffi::cui_table_column> = columns.iter().map(|c| c.flatten(self.arena)).collect();
         let fo = o.flatten(self.arena);
-        unsafe { ffi::cui_table_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), flat.as_ptr(), flat.len() as i32, &fo) }
+        // C keeps the column pointer and reads it in every later
+        // `cui_table_cell`, so the array must live as long as the frame.
+        let cols = self.arena.struct_array(&flat);
+        unsafe { ffi::cui_table_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), cols, flat.len() as i32, &fo) }
     }
 
     /// Begins a row. Returns true when the row is clicked.

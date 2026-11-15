@@ -242,12 +242,31 @@ pub enum Token {
 impl<'a> crate::Ui<'a> {
     /// A custom-painted area (C's `cui_canvas`). The `paint` function runs
     /// after layout with the surface to draw on and the (copied) `data`.
-    /// `T` must be plain copyable data, as CUI snapshots it.
+    /// `T` must be plain copyable data, as CUI snapshots it, and `'static`:
+    /// `paint` runs when the frame is rendered, inside the next
+    /// [`App::frame`](crate::App::frame), after anything `data` could borrow
+    /// from this frame may be gone. Copy what the painter needs into `T`
+    /// (an array, indices into state the painter can reach).
+    ///
+    /// # Panics
+    ///
+    /// When `T` is over-aligned (more than 16 bytes) for CUI's snapshot.
+    ///
+    /// Borrowed data does not compile:
+    ///
+    /// ```compile_fail
+    /// # use cui::{CanvasUi, Rect, Size, Ui, Vec2};
+    /// fn paint(_c: &mut CanvasUi, _r: Rect, _pts: &&[Vec2]) {}
+    /// fn plot(ui: &mut Ui) {
+    ///     let pts = vec![Vec2 { x: 0., y: 0. }; 8];
+    ///     ui.canvas("plot", Size::FILL, Size::FILL, paint, &pts.as_slice());
+    /// }
+    /// ```
     ///
     /// Returns what happened this frame: clicks, hover and where the canvas
     /// landed. A common companion is [`Ui::state`](crate::Ui::state), which keeps per-canvas
     /// state (like a hover flag) between frames.
-    pub fn canvas<T: Copy>(
+    pub fn canvas<T: Copy + 'static>(
         &mut self,
         id: impl AsRef<str>,
         width: Size,
@@ -270,6 +289,8 @@ impl<'a> crate::Ui<'a> {
             );
         }
 
+        // C copies the job into its frame arena, which aligns to 16 bytes.
+        assert!(core::mem::align_of::<Job<T>>() <= 16, "Ui::canvas: the data type is over-aligned for CUI's frame arena");
         let job = Job { paint, data: *data };
         let res = unsafe {
             ffi::cui_canvas(

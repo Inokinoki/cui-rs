@@ -2339,7 +2339,9 @@ fn page_files(ui: &mut Ui, g: &mut Gallery) {
 
     // a small shell over the same folder
     if m.term.line_cap == 0 {
-        ui.terminal_init(&mut m.term, &mut m.term_text, &mut m.term_lines);
+        // SAFETY: the buffers live in `m` next to `m.term` for the whole
+        // run and nothing else touches them.
+        unsafe { ui.terminal_init(&mut m.term, &mut m.term_text, &mut m.term_lines) };
         term_write(&mut m.term, "Type \x1b[1mhelp\x1b[0m for the commands.\n");
     }
     section(ui, "Terminal", Some("Colors, \\r progress, history on Up and Down, Ctrl+C, Ctrl+L, drag to select."));

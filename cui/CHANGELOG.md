@@ -28,6 +28,20 @@ Fixed:
   C writes (a short buffer was a heap overflow). `begin_c_string` leaves
   room for the NUL when a `String` is exactly full (C's `strlen` ran off
   the end).
+- **`table_begin`** freed its column array on return, while C keeps the
+  pointer and reads it in every `table_cell` / `table_cell_text` (a
+  use-after-free in every table). The columns live in the frame arena now.
+- **`Ui::canvas`** took any `T: Copy`, so `T` could borrow data that is
+  gone when C calls the painter (at render time, in the next `App::frame`).
+  **API change**: `T` must be `'static`; an over-aligned `T` panics.
+- **`data_grid_begin`**, **`tree_table_begin`** and **`reorder_begin`** are
+  hand-written: C keeps their arrays past the call. The column arrays and
+  `order` are copied into the frame arena (`order` is copied back, as C
+  only writes it during the call). **API change**: `tree_table_begin` is
+  `unsafe` and takes `nodes: *mut [cui_tree_node]`, since C reads and
+  writes the nodes until `tree_table_end`.
+- **`terminal_init`** is `unsafe` (**API change**): the terminal buffer
+  keeps pointers into `text` and `lines` for as long as it is used.
 - **`TableSort`** is `#[repr(C)]` (C writes `column`/`descending` through a
   pointer cast from it) with compile-time layout assertions.
 - **`textf` / `table_cell_textf`** passed their text as a printf format, so

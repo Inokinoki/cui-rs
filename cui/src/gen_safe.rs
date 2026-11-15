@@ -218,11 +218,6 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_cropper_ex(self.ctx, self.arena.cstr(id.as_ref()), tex, image_w, image_h, crop, opts) }
     }
 
-    /// cui_data_grid_begin_ex
-    pub fn data_grid_begin(&self, id: impl AsRef<str>, columns: &[ffi::cui_grid_column], row_count: i32, first: &mut i32, last: &mut i32, opts: &ffi::cui_grid_opts) -> bool {
-        unsafe { ffi::cui_data_grid_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), columns.as_ptr(), columns.len() as c_int, row_count, first, last, opts) }
-    }
-
     /// true when the row was clicked
     pub fn data_grid_cell(&self) {
         unsafe { ffi::cui_data_grid_cell(self.ctx) }
@@ -849,11 +844,6 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_reactions(self.ctx, self.arena.cstr(id.as_ref()), items.as_mut_ptr(), items.len() as c_int) }
     }
 
-    /// Reorderable list: drag rows to reorder. `order` holds your item indices in
-    pub fn reorder_begin(&self, id: impl AsRef<str>, order: &mut [i32]) {
-        unsafe { ffi::cui_reorder_begin(self.ctx, self.arena.cstr(id.as_ref()), order.as_mut_ptr(), order.len() as c_int) }
-    }
-
     /// cui_reorder_end
     pub fn reorder_end(&self) -> bool {
         unsafe { ffi::cui_reorder_end(self.ctx) }
@@ -1132,11 +1122,6 @@ impl<'a> Ui<'a> {
     /// cui_treemap_ex
     pub fn treemap(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &ffi::cui_treemap_opts) -> i32 {
         unsafe { ffi::cui_treemap_ex(self.ctx, self.arena.cstr(id.as_ref()), items.as_ptr(), items.len() as c_int, opts) }
-    }
-
-    /// cui_tree_table_begin_ex
-    pub fn tree_table_begin(&self, id: impl AsRef<str>, columns: &[ffi::cui_grid_column], nodes: &mut [ffi::cui_tree_node], opts: &ffi::cui_tree_table_opts) {
-        unsafe { ffi::cui_tree_table_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), columns.as_ptr(), columns.len() as c_int, nodes.as_mut_ptr(), nodes.len() as c_int, opts) }
     }
 
     /// cui_tree_table_depth

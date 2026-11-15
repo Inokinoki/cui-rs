@@ -210,3 +210,75 @@ fn generated(ui: &mut Ui, open: &mut bool) {
         HoverCard("h") { Text("tip"); }
     }
 }
+
+// ---- options that hold borrows, arrays and per-row scopes -------------------
+
+fn write_back(ui: &mut Ui, sel: &mut i32, on: &mut bool, day: &mut cui::Date, text: &mut String) {
+    let commits: [cui_sys::cui_commit; 0] = [];
+    let mut month = cui_sys::cui_date::default();
+    view! { ui,
+        // `Option<&mut T>` options: CUI writes the selection back
+        let r = CommitGraph("log", &commits, selected: Some(&mut *sel));
+        ToolbarButton(cui::ICON_X, toggle: Some(&mut *on), tooltip: Some("Pin"));
+        MonthCalendar("cal", &mut month, &[], selected: Some(&mut *day), first_weekday: 6);
+        // hand-written widgets whose method takes `&mut` options
+        let flags = ChatComposer("chat" => *text, placeholder: Some("Say something"));
+        let picked = EmojiPicker("emoji", tone: Some(&mut *sel), recent: Some(&mut *text));
+        Typewriter("tw", "hello", speed: 30.);
+    }
+}
+
+fn arrays(ui: &mut Ui, level: &mut f32) {
+    let candles: [cui_sys::cui_candle; 2] = Default::default();
+    let ma = [1.0_f32, 2.0];
+    let months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+    let mut month = cui_sys::cui_date::default();
+    let mut bytes = [0_u8; 16];
+    let mut hex_sel = cui_sys::cui_hex_selection::default();
+    view! { ui,
+        // counted arrays: the slice carries the count
+        Fader("gain" => *level, -60., 6., ticks: &[-60., -12., 0., 6.], meter: &[0.2, 0.3]);
+        RadialGauge("cpu", 40., 0., 100., bands: &[
+            cui::view::GaugeBand { to: 60., tone: cui::Tone::Success },
+            cui::view::GaugeBand { to: 100., tone: cui::Tone::Danger },
+        ]);
+        HexView("hex", &bytes, &mut hex_sel, base: 0x1000, ranges: &[
+            cui::view::HexRange { offset: 0, length: 4, label: Some("magic"), ..Default::default() },
+        ]);
+        HexEdit("hexed", &mut bytes, &mut hex_sel, bytes_per_row: 8);
+        // lengths taken from the call: checked against it
+        Candlestick("px", &candles, labels: &["Mon", "Tue"], overlays: &[
+            cui::Series { name: Some("MA"), values: &ma, ..Default::default() },
+        ]);
+        Heatmap("heat", &[0.; 4], 2, 2, row_labels: &["a", "b"], col_labels: &["x", "y"]);
+        // fixed lengths are in the type
+        MonthCalendar("cal2", &mut month, &[], month_names: Some(&months));
+        MenuBar("bar") { MenuBarMenu("File", mnemonic: 'F') { MenuItem("Open"); } }
+    }
+}
+
+fn rows(ui: &mut Ui, names: &[String], sel: &mut [bool], sort: &mut cui::TableSort, cursor: &mut i32) {
+    let cols = [cui::view::GridColumn { title: Some("Name"), sortable: true, ..Default::default() }];
+    let tcols = [cui::TableColumn { title: "Name", ..Default::default() }];
+    let mut nodes: [cui_sys::cui_tree_node; 0] = [];
+    let mut clicked_row = None;
+    view! { ui,
+        VirtualList("list", names.len() as i32, 28., Size::FILL) |i| {
+            Text(&names[i as usize]);
+        }
+        DataGrid("grid", &cols, names.len() as i32, selected: Some(&mut *sel), sort: Some(&mut *sort)) |row, clicked| {
+            if clicked { clicked_row = Some(row); }
+            ui.data_grid_cell_text(&names[row as usize]);
+        }
+        DataGrid("plain", &cols, 0) |_row, _clicked| { }
+        let events = TreeTable("tree", &cols, &mut nodes, cursor: Some(&mut *cursor), guides: true) |node| {
+            ui.tree_table_name(format!("node {node}"), "");
+        };
+        if events.sort_changed { Toast("sorted"); }
+        Table("orders", &tcols, striped: true) {
+            ui.table_row(false);
+            ui.table_cell_text("Alice");
+        }
+        Table("empty", &tcols) { }
+    }
+}

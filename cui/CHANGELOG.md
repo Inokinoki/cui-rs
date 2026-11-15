@@ -15,6 +15,16 @@ Added:
   (`accordion`, `popover`, `toolbar`, `dock_panel`, ...), safe opts structs
   (`cui::view::Alert`, ...) and `name_with` methods for the generated widgets
   whose opts hold plain data. The begin/end methods stay.
+- **Safe options for the rest of the generated widgets.** Values CUI writes
+  back are `Option<&mut T>` (the options go in as `&mut`), arrays are slices
+  that carry their length, and lengths C takes from the call are asserted.
+  New hand-written closure scopes hold those borrows until the scope ends:
+  `Ui::table`, `virtual_list`, `data_grid` / `data_grid_with`,
+  `tree_table` / `tree_table_with` (returns `TreeTableEvents`), plus
+  `emoji_picker_with` and `hex_edit` / `hex_edit_with`.
+- `view!`: `|row|` parameters before a scope's body, `&mut` options, and the
+  hand-written widgets whose method always takes options (`Typewriter`,
+  `ChatComposer`, `ToolCall`, ...).
 
 Needs the matching unreleased `cui-sys` (publish `cui-sys` first). Soundness fixes —
 each was reachable from safe code — plus the follow-through for the

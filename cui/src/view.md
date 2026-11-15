@@ -86,12 +86,47 @@ Every `Ui` method is a widget: `Name(args)` is `ui.name(args)`. Options
   The option types are in this module (`cui::view::Alert`, ...), with string
   fields as `&str`.
 
-A few C opts structs hold pointers CUI writes through (`selected`, `cursor`,
-`toggle`), arrays or callbacks. They have no safe options type yet, so these
-widgets (`heatmap`, `data_grid_begin`, `tree_table_begin`, `toolbar_button`,
-...) keep their raw `name(args, &ffi_opts)` method: call it from a plain
-statement, e.g. `ui.heatmap(.., &opts);`. `virtual_list` stays a begin/end
-pair because its body needs the `first`/`last` it fills in.
+Options that are more than plain values:
+
+- **Values CUI writes back** (`selected`, `cursor`, `toggle`, `sort`, ...) are
+  `Option<&mut T>`: `CommitGraph("log", &commits, selected: Some(&mut sel))`.
+  Such options are passed as `&mut`, which `view!` does for you.
+- **Arrays** are slices and carry their own length:
+  `Fader("gain" => v, -60., 6., ticks: &[-12., 0.])`,
+  `RadialGauge(.., bands: &[GaugeBand { to: 60., tone: Tone::Success }])`.
+  Where C takes the length from the call (`Candlestick` labels, `Heatmap`
+  row and column labels) a slice that is too short panics before the call;
+  fixed lengths are in the type (`month_names: Some(&[..; 12])`).
+
+**Per-row scopes** pass the row to their body, written as closure
+parameters before it:
+
+```no_run
+# use cui::{view, Size, Ui, view::GridColumn};
+# fn f(ui: &mut Ui, names: &[String], picked: &mut [bool]) {
+# let cols = [GridColumn { title: Some("Name"), ..Default::default() }];
+view! { ui,
+    VirtualList("list", names.len() as i32, 28., Size::FILL) |i| {
+        Text(&names[i as usize]);
+    }
+    DataGrid("grid", &cols, names.len() as i32, selected: Some(picked)) |row, clicked| {
+        ui.data_grid_cell_text(&names[row as usize]);
+    }
+}
+# }
+```
+
+`TreeTable(..) |node| { .. }` works the same way and its result (bind it with
+`let`) is a [`TreeTableEvents`](crate::TreeTableEvents). `Table(..) { .. }`
+is the closure form of `table_begin`. The borrows in a grid's or tree
+table's options are written until the scope ends, which is why these are
+closures. `HexEdit(id, &mut bytes, &mut sel)` edits bytes in place and
+`EmojiPicker(id, recent: Some(&mut text))` returns the emoji picked.
+
+Not covered: `TreeTable`'s type-ahead callback (use the raw
+`tree_table_begin`), and the begin/end pairs the C header does not define as
+scope macros (`kanban`, `node_editor`, `reorder`, `card_stack`, `swipe_item`,
+`path_bar_menu`): call their `_begin` / `_end` methods from plain statements.
 
 # Your own widgets
 

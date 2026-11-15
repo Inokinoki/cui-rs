@@ -31,9 +31,31 @@ fn builtin_container(name: &str) -> Option<(&'static str, Opts)> {
         "Menu" => ("menu", Opts::Optional),
         "UserMenu" => ("user_menu", Opts::Optional),
         "DialogFooter" => ("dialog_footer", Opts::No),
+        "Table" => ("table", Opts::Always),
+        "VirtualList" => ("virtual_list", Opts::No),
+        "DataGrid" => ("data_grid", Opts::Optional),
+        "TreeTable" => ("tree_table", Opts::Optional),
         "ContextMenu" => ("context_menu", Opts::No),
         _ => return None,
     })
+}
+
+/// Hand-written leaf widgets whose method always takes options and has no
+/// `_with` twin: `Typewriter(..)` is `ui.typewriter(.., &opts)`.
+const PLAIN_OPTS: [&str; 13] = [
+    "Typewriter", "NumberRoll", "WordRotate", "ToolCall", "AgentPlan", "AgentStatus",
+    "PromptSuggestions", "ModelPicker", "ContextMeter", "DotChart", "ChatComposer", "ResponseActions", "EventTrack",
+];
+
+/// Hand-written leaf widgets with only a `_with` form.
+const WITH_ONLY: [&str; 1] = ["EmojiPicker"];
+
+/// Hand-written widgets whose options hold `&mut` borrows.
+const HAND_MUT: [&str; 7] =
+    ["Table", "DataGrid", "TreeTable", "ChatComposer", "ResponseActions", "EmojiPicker", "EventTrack"];
+
+fn mut_opts(name: &str) -> bool {
+    HAND_MUT.contains(&name) || crate::generated::MUT_OPTS.contains(&name)
 }
 
 /// Widgets that return `InputFlags`, not `bool`.
@@ -89,10 +111,11 @@ fn with_opts(w: &Widget, force: bool, build: impl FnOnce(Option<TokenStream>) ->
         .enumerate()
         .map(|(i, (_, v))| Ident::new(&format!("__cui_p{i}"), syn::spanned::Spanned::span(v)))
         .collect();
-    let opts = quote!(&__cui_opts);
+    let is_mut = mut_opts(&name.to_string());
+    let (opts, mutability) = if is_mut { (quote!(&mut __cui_opts), quote!(mut)) } else { (quote!(&__cui_opts), quote!()) };
     let binding = quote! {
         #[allow(clippy::needless_update)]
-        let __cui_opts = {
+        let #mutability __cui_opts = {
             #[allow(unused_imports)]
             use ::cui::view::*;
             #name { #(#keys: #ids,)* ..::core::default::Default::default() }
@@ -193,24 +216,27 @@ fn widget(cx: &mut Ctx, w: &Widget, as_value: bool) -> TokenStream {
         let m = if kind == Opts::Optional && has_props { ident(&format!("{method}_with")) } else { ident(&method) };
         let children = nodes(cx, body);
         let ui = cx.ui;
+        let params = &w.params;
+        let closure = quote!(|#ui #(, #params)*| { #children });
         let call = if takes_opts {
             // `Always` containers take opts even when no option was written
-            if has_props {
-                with_opts(w, false, |o| quote!(#ui.#m(#(#positional,)* #o, |#ui| { #children })))
-            } else {
-                let name = &w.name;
-                quote!(#ui.#m(#(#positional,)* &::cui::view::#name { ..::core::default::Default::default() }, |#ui| { #children }))
-            }
+            with_opts(w, true, |o| quote!(#ui.#m(#(#positional,)* #o, #closure)))
         } else {
-            quote!(#ui.#m(#(#positional,)* |#ui| { #children }))
+            quote!(#ui.#m(#(#positional,)* #closure))
         };
         return if as_value { call } else { quote!(#call;) };
     }
 
     let base = snake(&name_s);
-    // generated leaf widgets have no plain form: always `name_with`
-    let forced = crate::generated::LEAF_OPTS.contains(&name_s.as_str());
-    let m = ident(&if has_props || forced { format!("{base}_with") } else { base });
+    if !w.params.is_empty() {
+        cx.errs.push(Error::new(span, format!("`{name_s}` is not a container, so its body takes no `|parameters|`")));
+        return quote!();
+    }
+    // widgets with no option-less form: generated ones go through
+    // `name_with`, a few hand-written ones take the options in `name` itself
+    let plain = PLAIN_OPTS.contains(&name_s.as_str());
+    let forced = plain || WITH_ONLY.contains(&name_s.as_str()) || crate::generated::LEAF_OPTS.contains(&name_s.as_str());
+    let m = ident(&if (has_props || forced) && !plain { format!("{base}_with") } else { base });
     // `Name("a", 1, k: v)` -> `ui.name_with("a", 1, &Opts { k: v, .. })`
     let call = with_opts(w, forced, |o| quote!(#ui.#m(#(#positional,)* #o)));
 

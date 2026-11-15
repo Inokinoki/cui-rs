@@ -75,7 +75,7 @@ pub use arena::Arena;
 pub use draw::*;
 pub use ext::{
     date_from_days, date_to_days, date_today, file_dialog, http_method_name, http_reason, key_name,
-    log_get, query_op_name,
+    log_get, query_op_name, EmojiPicker, TreeTableEvents,
 };
 pub use icons::*;
 pub use opts::*;

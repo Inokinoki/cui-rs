@@ -424,6 +424,41 @@ SKIP_SCOPES = {"virtual_list"}
 # cui-sys by hand, so not in gen.rs): C name -> (safe type, has a lifetime).
 HAND_OPTS = {"cui_text_fx_opts": ("TextFx", False)}
 
+# A read-only array field whose length is another field: (struct, array) ->
+# count field. `x` + `x_count`-style neighbours pair up by themselves.
+COUNT_OF = {("cui_fader_opts", "meter"): "meter_channels"}
+
+# Array fields whose length C takes from somewhere else. A number is a fixed
+# length (the type carries it); a string is an expression over the method's
+# own parameters, asserted before the call.
+#   candlestick labels: one per candle; heatmap labels: one per row / column
+#   (cui.c reads `row_labels[i]` for i < rows without a count of its own);
+#   grid `selected`: one bool per row.
+LEN_RULES = {
+    ("cui_month_opts", "month_names"): 12,
+    ("cui_month_opts", "day_names"): 7,
+    ("cui_candlestick_opts", "labels"): "candles.len()",
+    ("cui_heatmap_opts", "row_labels"): "rows.max(0) as usize",
+    ("cui_heatmap_opts", "col_labels"): "cols.max(0) as usize",
+    ("cui_grid_opts", "selected"): "row_count.max(0) as usize",
+}
+
+# Fields left out of the safe struct (C gets NULL / none):
+#   tree_table `label` + `user`: a callback for type-ahead;
+#   hex_view `edit`: may alias `data`, see `Ui::hex_edit` in ext.rs.
+OMIT_FIELDS = {("cui_tree_table_opts", "label"), ("cui_tree_table_opts", "user"),
+               ("cui_hex_view_opts", "edit")}
+
+# Opts that stay hand-written (ext.rs): a read/write text buffer.
+HAND_ONLY = {"cui_emoji_picker_opts"}
+
+# Safe twins of C structs used as array elements or behind `&mut`.
+HAND_ELEMS = {"cui_series": "Series<'a>"}
+# Element structs the hand-written wrappers in ext.rs take (data_grid's and
+# tree_table's columns): generated like the array elements above.
+EXTRA_ELEMS = ["cui_grid_column"]
+MUT_TWINS = {"cui_date": "Date", "cui_table_sort": "TableSort"}
+
 OUT_OPTS = ROOT / "cui/src/gen_opts.rs"
 OUT_VIEW = ROOT / "cui-macros/src/generated.rs"
 
@@ -447,45 +482,145 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
         existing |= set(re.findall(r"pub (?:struct|enum|type) (\w+)", f.read_text()))
     taken = set(existing)
 
-    # -- field plans: None when a field cannot be a plain safe value --
+    # -- field plans --
+    # A planned field is (rust name, rust type, C initialisers, is_mut); the
+    # initialisers are `c_field: expr` strings (an array sets its count too).
     enums_needed = {}
+    elem_plans = {}   # C element struct -> (safe name, plan)
+    FIXED = {"uint64_t": "u64", "int64_t": "i64", "uint32_t": "u32", "int32_t": "i32",
+             "uint8_t": "u8", "uint16_t": "u16", "double": "f64"}
 
-    def field_plan(p):
-        ctype, fname, ptr = p
-        if ptr in ("fnptr", "multi", "mut_ptr"):
-            return None
-        if ptr == "const_ptr":
-            return ("Option<&'a str>", "cstr(a, self.{n})") if ctype == "char" else None
+    class Blocked(Exception):
+        pass
+
+    def scalar_plan(ctype, n):
         if ctype == "cui_size":
-            return ("Size", "sz(self.{n})")
+            return ("Size", f"sz(self.{n})")
         if ctype == "cui_color":
-            return ("Color", "col(self.{n})")
+            return ("Color", f"col(self.{n})")
         if ctype == "cui_date":
-            return ("Date", "self.{n}.to_ffi()")
+            return ("Date", f"self.{n}.to_ffi()")
+        if ctype == "char":
+            return ("char", f"ascii(self.{n})")
         if ctype in h.enums:
             en = pascal(ctype[4:])
             if en in existing:
-                return (en, "self.{n}.to_ffi() as c_int")
+                return (en, f"self.{n}.to_ffi() as c_int")
             enums_needed[ctype] = en
-            return (en, "self.{n} as c_int")
+            return (en, f"self.{n} as c_int")
         if ctype in PRIM:
-            return (PRIM[ctype], "self.{n}")
+            return (PRIM[ctype], f"self.{n}")
+        if ctype in FIXED:
+            return (FIXED[ctype], f"self.{n}")
         return None
+
+    def elem_type(ctype):
+        """Safe element type of a read-only array of C structs."""
+        if ctype in HAND_ELEMS:
+            return HAND_ELEMS[ctype]
+        if ctype not in elem_plans:
+            if ctype not in needed:
+                raise Blocked(f"array of {ctype}")
+            name = pascal(ctype[len("cui_"):])
+            if name in taken:
+                raise Blocked(f"element name `{name}` is taken")
+            taken.add(name)
+            elem_plans[ctype] = (name, plan_struct(ctype))
+        name, (fields, _pad, _mut, _rules) = elem_plans[ctype]
+        return name + ("<'a>" if any("'a" in ty for _n, ty, _i, _m in fields) else "")
 
     def plan_struct(tname):
         cfields, _pos = needed[tname]
-        fields, pad = [], False
+        flat = []
         for cf in cfields:
             for f in expand_field(cf):
-                p = must_param(f, f"field of {tname}")
-                if p[1] == "_":
-                    pad = True
+                flat.append(must_param(f, f"field of {tname}"))
+        fields, pad, rules = [], False, []
+        counts = set()  # count fields consumed by an array before them
+        for i, p in enumerate(flat):
+            ctype, cname, ptr = p
+            n = rust_field_name(cname)
+            if cname == "_":
+                pad = True
+                continue
+            if cname in counts:
+                continue
+            if (tname, cname) in OMIT_FIELDS:
+                zero = "None" if ptr == "fnptr" else ("ptr::null_mut()" if ptr == "mut_ptr" else "ptr::null()")
+                fields.append((None, None, [f"{n}: {zero}"], False))
+                continue
+            if ptr == "fnptr":
+                raise Blocked(cname)
+            rule = LEN_RULES.get((tname, cname))
+            # the count field of a read-only array: named in COUNT_OF, or the
+            # next field when it is an int called `*_count`
+            cnt = COUNT_OF.get((tname, cname))
+            if cnt is None and i + 1 < len(flat) and flat[i + 1][2] == "value" \
+                    and flat[i + 1][0] == "int" and flat[i + 1][1].endswith("_count"):
+                cnt = flat[i + 1][1]
+            is_strs = ptr == "multi" and re.sub(r"\s+", " ", p.ctext.strip()) == "const char *const *"
+            if is_strs:
+                if isinstance(rule, int):
+                    fields.append((n, f"Option<&'a [&'a str; {rule}]>",
+                                   [f"{n}: self.{n}.map_or(ptr::null(), |s| a.cstr_array(s))"], False))
+                elif rule is not None:
+                    fields.append((n, "&'a [&'a str]", [f"{n}: cstr_array(a, self.{n})"], False))
+                    rules.append((n, rule, "slice"))
+                elif cnt:
+                    counts.add(cnt)
+                    fields.append((n, "&'a [&'a str]", [f"{n}: cstr_array(a, self.{n})",
+                                                        f"{rust_field_name(cnt)}: self.{n}.len() as c_int"], False))
+                else:
+                    raise Blocked(f"{cname}: string array of unknown length")
+                continue
+            if ptr == "multi":
+                raise Blocked(cname)
+            if ptr == "const_ptr":
+                if ctype == "char":
+                    fields.append((n, "Option<&'a str>", [f"{n}: cstr(a, self.{n})"], False))
                     continue
-                fp = field_plan(p)
-                if fp is None:
-                    return None, f"{p[1]}"
-                fields.append((rust_field_name(p[1]), fp[0], fp[1].format(n=rust_field_name(p[1]))))
-        return (fields, pad), None
+                if not cnt:
+                    raise Blocked(f"{cname}: array of unknown length")
+                counts.add(cnt)
+                cn = rust_field_name(cnt)
+                if ctype.startswith("cui_"):
+                    et = elem_type(ctype)
+                    fields.append((n, f"&'a [{et}]",
+                                   [f"{n}: arr(a, &self.{n}.iter().map(|e| e.flatten(a)).collect::<Vec<_>>())",
+                                    f"{cn}: self.{n}.len() as c_int"], False))
+                else:
+                    et = PRIM.get(ctype) or FIXED.get(ctype)
+                    if et is None:
+                        raise Blocked(cname)
+                    fields.append((n, f"&'a [{et}]", [f"{n}: arr(a, self.{n})",
+                                                      f"{cn}: self.{n}.len() as c_int"], False))
+                continue
+            if ptr == "mut_ptr":
+                if rule is not None:  # one element per row: a mutable slice
+                    et = PRIM.get(ctype)
+                    if et is None:
+                        raise Blocked(cname)
+                    fields.append((n, f"Option<&'a mut [{et}]>",
+                                   [f"{n}: self.{n}.as_deref_mut().map_or(ptr::null_mut(), |s| s.as_mut_ptr())"], True))
+                    rules.append((n, rule, "opt_slice"))
+                    continue
+                if ctype in MUT_TWINS:
+                    rt, cast = MUT_TWINS[ctype], f" as *mut {MUT_TWINS[ctype]} as *mut ffi::{ctype}"
+                elif ctype in PRIM and ctype not in ("cui_font", "cui_id", "cui_texture"):
+                    rt, cast = PRIM[ctype], f" as *mut {PRIM[ctype]}"
+                elif ctype.startswith("cui_") and ctype in h.structs:
+                    rt, cast = f"ffi::{ctype}", f" as *mut ffi::{ctype}"
+                else:
+                    raise Blocked(cname)
+                fields.append((n, f"Option<&'a mut {rt}>",
+                               [f"{n}: self.{n}.as_deref_mut().map_or(ptr::null_mut(), |v| v{cast})"], True))
+                continue
+            sp = scalar_plan(ctype, n)
+            if sp is None:
+                raise Blocked(cname)
+            fields.append((n, sp[0], [f"{n}: {sp[1]}"], False))
+        is_mut = any(m for _n, _t, _i, m in fields)
+        return (fields, pad, is_mut, rules)
 
     wanted = {}  # raw opts struct -> safe name, for every struct a method takes
     for fn, (mname, sig, ret) in emitted_info.items():
@@ -506,10 +641,15 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
         if name in taken:
             blocked[tname] = f"name `{name}` is taken"
             continue
-        plan, why = plan_struct(tname)
-        if plan is None:
-            blocked[tname] = f"field `{why}` needs a hand-written wrapper"
+        if tname in HAND_ONLY:
+            blocked[tname] = "hand-written in ext.rs"
             continue
+        try:
+            plan = plan_struct(tname)
+        except Blocked as why:
+            # fail loudly: an upstream change must not silently drop a widget
+            raise SystemExit(f"gen_ffi: no safe form for {tname}: field `{why}`; "
+                             "add a rule (COUNT_OF / LEN_RULES / OMIT_FIELDS / HAND_ONLY)")
         plans[tname] = (name, plan)
         taken.add(name)
 
@@ -519,8 +659,10 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
         members = h.enum_vals[ctype]
         if not any(v == 0 for _m, v in members):
             continue
-        import os
-        prefix = os.path.commonprefix([m for m, _v in members])
+        prefix = members[0][0]
+        for m, _v in members:
+            while not m.startswith(prefix):
+                prefix = prefix[:-1]
         prefix = prefix[:prefix.rfind("_") + 1]  # `CUI_LOADER_` from DOTS/BARS/..
         if len(prefix) <= len("CUI_"):
             prefix = "CUI_"
@@ -539,43 +681,98 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
            "//! `cui_*_opts` whose fields are plain data, used as `cui::view::Name`.",
            "//! Do not edit by hand.",
            "#![allow(missing_docs, unused_variables)]",
-           "use crate::opts::{col, cstr, sz};",
+           "use crate::opts::{col, cstr, cstr_array, sz};",
            "use crate::*;",
-           "use core::ffi::c_int;",
+           "use core::ffi::{c_char, c_int};",
+           "use core::ptr;",
            "use cui_sys as ffi;", ""]
     out += enum_src
-    for tname, (name, ((fields, pad), )) in []:
-        pass
-    for tname in sorted(plans):
-        if plans[tname][1] is None:
-            continue  # hand-written twin
-        name, (fields, pad) = plans[tname]
-        lt = any("'a" in ty for _n, ty, _e in fields)
+    out += ["fn arr<T: Copy>(a: &Arena, items: &[T]) -> *const T {",
+            "    if items.is_empty() { ptr::null() } else { a.struct_array(items) }",
+            "}",
+            "/// A C `char` option: ASCII only, `'\\0'` for none.",
+            "fn ascii(c: char) -> c_char {",
+            "    assert!(c.is_ascii(), \"this option takes an ASCII character\");",
+            "    c as u8 as c_char",
+            "}", ""]
+    # `&mut Date` is handed to C as a `*mut cui_date`: same layout, checked here
+    out += ["const _: () = {",
+            "    use core::mem::{align_of, offset_of, size_of};",
+            "    assert!(size_of::<Date>() == size_of::<ffi::cui_date>());",
+            "    assert!(align_of::<Date>() == align_of::<ffi::cui_date>());",
+            "    assert!(offset_of!(Date, year) == offset_of!(ffi::cui_date, year));",
+            "    assert!(offset_of!(Date, month) == offset_of!(ffi::cui_date, month));",
+            "    assert!(offset_of!(Date, day) == offset_of!(ffi::cui_date, day));",
+            "};", ""]
+
+    def lt_of(fields):
+        return any("'a" in ty for n, ty, _i, _m in fields if n)
+
+    def emit_struct(tname, name, plan, what):
+        fields, pad, is_mut, _rules = plan
+        lt = lt_of(fields)
         doc = doc_before(h.comments, needed[tname][1], h.text)
-        out.append(f"/// {doc_first_line(doc) or 'Options for `' + name + '`.'}")
-        out.append(f"/// Safe form of C's `{tname}`; the `_with` methods take it.")
-        out.append("#[derive(Clone, Copy, Debug, Default)]")
+        out.append(f"/// {doc_first_line(doc) or what + ' `' + name + '`.'}")
+        out.append(f"/// Safe form of C's `{tname}`.")
+        out.append("#[derive(Debug, Default)]" if is_mut else "#[derive(Clone, Copy, Debug, Default)]")
         out.append(f"pub struct {name}{'<' + chr(39) + 'a>' if lt else ''} {{")
-        out += [f"    pub {n}: {ty}," for n, ty, _e in fields]
+        out.extend(f"    pub {n}: {ty}," for n, ty, _i, _m in fields if n)
         out.append("}")
         out.append(f"impl {name}{'<' + chr(39) + '_>' if lt else ''} {{")
-        out.append(f"    pub(crate) fn flatten(&self, a: &Arena) -> ffi::{tname} {{")
-        inits = (["_pad: 0"] if pad else []) + [f"{n}: {e}" for n, _t, e in fields]
+        recv = "&mut self" if is_mut else "&self"
+        out.append(f"    pub(crate) fn flatten({recv}, a: &Arena) -> ffi::{tname} {{")
+        inits = (["_pad: 0"] if pad else []) + [x for _n, _t, i, _m in fields for x in i]
         out.append(f"        ffi::{tname} {{ {', '.join(inits)} }}")
         out.append("    }")
         out.append("}")
         out.append("")
+
+    for ctype in EXTRA_ELEMS:
+        elem_type(ctype)
+    for ctype in sorted(elem_plans):
+        emit_struct(ctype, elem_plans[ctype][0], elem_plans[ctype][1], "An element for")
+    for tname in sorted(plans):
+        if plans[tname][1] is None:
+            continue  # hand-written twin
+        emit_struct(tname, plans[tname][0], plans[tname][1], "Options for")
+
+    def is_mut_opts(tname):
+        return plans[tname][1] is not None and plans[tname][1][2]
+
+    def opts_param(tname):
+        return ("&mut " if is_mut_opts(tname) else "&") + f"crate::view::{plans[tname][0]}"
+
+    def len_asserts(tname, mname, sig):
+        """Bounds the C side takes on trust, checked before the call."""
+        if plans[tname][1] is None:
+            return []
+        lines = []
+        names = {x.split(":")[0].strip() for x in sig}
+        for n, expr, kind in plans[tname][1][3]:
+            var = re.match(r"\w+", expr).group(0)
+            if var not in names:
+                raise SystemExit(f"gen_ffi: LEN_RULES for {tname}.{n} names `{var}`, "
+                                 f"which is not a parameter of {mname}")
+            ok = f"opts.{n}.is_empty() || opts.{n}.len() >= need" if kind == "slice" \
+                else f"!opts.{n}.as_ref().is_some_and(|s| s.len() < need)"
+            lines.append(f"        {{ let need: usize = {expr}; assert!({ok}, "
+                         f"\"{mname}: `{n}` holds fewer elements than the call needs\"); }}")
+        return lines
+
+    mut_names = []
 
     leaf_always, scopes, skipped = [], [], []
 
     def widget_alias(wname, tname):
         """`Name` for a widget whose opts struct has another name."""
         sname, plan = plans[tname]
+        if is_mut_opts(tname) and wname not in mut_names:
+            mut_names.append(wname)
         if wname == sname:
             return True
         if wname in taken:
             return False
-        lt = HAND_OPTS[tname][1] if plan is None else any("'a" in ty for _n, ty, _e in plan[0])
+        lt = HAND_OPTS[tname][1] if plan is None else lt_of(plan[0])
         out.append(f"/// Options of `{wname}`: [`{sname}`].")
         out.append(f"pub type {wname}{'<' + chr(39) + 'a>' if lt else ''} = {sname}{'<' + chr(39) + 'a>' if lt else ''};")
         taken.add(wname)
@@ -634,7 +831,8 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
             if opts_t in plans:
                 sname = plans[opts_t][0]
                 sc.append(f"    /// Like [`Ui::{mname}`] with options (`view::{sname}`).")
-                sc.append(f"    pub fn {mname}_with(&mut self, {params}opts: &crate::view::{sname}, f: impl FnOnce(&mut Ui<'a>)) {{")
+                sc.append(f"    pub fn {mname}_with(&mut self, {params}opts: {opts_param(opts_t)}, f: impl FnOnce(&mut Ui<'a>)) {{")
+                sc += len_asserts(opts_t, mname, sig)
                 sc.append("        let fo = opts.flatten(self.arena);")
                 sc += body(f"self.{bn}({fwd}{', ' if fwd else ''}&fo)")
             else:
@@ -660,6 +858,11 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
         if tname not in plans:
             continue
         wname = pascal(mname)
+        if mname.endswith("_begin") and is_mut_opts(tname):
+            # C keeps the write-back pointers until the matching `_end`: only
+            # a closure form can hold the borrows that long (ext.rs)
+            skipped.append((mname, "write-back options outlive begin: closure form in ext.rs"))
+            continue
         if f"{mname}_with" in hand_methods or f"{mname}_with" in emitted_methods:
             skipped.append((mname, "`_with` name already taken"))
             continue
@@ -671,7 +874,8 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
         fwd = ", ".join(x.split(":")[0].strip() for x in rest)
         params = "".join(x + ", " for x in rest)
         safe.append(f"    /// Like [`Ui::{mname}`] with safe options (`view::{sname}`).")
-        safe.append(f"    pub fn {mname}_with(&self, {params}opts: &crate::view::{sname}){ret} {{")
+        safe.append(f"    pub fn {mname}_with(&self, {params}opts: {opts_param(tname)}){ret} {{")
+        safe.extend(len_asserts(tname, mname, rest))
         safe.append("        let fo = opts.flatten(self.arena);")
         safe.append(f"        self.{mname}({fwd}{', ' if fwd else ''}&fo)")
         safe.append("    }")
@@ -686,7 +890,10 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
         "pub const SCOPES: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(scopes)) + "];\n\n"
         "/// Leaf widgets whose only form takes options: `view!` always calls\n"
         "/// `name_with`, with default options when none are written.\n"
-        "pub const LEAF_OPTS: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(leaf_always)) + "];\n")
+        "pub const LEAF_OPTS: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(leaf_always)) + "];\n\n"
+        "/// Widgets whose options hold `&mut` borrows CUI writes through: `view!`\n"
+        "/// passes them as `&mut`.\n"
+        "pub const MUT_OPTS: &[&str] = &[\n" + "".join(f'    "{n}",\n' for n in sorted(mut_names)) + "];\n")
     print(f"view!: {len(scopes)} closure scopes, {len(leaf_always)} leaf widgets with safe opts, "
           f"{len(plans)} safe opts structs, {len(enum_src and enums_needed)} generated enums", file=sys.stderr)
     for t, why in sorted(blocked.items()):

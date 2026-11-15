@@ -2,9 +2,10 @@
 //! `cui_*_opts` whose fields are plain data, used as `cui::view::Name`.
 //! Do not edit by hand.
 #![allow(missing_docs, unused_variables)]
-use crate::opts::{col, cstr, sz};
+use crate::opts::{col, cstr, cstr_array, sz};
 use crate::*;
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
+use core::ptr;
 use cui_sys as ffi;
 
 /// C's `cui_diff_mode`.
@@ -28,8 +29,85 @@ pub enum LoaderStyle {
     Grid = 4,
 }
 
+fn arr<T: Copy>(a: &Arena, items: &[T]) -> *const T {
+    if items.is_empty() { ptr::null() } else { a.struct_array(items) }
+}
+/// A C `char` option: ASCII only, `'\0'` for none.
+fn ascii(c: char) -> c_char {
+    assert!(c.is_ascii(), "this option takes an ASCII character");
+    c as u8 as c_char
+}
+
+const _: () = {
+    use core::mem::{align_of, offset_of, size_of};
+    assert!(size_of::<Date>() == size_of::<ffi::cui_date>());
+    assert!(align_of::<Date>() == align_of::<ffi::cui_date>());
+    assert!(offset_of!(Date, year) == offset_of!(ffi::cui_date, year));
+    assert!(offset_of!(Date, month) == offset_of!(ffi::cui_date, month));
+    assert!(offset_of!(Date, day) == offset_of!(ffi::cui_date, day));
+};
+
+/// Radial gauge: one value on a dial with colored bands, labelled ticks, a
+/// Safe form of C's `cui_gauge_band`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GaugeBand {
+    pub to: f32,
+    pub tone: Tone,
+}
+impl GaugeBand {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_gauge_band {
+        ffi::cui_gauge_band { to: self.to, tone: self.tone.to_ffi() as c_int }
+    }
+}
+
+/// A virtualized table for large data: sticky header, resizable and sortable
+/// Safe form of C's `cui_grid_column`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GridColumn<'a> {
+    pub title: Option<&'a str>,
+    pub width: f32,
+    pub align: TextAlign,
+    pub sortable: bool,
+    pub fixed: bool,
+    pub priority: i32,
+}
+impl GridColumn<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_grid_column {
+        ffi::cui_grid_column { title: cstr(a, self.title), width: self.width, align: self.align.to_ffi() as c_int, sortable: self.sortable, fixed: self.fixed, priority: self.priority }
+    }
+}
+
+/// Hex viewer: offsets, bytes in hex and the same bytes as ASCII, in the code
+/// Safe form of C's `cui_hex_range`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct HexRange<'a> {
+    pub offset: usize,
+    pub length: usize,
+    pub tone: Tone,
+    pub label: Option<&'a str>,
+}
+impl HexRange<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_hex_range {
+        ffi::cui_hex_range { offset: self.offset, length: self.length, tone: self.tone.to_ffi() as c_int, label: cstr(a, self.label) }
+    }
+}
+
+/// An element for `TraceMarker`.
+/// Safe form of C's `cui_trace_marker`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TraceMarker<'a> {
+    pub name: Option<&'a str>,
+    pub time: f64,
+    pub tone: Tone,
+}
+impl TraceMarker<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_trace_marker {
+        ffi::cui_trace_marker { name: cstr(a, self.name), time: self.time, tone: self.tone.to_ffi() as c_int }
+    }
+}
+
 /// Options for `Alert`.
-/// Safe form of C's `cui_alert_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_alert_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Alert<'a> {
     pub description: Option<&'a str>,
@@ -43,8 +121,22 @@ impl Alert<'_> {
     }
 }
 
+/// Options for `ApiExplorer`.
+/// Safe form of C's `cui_api_explorer_opts`.
+#[derive(Debug, Default)]
+pub struct ApiExplorer<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub selected: Option<&'a mut i32>,
+}
+impl ApiExplorer<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_api_explorer_opts {
+        ffi::cui_api_explorer_opts { _pad: 0, width: sz(self.width), height: self.height, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32) }
+    }
+}
+
 /// Announcement banner across the top of a view. Collapses smoothly when
-/// Safe form of C's `cui_banner_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_banner_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Banner<'a> {
     pub tone: Tone,
@@ -59,7 +151,7 @@ impl Banner<'_> {
 }
 
 /// Bar list: ranked horizontal bars. Rows are keyed by label, so when the
-/// Safe form of C's `cui_bar_list_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_bar_list_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BarList<'a> {
     pub width: Size,
@@ -75,7 +167,7 @@ impl BarList<'_> {
 }
 
 /// Calendar heatmap: one cell per day from start, weeks as columns, in five
-/// Safe form of C's `cui_calendar_heatmap_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_calendar_heatmap_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CalendarHeatmap<'a> {
     pub cell: f32,
@@ -89,8 +181,28 @@ impl CalendarHeatmap<'_> {
     }
 }
 
+/// Options for `Candlestick`.
+/// Safe form of C's `cui_candlestick_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Candlestick<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub labels: &'a [&'a str],
+    pub format: Option<&'a str>,
+    pub overlays: &'a [Series<'a>],
+    pub no_volume: bool,
+    pub ohlc: bool,
+    pub up: Color,
+    pub down: Color,
+}
+impl Candlestick<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_candlestick_opts {
+        ffi::cui_candlestick_opts { _pad: 0, width: sz(self.width), height: self.height, labels: cstr_array(a, self.labels), format: cstr(a, self.format), overlays: arr(a, &self.overlays.iter().map(|e| e.flatten(a)).collect::<Vec<_>>()), overlay_count: self.overlays.len() as c_int, no_volume: self.no_volume, ohlc: self.ohlc, up: col(self.up), down: col(self.down) }
+    }
+}
+
 /// Card stack: a deck where the top card can be flicked away left or right.
-/// Safe form of C's `cui_card_stack_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_card_stack_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CardStack {
     pub width: Size,
@@ -104,7 +216,7 @@ impl CardStack {
 }
 
 /// Carousel: slides that you swipe, drag, scroll or page with the arrows
-/// Safe form of C's `cui_carousel_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_carousel_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Carousel {
     pub height: f32,
@@ -121,7 +233,7 @@ impl Carousel {
 }
 
 /// Options for `Checklist`.
-/// Safe form of C's `cui_checklist_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_checklist_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Checklist<'a> {
     pub title: Option<&'a str>,
@@ -134,7 +246,7 @@ impl Checklist<'_> {
 }
 
 /// Code block with syntax highlighting (lang: "c", "cpp", "js", "ts",
-/// Safe form of C's `cui_code_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_code_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Code<'a> {
     pub lang: Option<&'a str>,
@@ -152,8 +264,39 @@ impl Code<'_> {
     }
 }
 
+/// Options for `Comment`.
+/// Safe form of C's `cui_comment_opts`.
+#[derive(Debug, Default)]
+pub struct Comment<'a> {
+    pub time: Option<&'a str>,
+    pub depth: i32,
+    pub likes: Option<&'a mut i32>,
+    pub liked: Option<&'a mut bool>,
+    pub edited: bool,
+    pub badge: Option<&'a str>,
+}
+impl Comment<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_comment_opts {
+        ffi::cui_comment_opts { _pad: 0, time: cstr(a, self.time), depth: self.depth, likes: self.likes.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), liked: self.liked.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut bool), edited: self.edited, badge: cstr(a, self.badge) }
+    }
+}
+
+/// Options for `CommitGraph`.
+/// Safe form of C's `cui_commit_graph_opts`.
+#[derive(Debug, Default)]
+pub struct CommitGraph<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub selected: Option<&'a mut i32>,
+}
+impl CommitGraph<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_commit_graph_opts {
+        ffi::cui_commit_graph_opts { _pad: 0, width: sz(self.width), height: self.height, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32) }
+    }
+}
+
 /// Before and after: drag the divider to compare two images. *pos is 0..1.
-/// Safe form of C's `cui_compare_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_compare_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Compare<'a> {
     pub width: Size,
@@ -169,7 +312,7 @@ impl Compare<'_> {
 }
 
 /// Two step destructive button: the first click morphs it into a confirm
-/// Safe form of C's `cui_confirm_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_confirm_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Confirm<'a> {
     pub confirm_label: Option<&'a str>,
@@ -185,7 +328,7 @@ impl Confirm<'_> {
 }
 
 /// Confirm popover: a small question anchored to the previous component.
-/// Safe form of C's `cui_confirm_popover_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_confirm_popover_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ConfirmPopover<'a> {
     pub title: Option<&'a str>,
@@ -202,7 +345,7 @@ impl ConfirmPopover<'_> {
 }
 
 /// Countdown: days, hours, minutes and seconds as tiles whose digits roll.
-/// Safe form of C's `cui_countdown_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_countdown_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Countdown {
     pub hide_days: bool,
@@ -215,7 +358,7 @@ impl Countdown {
 }
 
 /// Odometer: a number whose digits roll to their new values.
-/// Safe form of C's `cui_counter_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_counter_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Counter<'a> {
     pub format: Option<&'a str>,
@@ -231,7 +374,7 @@ impl Counter<'_> {
 }
 
 /// Options for `Coverage`.
-/// Safe form of C's `cui_coverage_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_coverage_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Coverage {
     pub width: Size,
@@ -246,7 +389,7 @@ impl Coverage {
 }
 
 /// Cropper: a crop rectangle over a picture, in image pixels. Drag inside to
-/// Safe form of C's `cui_cropper_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_cropper_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Cropper {
     pub width: Size,
@@ -262,7 +405,7 @@ impl Cropper {
 }
 
 /// Options for `DateOpts`.
-/// Safe form of C's `cui_date_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_date_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DateOpts<'a> {
     pub label: Option<&'a str>,
@@ -276,7 +419,7 @@ impl DateOpts<'_> {
 }
 
 /// Options for `DateRange`.
-/// Safe form of C's `cui_date_range_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_date_range_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DateRange<'a> {
     pub label: Option<&'a str>,
@@ -290,8 +433,31 @@ impl DateRange<'_> {
     }
 }
 
+/// Options for `Diff`.
+/// Safe form of C's `cui_diff_opts`.
+#[derive(Debug, Default)]
+pub struct Diff<'a> {
+    pub mode: DiffMode,
+    pub language: Option<&'a str>,
+    pub old_title: Option<&'a str>,
+    pub new_title: Option<&'a str>,
+    pub current: Option<&'a mut i32>,
+    pub context: i32,
+    pub no_fold: bool,
+    pub ignore_eol: bool,
+    pub split_min_width: f32,
+    pub width: Size,
+    pub height: f32,
+    pub size: f32,
+}
+impl Diff<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_diff_opts {
+        ffi::cui_diff_opts { _pad: 0, mode: self.mode as c_int, language: cstr(a, self.language), old_title: cstr(a, self.old_title), new_title: cstr(a, self.new_title), current: self.current.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), context: self.context, no_fold: self.no_fold, ignore_eol: self.ignore_eol, split_min_width: self.split_min_width, width: sz(self.width), height: self.height, size: self.size }
+    }
+}
+
 /// Options for `DocTabs`.
-/// Safe form of C's `cui_doc_tabs_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_doc_tabs_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DocTabs {
     pub shortcuts: bool,
@@ -305,7 +471,7 @@ impl DocTabs {
 }
 
 /// Options for `DockItem`.
-/// Safe form of C's `cui_dock_item_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_dock_item_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DockItem {
     pub color: Color,
@@ -319,7 +485,7 @@ impl DockItem {
 }
 
 /// Dock: a row of icons that grow as the pointer passes, with labels and a
-/// Safe form of C's `cui_dock_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_dock_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Dock {
     pub size: f32,
@@ -332,7 +498,7 @@ impl Dock {
 }
 
 /// Returns true while the panel's content should be built; then call
-/// Safe form of C's `cui_dock_panel_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_dock_panel_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DockPanel<'a> {
     pub icon: Option<&'a str>,
@@ -345,7 +511,7 @@ impl DockPanel<'_> {
 }
 
 /// Dockspace: an IDE style workspace that lays out your panels in a tree of
-/// Safe form of C's `cui_dockspace_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_dockspace_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Dockspace<'a> {
     pub layout: Option<&'a str>,
@@ -362,7 +528,7 @@ impl Dockspace<'_> {
 }
 
 /// Dropzone: drop files from the OS, or click to browse. Returns the number
-/// Safe form of C's `cui_dropzone_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_dropzone_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Dropzone<'a> {
     pub title: Option<&'a str>,
@@ -380,7 +546,7 @@ impl Dropzone<'_> {
 }
 
 /// Expandable card: a card whose header opens a body with a height spring.
-/// Safe form of C's `cui_expandable_card_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_expandable_card_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ExpandableCard<'a> {
     pub description: Option<&'a str>,
@@ -395,7 +561,7 @@ impl ExpandableCard<'_> {
 }
 
 /// Text clamped to a few lines with a fade and Show more / Show less.
-/// Safe form of C's `cui_expandable_text_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_expandable_text_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ExpandableText {
     pub lines: i32,
@@ -409,8 +575,30 @@ impl ExpandableText {
     }
 }
 
+/// Options for `Fader`.
+/// Safe form of C's `cui_fader_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Fader<'a> {
+    pub label: Option<&'a str>,
+    pub format: Option<&'a str>,
+    pub unit: Option<&'a str>,
+    pub length: f32,
+    pub horizontal: bool,
+    pub step: f32,
+    pub reset: f32,
+    pub ticks: &'a [f32],
+    pub meter: &'a [f32],
+    pub hide_value: bool,
+    pub disabled: bool,
+}
+impl Fader<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_fader_opts {
+        ffi::cui_fader_opts { _pad: 0, label: cstr(a, self.label), format: cstr(a, self.format), unit: cstr(a, self.unit), length: self.length, horizontal: self.horizontal, step: self.step, reset: self.reset, ticks: arr(a, self.ticks), tick_count: self.ticks.len() as c_int, meter: arr(a, self.meter), meter_channels: self.meter.len() as c_int, hide_value: self.hide_value, disabled: self.disabled }
+    }
+}
+
 /// Options for `Flame`.
-/// Safe form of C's `cui_flame_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_flame_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Flame {
     pub width: Size,
@@ -425,7 +613,7 @@ impl Flame {
 }
 
 /// Funnel: stages narrowing by value, with the conversion between them.
-/// Safe form of C's `cui_funnel_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_funnel_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Funnel<'a> {
     pub width: Size,
@@ -440,7 +628,7 @@ impl Funnel<'_> {
 }
 
 /// Options for `Gantt`.
-/// Safe form of C's `cui_gantt_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_gantt_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Gantt {
     pub day_width: f32,
@@ -455,8 +643,22 @@ impl Gantt {
     }
 }
 
+/// pos 0..1
+/// Safe form of C's `cui_gradient_opts`.
+#[derive(Debug, Default)]
+pub struct Gradient<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub selected: Option<&'a mut i32>,
+}
+impl Gradient<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_gradient_opts {
+        ffi::cui_gradient_opts { _pad: 0, width: sz(self.width), height: self.height, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32) }
+    }
+}
+
 /// Text painted with a gradient from one color to another; animate makes it drift.
-/// Safe form of C's `cui_gradient_text_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_gradient_text_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GradientText {
     pub font: i32,
@@ -472,8 +674,81 @@ impl GradientText {
     }
 }
 
+/// Options for `Graph`.
+/// Safe form of C's `cui_graph_opts`.
+#[derive(Debug, Default)]
+pub struct Graph<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub top_down: bool,
+    pub selected: Option<&'a mut i32>,
+}
+impl Graph<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_graph_opts {
+        ffi::cui_graph_opts { _pad: 0, width: sz(self.width), height: self.height, top_down: self.top_down, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32) }
+    }
+}
+
+/// Options for `Grid`.
+/// Safe form of C's `cui_grid_opts`.
+#[derive(Debug, Default)]
+pub struct Grid<'a> {
+    pub width: Size,
+    pub height: Size,
+    pub row_height: f32,
+    pub selected: Option<&'a mut [bool]>,
+    pub sort: Option<&'a mut TableSort>,
+    pub striped: bool,
+    pub cursor: Option<&'a mut i32>,
+    pub hide_checkboxes: bool,
+    pub anchor: Option<&'a mut i32>,
+}
+impl Grid<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_grid_opts {
+        ffi::cui_grid_opts { _pad: 0, width: sz(self.width), height: sz(self.height), row_height: self.row_height, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |s| s.as_mut_ptr()), sort: self.sort.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut TableSort as *mut ffi::cui_table_sort), striped: self.striped, cursor: self.cursor.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), hide_checkboxes: self.hide_checkboxes, anchor: self.anchor.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32) }
+    }
+}
+
+/// Heatmap: a rows x cols matrix (values\[row * cols + col]) on one hue,
+/// Safe form of C's `cui_heatmap_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Heatmap<'a> {
+    pub row_labels: &'a [&'a str],
+    pub col_labels: &'a [&'a str],
+    pub cell: f32,
+    pub min: f32,
+    pub max: f32,
+    pub color: Color,
+    pub format: Option<&'a str>,
+    pub width: Size,
+}
+impl Heatmap<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_heatmap_opts {
+        ffi::cui_heatmap_opts { _pad: 0, row_labels: cstr_array(a, self.row_labels), col_labels: cstr_array(a, self.col_labels), cell: self.cell, min: self.min, max: self.max, color: col(self.color), format: cstr(a, self.format), width: sz(self.width) }
+    }
+}
+
+/// Options for `HexView`.
+/// Safe form of C's `cui_hex_view_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct HexView<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub base: u64,
+    pub bytes_per_row: i32,
+    pub ranges: &'a [HexRange<'a>],
+    pub no_ascii: bool,
+    pub no_header: bool,
+    pub size: f32,
+}
+impl HexView<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_hex_view_opts {
+        ffi::cui_hex_view_opts { _pad: 0, width: sz(self.width), height: self.height, base: self.base, bytes_per_row: self.bytes_per_row, ranges: arr(a, &self.ranges.iter().map(|e| e.flatten(a)).collect::<Vec<_>>()), range_count: self.ranges.len() as c_int, edit: ptr::null_mut(), no_ascii: self.no_ascii, no_header: self.no_header, size: self.size }
+    }
+}
+
 /// Range slider over a histogram of the data it filters.
-/// Safe form of C's `cui_histogram_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_histogram_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Histogram<'a> {
     pub height: f32,
@@ -486,7 +761,7 @@ impl Histogram<'_> {
 }
 
 /// Hold to confirm: a destructive action that fills while held and fires when
-/// Safe form of C's `cui_hold_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_hold_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Hold<'a> {
     pub duration: f32,
@@ -500,7 +775,7 @@ impl Hold<'_> {
 }
 
 /// Hover card: rich content that appears when the pointer rests on the
-/// Safe form of C's `cui_hover_card_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_hover_card_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct HoverCard {
     pub placement: Placement,
@@ -514,7 +789,7 @@ impl HoverCard {
 }
 
 /// Options for `Image`.
-/// Safe form of C's `cui_image_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_image_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Image {
     pub width: Size,
@@ -529,7 +804,7 @@ impl Image {
 }
 
 /// Options for `ImageViewer`.
-/// Safe form of C's `cui_image_viewer_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_image_viewer_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ImageViewer {
     pub width: Size,
@@ -545,7 +820,7 @@ impl ImageViewer {
 }
 
 /// Property inspector: labelled rows in folding groups, a label column on the
-/// Safe form of C's `cui_inspector_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_inspector_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Inspector {
     pub width: Size,
@@ -558,7 +833,7 @@ impl Inspector {
 }
 
 /// JSON viewer: a collapsible tree with typed colors and item counts.
-/// Safe form of C's `cui_json_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_json_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Json {
     pub expand_depth: i32,
@@ -571,7 +846,7 @@ impl Json {
 }
 
 /// Options for `KanbanColumn`.
-/// Safe form of C's `cui_kanban_column_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_kanban_column_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KanbanColumn {
     pub dot: Color,
@@ -584,8 +859,23 @@ impl KanbanColumn {
     }
 }
 
+/// Options for `Keymap`.
+/// Safe form of C's `cui_keymap_opts`.
+#[derive(Debug, Default)]
+pub struct Keymap<'a> {
+    pub width: Size,
+    pub categories: &'a [&'a str],
+    pub mods: Option<&'a mut i32>,
+    pub no_function_row: bool,
+}
+impl Keymap<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_keymap_opts {
+        ffi::cui_keymap_opts { _pad: 0, width: sz(self.width), categories: cstr_array(a, self.categories), category_count: self.categories.len() as c_int, mods: self.mods.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), no_function_row: self.no_function_row }
+    }
+}
+
 /// Knob, fader and level meter: the controls of audio, synth and mixer panels.
-/// Safe form of C's `cui_knob_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_knob_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Knob<'a> {
     pub label: Option<&'a str>,
@@ -607,7 +897,7 @@ impl Knob<'_> {
 }
 
 /// Level meter: bars that jump up to each new peak and fall back at `decay`
-/// Safe form of C's `cui_level_meter_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_level_meter_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LevelMeter {
     pub min_db: f32,
@@ -627,7 +917,7 @@ impl LevelMeter {
 }
 
 /// Options for `Loader`.
-/// Safe form of C's `cui_loader_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_loader_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Loader {
     pub style: LoaderStyle,
@@ -641,7 +931,7 @@ impl Loader {
 }
 
 /// Options for `LogView`.
-/// Safe form of C's `cui_log_view_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_log_view_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LogView {
     pub width: Size,
@@ -657,7 +947,7 @@ impl LogView {
 }
 
 /// Markdown view: renders your markdown text (UTF-8) as native content, every
-/// Safe form of C's `cui_markdown_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_markdown_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Markdown {
     pub width: Size,
@@ -674,8 +964,22 @@ impl Markdown {
     }
 }
 
+/// One menu of the bar. Returns true while its items should be built; call
+/// Safe form of C's `cui_menu_bar_menu_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MenuBarMenu {
+    pub mnemonic: char,
+    pub width: f32,
+    pub disabled: bool,
+}
+impl MenuBarMenu {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_menu_bar_menu_opts {
+        ffi::cui_menu_bar_menu_opts { _pad: 0, mnemonic: ascii(self.mnemonic), width: self.width, disabled: self.disabled }
+    }
+}
+
 /// Menu bar: File / Edit / View along the top of a window. Each menu holds
-/// Safe form of C's `cui_menu_bar_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_menu_bar_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MenuBar {
     pub no_border: bool,
@@ -687,7 +991,7 @@ impl MenuBar {
 }
 
 /// Money field: shows the amount with thousands separators, edits as plain
-/// Safe form of C's `cui_money_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_money_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Money<'a> {
     pub label: Option<&'a str>,
@@ -703,8 +1007,26 @@ impl Money<'_> {
     }
 }
 
+/// Options for `Month`.
+/// Safe form of C's `cui_month_opts`.
+#[derive(Debug, Default)]
+pub struct Month<'a> {
+    pub selected: Option<&'a mut Date>,
+    pub first_weekday: i32,
+    pub cell_height: f32,
+    pub month_names: Option<&'a [&'a str; 12]>,
+    pub day_names: Option<&'a [&'a str; 7]>,
+    pub hour12: bool,
+    pub today: Date,
+}
+impl Month<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_month_opts {
+        ffi::cui_month_opts { _pad: 0, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut Date as *mut ffi::cui_date), first_weekday: self.first_weekday, cell_height: self.cell_height, month_names: self.month_names.map_or(ptr::null(), |s| a.cstr_array(s)), day_names: self.day_names.map_or(ptr::null(), |s| a.cstr_array(s)), hour12: self.hour12, today: self.today.to_ffi() }
+    }
+}
+
 /// pan in points; zoom 0 means 1
-/// Safe form of C's `cui_node_editor_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_node_editor_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NodeEditor {
     pub width: Size,
@@ -721,7 +1043,7 @@ impl NodeEditor {
 }
 
 /// A node at canvas position (*x, *y), updated while it is dragged. Returns
-/// Safe form of C's `cui_node_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_node_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Node<'a> {
     pub width: f32,
@@ -734,7 +1056,7 @@ impl Node<'_> {
 }
 
 /// Options for `NowPlaying`.
-/// Safe form of C's `cui_now_playing_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_now_playing_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NowPlaying {
     pub width: Size,
@@ -747,7 +1069,7 @@ impl NowPlaying {
 }
 
 /// A row with a pin on the left (input) or right (output). type picks the pin
-/// Safe form of C's `cui_pin_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_pin_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Pin {
     pub type_: i32,
@@ -759,7 +1081,7 @@ impl Pin {
 }
 
 /// Popover anchored to the previous component. Toggle it with
-/// Safe form of C's `cui_popover_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_popover_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Popover {
     pub placement: Placement,
@@ -774,7 +1096,7 @@ impl Popover {
 }
 
 /// Options for `Problems`.
-/// Safe form of C's `cui_problems_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_problems_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Problems {
     pub width: Size,
@@ -788,7 +1110,7 @@ impl Problems {
 }
 
 /// Options for `Prop`.
-/// Safe form of C's `cui_prop_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_prop_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Prop<'a> {
     pub min: f32,
@@ -807,8 +1129,29 @@ impl Prop<'_> {
     }
 }
 
+/// from the band before (or min) up to `to`
+/// Safe form of C's `cui_radial_gauge_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RadialGauge<'a> {
+    pub label: Option<&'a str>,
+    pub format: Option<&'a str>,
+    pub unit: Option<&'a str>,
+    pub size: f32,
+    pub sweep: f32,
+    pub bands: &'a [GaugeBand],
+    pub ticks: i32,
+    pub target: f32,
+    pub show_target: bool,
+    pub no_needle: bool,
+}
+impl RadialGauge<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_radial_gauge_opts {
+        ffi::cui_radial_gauge_opts { _pad: 0, label: cstr(a, self.label), format: cstr(a, self.format), unit: cstr(a, self.unit), size: self.size, sweep: self.sweep, bands: arr(a, &self.bands.iter().map(|e| e.flatten(a)).collect::<Vec<_>>()), band_count: self.bands.len() as c_int, ticks: self.ticks, target: self.target, show_target: self.show_target, no_needle: self.no_needle }
+    }
+}
+
 /// Options for `RadioCards`.
-/// Safe form of C's `cui_radio_cards_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_radio_cards_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RadioCards {
     pub columns: i32,
@@ -820,7 +1163,7 @@ impl RadioCards {
 }
 
 /// Activity rings: concentric progress rings; values past 1 keep winding.
-/// Safe form of C's `cui_rings_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_rings_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Rings<'a> {
     pub size: f32,
@@ -836,7 +1179,7 @@ impl Rings<'_> {
 }
 
 /// Ruler slider: a tape measure that slides under a fixed marker, with
-/// Safe form of C's `cui_ruler_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_ruler_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Ruler<'a> {
     pub step: f32,
@@ -853,7 +1196,7 @@ impl Ruler<'_> {
 }
 
 /// Options for `Scatter`.
-/// Safe form of C's `cui_scatter_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_scatter_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Scatter<'a> {
     pub width: Size,
@@ -871,7 +1214,7 @@ impl Scatter<'_> {
 }
 
 /// Scrub field: drag sideways anywhere on it to change the value (Shift for
-/// Safe form of C's `cui_scrub_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_scrub_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Scrub<'a> {
     pub step: f32,
@@ -887,7 +1230,7 @@ impl Scrub<'_> {
 }
 
 /// Options for `ShortcutRecorder`.
-/// Safe form of C's `cui_shortcut_recorder_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_shortcut_recorder_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ShortcutRecorder<'a> {
     pub placeholder: Option<&'a str>,
@@ -900,7 +1243,7 @@ impl ShortcutRecorder<'_> {
 }
 
 /// Signature pad: draw with the mouse or a pen. The strokes are kept for you;
-/// Safe form of C's `cui_signature_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_signature_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Signature<'a> {
     pub width: Size,
@@ -915,7 +1258,7 @@ impl Signature<'_> {
 }
 
 /// Options for `SpeedDial`.
-/// Safe form of C's `cui_speed_dial_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_speed_dial_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SpeedDial<'a> {
     pub icon: Option<&'a str>,
@@ -929,7 +1272,7 @@ impl SpeedDial<'_> {
 }
 
 /// Split bar: one bar split into parts, with a legend of values and shares.
-/// Safe form of C's `cui_split_bar_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_split_bar_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplitBar<'a> {
     pub width: Size,
@@ -944,7 +1287,7 @@ impl SplitBar<'_> {
 }
 
 /// Spotlight card: a soft light follows the pointer across the card and lights
-/// Safe form of C's `cui_spotlight_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_spotlight_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Spotlight {
     pub width: Size,
@@ -961,7 +1304,7 @@ impl Spotlight {
 }
 
 /// Options for `StackTrace`.
-/// Safe form of C's `cui_stack_trace_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_stack_trace_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StackTrace<'a> {
     pub width: Size,
@@ -976,7 +1319,7 @@ impl StackTrace<'_> {
 }
 
 /// Status bar: a thin bar along the bottom of a window, with a hairline on
-/// Safe form of C's `cui_status_bar_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_status_bar_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StatusBar {
     pub no_border: bool,
@@ -988,7 +1331,7 @@ impl StatusBar {
 }
 
 /// Options for `StatusButton`.
-/// Safe form of C's `cui_status_button_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_status_button_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StatusButton<'a> {
     pub busy_label: Option<&'a str>,
@@ -1005,7 +1348,7 @@ impl StatusButton<'_> {
 }
 
 /// Options for `StatusItem`.
-/// Safe form of C's `cui_status_item_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_status_item_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StatusItem<'a> {
     pub icon: Option<&'a str>,
@@ -1020,7 +1363,7 @@ impl StatusItem<'_> {
 }
 
 /// A small progress bar with an optional label. value is 0..1.
-/// Safe form of C's `cui_status_progress_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_status_progress_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct StatusProgress<'a> {
     pub label: Option<&'a str>,
@@ -1034,7 +1377,7 @@ impl StatusProgress<'_> {
 }
 
 /// Options for `TabBar`.
-/// Safe form of C's `cui_tab_bar_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_tab_bar_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TabBar {
     pub width: Size,
@@ -1047,7 +1390,7 @@ impl TabBar {
 }
 
 /// Options for `Terminal`.
-/// Safe form of C's `cui_terminal_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_terminal_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Terminal<'a> {
     pub width: Size,
@@ -1063,7 +1406,7 @@ impl Terminal<'_> {
 }
 
 /// Options for `TestExplorer`.
-/// Safe form of C's `cui_test_explorer_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_test_explorer_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TestExplorer {
     pub width: Size,
@@ -1076,7 +1419,7 @@ impl TestExplorer {
 }
 
 /// a fall is good: shown green
-/// Safe form of C's `cui_ticker_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_ticker_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Ticker {
     pub speed: f32,
@@ -1089,7 +1432,7 @@ impl Ticker {
 }
 
 /// Control tile: a large toggle with an icon, a label and a state line.
-/// Safe form of C's `cui_tile_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_tile_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Tile<'a> {
     pub icon: Option<&'a str>,
@@ -1105,7 +1448,7 @@ impl Tile<'_> {
 }
 
 /// Options for `TimeHistogram`.
-/// Safe form of C's `cui_time_histogram_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_time_histogram_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TimeHistogram {
     pub width: Size,
@@ -1119,7 +1462,7 @@ impl TimeHistogram {
 }
 
 /// Time picker: a field that opens hour and minute columns. hour is 0..23.
-/// Safe form of C's `cui_time_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_time_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Time<'a> {
     pub label: Option<&'a str>,
@@ -1133,8 +1476,50 @@ impl Time<'_> {
     }
 }
 
+/// Options for `TimelineEditor`.
+/// Safe form of C's `cui_timeline_editor_opts`.
+#[derive(Debug, Default)]
+pub struct TimelineEditor<'a> {
+    pub start: f32,
+    pub end: f32,
+    pub fps: f32,
+    pub ruler: i32,
+    pub view: Option<&'a mut ffi::cui_timeline_view>,
+    pub in_: Option<&'a mut f32>,
+    pub out: Option<&'a mut f32>,
+    pub current_track: Option<&'a mut i32>,
+    pub current_key: Option<&'a mut i32>,
+    pub width: Size,
+    pub height: f32,
+    pub row_height: f32,
+    pub track_width: f32,
+    pub toggles: bool,
+    pub free_drag: bool,
+}
+impl TimelineEditor<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_timeline_editor_opts {
+        ffi::cui_timeline_editor_opts { _pad: 0, start: self.start, end: self.end, fps: self.fps, ruler: self.ruler, view: self.view.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut ffi::cui_timeline_view), in_: self.in_.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut f32), out: self.out.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut f32), current_track: self.current_track.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), current_key: self.current_key.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), width: sz(self.width), height: self.height, row_height: self.row_height, track_width: self.track_width, toggles: self.toggles, free_drag: self.free_drag }
+    }
+}
+
+/// Options for `Tool`.
+/// Safe form of C's `cui_tool_opts`.
+#[derive(Debug, Default)]
+pub struct Tool<'a> {
+    pub label: Option<&'a str>,
+    pub tooltip: Option<&'a str>,
+    pub shortcut: Option<&'a str>,
+    pub toggle: Option<&'a mut bool>,
+    pub disabled: bool,
+}
+impl Tool<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_tool_opts {
+        ffi::cui_tool_opts { _pad: 0, label: cstr(a, self.label), tooltip: cstr(a, self.tooltip), shortcut: cstr(a, self.shortcut), toggle: self.toggle.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut bool), disabled: self.disabled }
+    }
+}
+
 /// Toolbar: a row of compact icon buttons, toggles, separators and small text
-/// Safe form of C's `cui_toolbar_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_toolbar_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Toolbar {
     pub no_border: bool,
@@ -1146,7 +1531,7 @@ impl Toolbar {
 }
 
 /// Options for `Tour`.
-/// Safe form of C's `cui_tour_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_tour_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Tour<'a> {
     pub width: f32,
@@ -1163,8 +1548,23 @@ impl Tour<'_> {
     }
 }
 
+/// Options for `Trace`.
+/// Safe form of C's `cui_trace_opts`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Trace<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub row_height: f32,
+    pub markers: &'a [TraceMarker<'a>],
+}
+impl Trace<'_> {
+    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_trace_opts {
+        ffi::cui_trace_opts { _pad: 0, width: sz(self.width), height: self.height, row_height: self.row_height, markers: arr(a, &self.markers.iter().map(|e| e.flatten(a)).collect::<Vec<_>>()), marker_count: self.markers.len() as c_int }
+    }
+}
+
 /// Tree view node.
-/// Safe form of C's `cui_tree_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_tree_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Tree<'a> {
     pub icon: Option<&'a str>,
@@ -1177,8 +1577,26 @@ impl Tree<'_> {
     }
 }
 
+/// Options for `TreeTable`.
+/// Safe form of C's `cui_tree_table_opts`.
+#[derive(Debug, Default)]
+pub struct TreeTable<'a> {
+    pub width: Size,
+    pub height: Size,
+    pub row_height: f32,
+    pub root: i32,
+    pub sort: Option<&'a mut TableSort>,
+    pub cursor: Option<&'a mut i32>,
+    pub guides: bool,
+}
+impl TreeTable<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_tree_table_opts {
+        ffi::cui_tree_table_opts { _pad: 0, width: sz(self.width), height: sz(self.height), row_height: self.row_height, root: self.root, sort: self.sort.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut TableSort as *mut ffi::cui_table_sort), cursor: self.cursor.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), guides: self.guides, label: None, user: ptr::null_mut() }
+    }
+}
+
 /// Options for `Treemap`.
-/// Safe form of C's `cui_treemap_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_treemap_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Treemap<'a> {
     pub width: Size,
@@ -1192,7 +1610,7 @@ impl Treemap<'_> {
 }
 
 /// Options for `Uptime`.
-/// Safe form of C's `cui_uptime_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_uptime_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Uptime {
     pub width: Size,
@@ -1205,7 +1623,7 @@ impl Uptime {
 }
 
 /// Options for `VoiceOrb`.
-/// Safe form of C's `cui_voice_orb_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_voice_orb_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct VoiceOrb {
     pub size: f32,
@@ -1218,7 +1636,7 @@ impl VoiceOrb {
 }
 
 /// Waffle: a 10 x 10 grid of squares split by share, with a legend.
-/// Safe form of C's `cui_waffle_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_waffle_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Waffle<'a> {
     pub cell: f32,
@@ -1232,8 +1650,24 @@ impl Waffle<'_> {
     }
 }
 
+/// Options for `Waterfall`.
+/// Safe form of C's `cui_waterfall_opts`.
+#[derive(Debug, Default)]
+pub struct Waterfall<'a> {
+    pub width: Size,
+    pub height: f32,
+    pub selected: Option<&'a mut i32>,
+    pub dom_loaded: f64,
+    pub loaded: f64,
+}
+impl Waterfall<'_> {
+    pub(crate) fn flatten(&mut self, a: &Arena) -> ffi::cui_waterfall_opts {
+        ffi::cui_waterfall_opts { _pad: 0, width: sz(self.width), height: self.height, selected: self.selected.as_deref_mut().map_or(ptr::null_mut(), |v| v as *mut i32), dom_loaded: self.dom_loaded, loaded: self.loaded }
+    }
+}
+
 /// Waveform: bars from peaks (0..1). With progress, the played part is
-/// Safe form of C's `cui_waveform_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_waveform_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Waveform {
     pub width: Size,
@@ -1249,7 +1683,7 @@ impl Waveform {
 }
 
 /// Options for `Week`.
-/// Safe form of C's `cui_week_opts`; the `_with` methods take it.
+/// Safe form of C's `cui_week_opts`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Week {
     pub start_hour: f32,
@@ -1278,8 +1712,14 @@ pub type ControlTile<'a> = Tile<'a>;
 pub type DatePicker<'a> = DateOpts<'a>;
 /// Options of `DateRangePicker`: [`DateRange`].
 pub type DateRangePicker<'a> = DateRange<'a>;
+/// Options of `DiffView`: [`Diff`].
+pub type DiffView<'a> = Diff<'a>;
 /// Options of `FlameGraph`: [`Flame`].
 pub type FlameGraph = Flame;
+/// Options of `GradientEditor`: [`Gradient`].
+pub type GradientEditor<'a> = Gradient<'a>;
+/// Options of `GraphView`: [`Graph`].
+pub type GraphView<'a> = Graph<'a>;
 /// Options of `HistogramSlider`: [`Histogram`].
 pub type HistogramSlider<'a> = Histogram<'a>;
 /// Options of `HoldButton`: [`Hold`].
@@ -1292,6 +1732,8 @@ pub type JsonView = Json;
 pub type KanbanColumnBegin = KanbanColumn;
 /// Options of `MoneyInput`: [`Money`].
 pub type MoneyInput<'a> = Money<'a>;
+/// Options of `MonthCalendar`: [`Month`].
+pub type MonthCalendar<'a> = Month<'a>;
 /// Options of `NodeBegin`: [`Node`].
 pub type NodeBegin<'a> = Node<'a>;
 /// Options of `NodeEditorBegin`: [`NodeEditor`].
@@ -1328,5 +1770,9 @@ pub type StatusBarText<'a> = StatusItem<'a>;
 pub type TextReveal = TextFx;
 /// Options of `TimePicker`: [`Time`].
 pub type TimePicker<'a> = Time<'a>;
+/// Options of `ToolbarButton`: [`Tool`].
+pub type ToolbarButton<'a> = Tool<'a>;
+/// Options of `TraceView`: [`Trace`].
+pub type TraceView<'a> = Trace<'a>;
 /// Options of `WeekCalendar`: [`Week`].
 pub type WeekCalendar = Week;

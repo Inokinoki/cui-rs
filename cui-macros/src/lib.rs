@@ -46,6 +46,9 @@ use syn::parse::Parser;
 /// - `if`/`else`, `for`, `while`, `loop` and `match` have node lists as
 ///   bodies; every other Rust statement is copied as written.
 ///
+/// - A scope that runs its body per row passes the row as closure
+///   parameters: `VirtualList("l", n, 28., Size::FILL) |i| { .. }`.
+///
 /// Your own widgets work the same way: define `name` / `name_with` methods
 /// (an extension trait on `Ui`) and an opts type called `Name`. A widget that
 /// takes a closure for children is declared once, right after the handle:

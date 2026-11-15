@@ -1338,9 +1338,10 @@ impl<'a> Ui<'a> {
         if shown { self.scope(ffi::cui_menu_bar_menu_end, f); }
     }
 
-    /// Like [`Ui::menu_bar_menu`] with raw options.
-    pub fn menu_bar_menu_with(&mut self, label: impl AsRef<str>, opts: &ffi::cui_menu_bar_menu_opts, f: impl FnOnce(&mut Ui<'a>)) {
-        let shown = self.menu_bar_menu_begin(label, opts);
+    /// Like [`Ui::menu_bar_menu`] with options (`view::MenuBarMenu`).
+    pub fn menu_bar_menu_with(&mut self, label: impl AsRef<str>, opts: &crate::view::MenuBarMenu, f: impl FnOnce(&mut Ui<'a>)) {
+        let fo = opts.flatten(self.arena);
+        let shown = self.menu_bar_menu_begin(label, &fo);
         if shown { self.scope(ffi::cui_menu_bar_menu_end, f); }
     }
 
@@ -1433,6 +1434,12 @@ impl<'a> Ui<'a> {
         self.alert(title, &fo)
     }
 
+    /// Like [`Ui::api_explorer`] with safe options (`view::ApiExplorer`).
+    pub fn api_explorer_with(&self, id: impl AsRef<str>, endpoints: &[ffi::cui_api_endpoint], opts: &mut crate::view::ApiExplorer) -> ffi::cui_api_explorer_result {
+        let fo = opts.flatten(self.arena);
+        self.api_explorer(id, endpoints, &fo)
+    }
+
     /// Like [`Ui::banner`] with safe options (`view::Banner`).
     pub fn banner_with(&self, text: impl AsRef<str>, open: &mut bool, opts: &crate::view::Banner) -> bool {
         let fo = opts.flatten(self.arena);
@@ -1451,6 +1458,13 @@ impl<'a> Ui<'a> {
         self.calendar_heatmap(id, start, values, days, &fo)
     }
 
+    /// Like [`Ui::candlestick`] with safe options (`view::Candlestick`).
+    pub fn candlestick_with(&self, id: impl AsRef<str>, candles: &[ffi::cui_candle], opts: &crate::view::Candlestick) -> i32 {
+        { let need: usize = candles.len(); assert!(opts.labels.is_empty() || opts.labels.len() >= need, "candlestick: `labels` holds fewer elements than the call needs"); }
+        let fo = opts.flatten(self.arena);
+        self.candlestick(id, candles, &fo)
+    }
+
     /// Like [`Ui::card_stack_begin`] with safe options (`view::CardStack`).
     pub fn card_stack_begin_with(&self, id: impl AsRef<str>, count: i32, opts: &crate::view::CardStack) {
         let fo = opts.flatten(self.arena);
@@ -1467,6 +1481,18 @@ impl<'a> Ui<'a> {
     pub fn code_block_with(&self, id: impl AsRef<str>, code: impl AsRef<str>, opts: &crate::view::Code) {
         let fo = opts.flatten(self.arena);
         self.code_block(id, code, &fo)
+    }
+
+    /// Like [`Ui::comment`] with safe options (`view::Comment`).
+    pub fn comment_with(&self, id: impl AsRef<str>, author: impl AsRef<str>, text: impl AsRef<str>, opts: &mut crate::view::Comment) -> i32 {
+        let fo = opts.flatten(self.arena);
+        self.comment(id, author, text, &fo)
+    }
+
+    /// Like [`Ui::commit_graph`] with safe options (`view::CommitGraph`).
+    pub fn commit_graph_with(&self, id: impl AsRef<str>, commits: &[ffi::cui_commit], opts: &mut crate::view::CommitGraph) -> ffi::cui_commit_graph_result {
+        let fo = opts.flatten(self.arena);
+        self.commit_graph(id, commits, &fo)
     }
 
     /// Like [`Ui::confirm_button`] with safe options (`view::Confirm`).
@@ -1523,6 +1549,12 @@ impl<'a> Ui<'a> {
         self.date_range_picker(id, range, &fo)
     }
 
+    /// Like [`Ui::diff_view`] with safe options (`view::Diff`).
+    pub fn diff_view_with(&self, id: impl AsRef<str>, old_text: impl AsRef<str>, new_text: impl AsRef<str>, opts: &mut crate::view::Diff) -> ffi::cui_diff_result {
+        let fo = opts.flatten(self.arena);
+        self.diff_view(id, old_text, new_text, &fo)
+    }
+
     /// Like [`Ui::doc_tabs`] with safe options (`view::DocTabs`).
     pub fn doc_tabs_with(&self, id: impl AsRef<str>, tabs: &[ffi::cui_doc_tab], selected: &mut i32, opts: &crate::view::DocTabs) -> ffi::cui_doc_tabs_result {
         let fo = opts.flatten(self.arena);
@@ -1547,6 +1579,12 @@ impl<'a> Ui<'a> {
         self.expandable_text(id, text, &fo)
     }
 
+    /// Like [`Ui::fader`] with safe options (`view::Fader`).
+    pub fn fader_with(&self, id: impl AsRef<str>, value: &mut f32, min: f32, max: f32, opts: &crate::view::Fader) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.fader(id, value, min, max, &fo)
+    }
+
     /// Like [`Ui::flame_graph`] with safe options (`view::Flame`).
     pub fn flame_graph_with(&self, id: impl AsRef<str>, spans: &[ffi::cui_flame_span], view: &mut ffi::cui_flame_view, selected: &mut i32, opts: &crate::view::Flame) -> ffi::cui_flame_result {
         let fo = opts.flatten(self.arena);
@@ -1565,10 +1603,36 @@ impl<'a> Ui<'a> {
         self.gantt(id, tasks, origin, days, &fo)
     }
 
+    /// Like [`Ui::gradient_editor`] with safe options (`view::Gradient`).
+    pub fn gradient_editor_with(&self, id: impl AsRef<str>, stops: &mut [ffi::cui_gradient_stop], count: &mut i32, opts: &mut crate::view::Gradient) -> ffi::cui_gradient_result {
+        let fo = opts.flatten(self.arena);
+        self.gradient_editor(id, stops, count, &fo)
+    }
+
     /// Like [`Ui::gradient_text`] with safe options (`view::GradientText`).
     pub fn gradient_text_with(&self, text: impl AsRef<str>, opts: &crate::view::GradientText) {
         let fo = opts.flatten(self.arena);
         self.gradient_text(text, &fo)
+    }
+
+    /// Like [`Ui::graph_view`] with safe options (`view::Graph`).
+    pub fn graph_view_with(&self, id: impl AsRef<str>, nodes: &[ffi::cui_graph_node], edges: &[ffi::cui_graph_edge], opts: &mut crate::view::Graph) -> ffi::cui_graph_result {
+        let fo = opts.flatten(self.arena);
+        self.graph_view(id, nodes, edges, &fo)
+    }
+
+    /// Like [`Ui::heatmap`] with safe options (`view::Heatmap`).
+    pub fn heatmap_with(&self, id: impl AsRef<str>, values: &[f32], rows: i32, cols: i32, opts: &crate::view::Heatmap) -> i32 {
+        { let need: usize = rows.max(0) as usize; assert!(opts.row_labels.is_empty() || opts.row_labels.len() >= need, "heatmap: `row_labels` holds fewer elements than the call needs"); }
+        { let need: usize = cols.max(0) as usize; assert!(opts.col_labels.is_empty() || opts.col_labels.len() >= need, "heatmap: `col_labels` holds fewer elements than the call needs"); }
+        let fo = opts.flatten(self.arena);
+        self.heatmap(id, values, rows, cols, &fo)
+    }
+
+    /// Like [`Ui::hex_view`] with safe options (`view::HexView`).
+    pub fn hex_view_with(&self, id: impl AsRef<str>, data: &[u8], sel: &mut ffi::cui_hex_selection, opts: &crate::view::HexView) -> ffi::cui_hex_result {
+        let fo = opts.flatten(self.arena);
+        self.hex_view(id, data, sel, &fo)
     }
 
     /// Like [`Ui::histogram_slider`] with safe options (`view::Histogram`).
@@ -1613,6 +1677,12 @@ impl<'a> Ui<'a> {
         self.kanban_column_begin(title, card_count, &fo)
     }
 
+    /// Like [`Ui::keymap`] with safe options (`view::Keymap`).
+    pub fn keymap_with(&self, id: impl AsRef<str>, bindings: &[ffi::cui_keymap_binding], opts: &mut crate::view::Keymap) -> ffi::cui_keymap_result {
+        let fo = opts.flatten(self.arena);
+        self.keymap(id, bindings, &fo)
+    }
+
     /// Like [`Ui::knob`] with safe options (`view::Knob`).
     pub fn knob_with(&self, id: impl AsRef<str>, value: &mut f32, min: f32, max: f32, opts: &crate::view::Knob) -> bool {
         let fo = opts.flatten(self.arena);
@@ -1647,6 +1717,12 @@ impl<'a> Ui<'a> {
     pub fn money_input_with(&self, id: impl AsRef<str>, value: &mut f64, opts: &crate::view::Money) -> bool {
         let fo = opts.flatten(self.arena);
         self.money_input(id, value, &fo)
+    }
+
+    /// Like [`Ui::month_calendar`] with safe options (`view::Month`).
+    pub fn month_calendar_with(&self, id: impl AsRef<str>, month: &mut ffi::cui_date, events: &[ffi::cui_month_event], opts: &mut crate::view::Month) -> ffi::cui_month_result {
+        let fo = opts.flatten(self.arena);
+        self.month_calendar(id, month, events, &fo)
     }
 
     /// Like [`Ui::node_begin`] with safe options (`view::Node`).
@@ -1713,6 +1789,12 @@ impl<'a> Ui<'a> {
     pub fn prop_vec_with(&self, label: impl AsRef<str>, value: &mut [f32], components: i32, opts: &crate::view::Prop) -> bool {
         let fo = opts.flatten(self.arena);
         self.prop_vec(label, value, components, &fo)
+    }
+
+    /// Like [`Ui::radial_gauge`] with safe options (`view::RadialGauge`).
+    pub fn radial_gauge_with(&self, id: impl AsRef<str>, value: f32, min: f32, max: f32, opts: &crate::view::RadialGauge) {
+        let fo = opts.flatten(self.arena);
+        self.radial_gauge(id, value, min, max, &fo)
     }
 
     /// Like [`Ui::radio_cards`] with safe options (`view::RadioCards`).
@@ -1841,10 +1923,28 @@ impl<'a> Ui<'a> {
         self.time_picker(id, hour, minute, &fo)
     }
 
+    /// Like [`Ui::timeline_editor`] with safe options (`view::TimelineEditor`).
+    pub fn timeline_editor_with(&self, id: impl AsRef<str>, tracks: &mut [ffi::cui_timeline_track], time: &mut f32, opts: &mut crate::view::TimelineEditor) -> ffi::cui_timeline_editor_result {
+        let fo = opts.flatten(self.arena);
+        self.timeline_editor(id, tracks, time, &fo)
+    }
+
+    /// Like [`Ui::toolbar_button`] with safe options (`view::Tool`).
+    pub fn toolbar_button_with(&self, icon: impl AsRef<str>, opts: &mut crate::view::Tool) -> bool {
+        let fo = opts.flatten(self.arena);
+        self.toolbar_button(icon, &fo)
+    }
+
     /// Like [`Ui::tour`] with safe options (`view::Tour`).
     pub fn tour_with(&self, id: impl AsRef<str>, steps: &[ffi::cui_tour_step], step: &mut i32, opts: &crate::view::Tour) -> i32 {
         let fo = opts.flatten(self.arena);
         self.tour(id, steps, step, &fo)
+    }
+
+    /// Like [`Ui::trace_view`] with safe options (`view::Trace`).
+    pub fn trace_view_with(&self, id: impl AsRef<str>, tracks: &mut [ffi::cui_trace_track], spans: &[ffi::cui_trace_span], view: &mut ffi::cui_trace_view, selected: &mut i32, opts: &crate::view::Trace) -> ffi::cui_trace_result {
+        let fo = opts.flatten(self.arena);
+        self.trace_view(id, tracks, spans, view, selected, &fo)
     }
 
     /// Like [`Ui::treemap`] with safe options (`view::Treemap`).
@@ -1869,6 +1969,12 @@ impl<'a> Ui<'a> {
     pub fn waffle_with(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &crate::view::Waffle) -> i32 {
         let fo = opts.flatten(self.arena);
         self.waffle(id, items, &fo)
+    }
+
+    /// Like [`Ui::waterfall`] with safe options (`view::Waterfall`).
+    pub fn waterfall_with(&self, id: impl AsRef<str>, requests: &[ffi::cui_net_request], opts: &mut crate::view::Waterfall) -> ffi::cui_waterfall_result {
+        let fo = opts.flatten(self.arena);
+        self.waterfall(id, requests, &fo)
     }
 
     /// Like [`Ui::waveform`] with safe options (`view::Waveform`).

@@ -29,6 +29,9 @@ pub struct Widget {
     pub positional: Vec<Expr>,
     /// `key: value` options for the widget's opts struct.
     pub props: Vec<(Ident, Expr)>,
+    /// `|row, clicked|` before the body: extra closure parameters of a scope
+    /// widget that runs its body once per row.
+    pub params: Vec<TokenStream>,
     pub block: Option<Vec<Node>>,
     /// The arguments did not parse (already reported): expand to nothing.
     pub broken: bool,
@@ -166,7 +169,7 @@ fn let_widget_ahead(input: ParseStream) -> bool {
         fork.call(Ident::parse_any)?;
         let args;
         parenthesized!(args in fork);
-        Ok(fork.peek(Token![;]) || fork.peek(token::Brace))
+        Ok(fork.peek(Token![;]) || fork.peek(token::Brace) || fork.peek(Token![|]))
     })();
     shape.unwrap_or(false)
 }
@@ -222,9 +225,30 @@ fn parse_widget(input: ParseStream, errs: &mut Vec<Error>) -> Result<Widget> {
         errs.push(e);
         let _ = content.parse::<TokenStream>();
     }
+    let mut params = Vec::new();
+    if input.peek(Token![|]) {
+        input.parse::<Token![|]>()?;
+        while !input.peek(Token![|]) {
+            let pat = Pat::parse_single(input)?;
+            params.push(if input.peek(Token![:]) {
+                input.parse::<Token![:]>()?;
+                let ty: Type = input.parse()?;
+                quote!(#pat: #ty)
+            } else {
+                quote!(#pat)
+            });
+            if !input.peek(Token![|]) {
+                input.parse::<Token![,]>()?;
+            }
+        }
+        input.parse::<Token![|]>()?;
+        if !input.peek(token::Brace) {
+            return Err(input.error("expected the `{ ... }` body after its `|parameters|`"));
+        }
+    }
     let block = if input.peek(token::Brace) { Some(block(input, errs)?) } else { None };
     semi(input)?;
-    Ok(Widget { name, positional, props, block, broken })
+    Ok(Widget { name, positional, props, params, block, broken })
 }
 
 fn parse_args(

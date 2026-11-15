@@ -69,6 +69,30 @@ fn list(ui: &mut Ui, rows: &[String], draft: &mut String) {
 }
 ```
 
+# Built-in widgets
+
+Every `Ui` method is a widget: `Name(args)` is `ui.name(args)`. Options
+(`key: value`) and scope bodies work for:
+
+- the hand-written widgets (`Button`, `Input`, `Column`, `Dialog`, ...);
+- the generated ones, which `scripts/gen_ffi.py` derives from the C header:
+  - **scope widgets** with a children closure, made from the C library's own
+  scope macros (`CUI__SCOPE` runs `end` always, `CUI__SCOPE_IF` only when
+  `begin` returned true, and the closure form keeps that rule and the panic
+  safety of the hand-written scopes): `Accordion`, `ButtonGroup`, `CardStackItem`, `Carousel`, `CarouselSlide`, `Dock`, `DockPanel`, `Dockspace`, `ExpandableCard`, `HoverCard`, `Inspector`, `MenuBar`, `MenuBarMenu`, `NodeContent`, `Popover`, `ReorderItem`, `Spotlight`, `StatusBar`, `Toolbar`, `Tree`;
+  - **leaf widgets with options**, e.g. `Alert("Saved", tone: Tone::Success)`.
+  The C functions take a raw `cui_*_opts` struct, so these have no plain form:
+  `view!` always calls `name_with`, with default options when you write none.
+  The option types are in this module (`cui::view::Alert`, ...), with string
+  fields as `&str`.
+
+A few C opts structs hold pointers CUI writes through (`selected`, `cursor`,
+`toggle`), arrays or callbacks. They have no safe options type yet, so these
+widgets (`heatmap`, `data_grid_begin`, `tree_table_begin`, `toolbar_button`,
+...) keep their raw `name(args, &ffi_opts)` method: call it from a plain
+statement, e.g. `ui.heatmap(.., &opts);`. `virtual_list` stays a begin/end
+pair because its body needs the `first`/`last` it fills in.
+
 # Your own widgets
 
 `view!` asks very little of a widget, so anything you write fits: an

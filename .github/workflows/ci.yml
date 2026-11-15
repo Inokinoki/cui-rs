@@ -18,7 +18,7 @@ jobs:
       - name: Generated files are current
         run: |
           python3 scripts/gen_ffi.py
-          git diff --exit-code -- cui cui-sys scripts
+          git diff --exit-code -- cui cui-sys cui-macros scripts
       - name: Every extern declaration matches its C prototype
         run: scripts/sigcheck.sh
       - run: cargo test

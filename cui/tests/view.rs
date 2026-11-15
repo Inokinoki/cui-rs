@@ -188,3 +188,25 @@ macro_rules! my_view {
 fn wrapped(ui: &mut Ui) {
     my_view! { ui, Panel("wrapped") { Text("x"); } }
 }
+
+// ---- generated widgets (scripts/gen_ffi.py) ---------------------------------
+
+fn generated(ui: &mut Ui, open: &mut bool) {
+    view! { ui,
+        // leaf widgets whose only C form takes options: `name_with`, always
+        Alert("Saved");
+        Alert("Saved", dismissible: true, tone: cui::Tone::Success);
+        let shown = Alert("x");
+        Banner("Heads up" => *open, tone: cui::Tone::Warning, action: Some("Undo"));
+        // closure scopes made from the C library's own scope macros
+        Accordion("Details" => *open) { Text("body"); }
+        ButtonGroup() { Button("a"); Button("b"); }
+        Toolbar("tb") { Text("t"); }
+        Toolbar("tb", no_border: true) { Spacer(); }
+        DockPanel("Files" => *open, dirty: true) { Text("x"); }
+        Popover("pop") { Text("p"); }
+        Spotlight("s", beam: true, pad: 4.) { }
+        Tree("root" => *open) { Text("leaf"); }
+        HoverCard("h") { Text("tip"); }
+    }
+}

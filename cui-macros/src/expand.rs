@@ -67,7 +67,8 @@ fn container_of(cx: &Ctx, name: &str) -> Option<(String, Opts)> {
     if let Some((m, k)) = builtin_container(name) {
         return Some((m.to_string(), k));
     }
-    cx.custom.iter().any(|c| c == name).then(|| (snake(name), Opts::Optional))
+    let declared = cx.custom.iter().any(|c| c == name);
+    (declared || crate::generated::SCOPES.contains(&name)).then(|| (snake(name), Opts::Optional))
 }
 
 /// Wraps `build(opts)` for a widget that has `key: value` options. The values
@@ -75,8 +76,8 @@ fn container_of(cx: &Ctx, name: &str) -> Option<(String, Opts)> {
 /// see `cui::view`'s names; then the opts struct is built where `Name`
 /// resolves to the built-in opts type of that name, or else to a type of that
 /// name in the caller's scope.
-fn with_opts(w: &Widget, build: impl FnOnce(Option<TokenStream>) -> TokenStream) -> TokenStream {
-    if w.props.is_empty() {
+fn with_opts(w: &Widget, force: bool, build: impl FnOnce(Option<TokenStream>) -> TokenStream) -> TokenStream {
+    if w.props.is_empty() && !force {
         return build(None);
     }
     let name = &w.name;
@@ -195,7 +196,7 @@ fn widget(cx: &mut Ctx, w: &Widget, as_value: bool) -> TokenStream {
         let call = if takes_opts {
             // `Always` containers take opts even when no option was written
             if has_props {
-                with_opts(w, |o| quote!(#ui.#m(#(#positional,)* #o, |#ui| { #children })))
+                with_opts(w, false, |o| quote!(#ui.#m(#(#positional,)* #o, |#ui| { #children })))
             } else {
                 let name = &w.name;
                 quote!(#ui.#m(#(#positional,)* &::cui::view::#name { ..::core::default::Default::default() }, |#ui| { #children }))
@@ -207,9 +208,11 @@ fn widget(cx: &mut Ctx, w: &Widget, as_value: bool) -> TokenStream {
     }
 
     let base = snake(&name_s);
-    let m = ident(&if has_props { format!("{base}_with") } else { base });
+    // generated leaf widgets have no plain form: always `name_with`
+    let forced = crate::generated::LEAF_OPTS.contains(&name_s.as_str());
+    let m = ident(&if has_props || forced { format!("{base}_with") } else { base });
     // `Name("a", 1, k: v)` -> `ui.name_with("a", 1, &Opts { k: v, .. })`
-    let call = with_opts(w, |o| quote!(#ui.#m(#(#positional,)* #o)));
+    let call = with_opts(w, forced, |o| quote!(#ui.#m(#(#positional,)* #o)));
 
     match &w.block {
         None => {

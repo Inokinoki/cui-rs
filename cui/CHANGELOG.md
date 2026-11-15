@@ -10,6 +10,11 @@ Added:
   reachable as `cui::view::*`. See the `view` module docs and
   `examples/todo_view.rs`.
 - **`view!` and your own widgets**: opts types are looked up in `cui::view`, then in the caller's scope, and `#![containers(..)]` declares custom scope widgets.
+- **Generated widgets work in `view!`.** `scripts/gen_ffi.py` now emits closure
+  methods for the 20 begin/end pairs the C header defines as scope macros
+  (`accordion`, `popover`, `toolbar`, `dock_panel`, ...), safe opts structs
+  (`cui::view::Alert`, ...) and `name_with` methods for the generated widgets
+  whose opts hold plain data. The begin/end methods stay.
 
 Needs the matching unreleased `cui-sys` (publish `cui-sys` first). Soundness fixes —
 each was reachable from safe code — plus the follow-through for the

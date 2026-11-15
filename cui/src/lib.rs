@@ -59,6 +59,7 @@ mod types;
 mod arena;
 mod draw;
 mod ext;
+mod gen_opts;
 mod gen_safe;
 mod icons;
 mod opts;

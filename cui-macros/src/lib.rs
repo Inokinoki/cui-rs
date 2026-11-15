@@ -5,6 +5,7 @@
 //! `cui`'s own scope guards. Use it through `cui::view!`.
 
 mod expand;
+mod generated;
 mod parse;
 
 use proc_macro::TokenStream;

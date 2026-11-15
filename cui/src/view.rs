@@ -5,6 +5,7 @@
 //! Every opts struct is re-exported here under its own name; the aliases below
 //! cover the widgets whose method shares an opts struct with another.
 
+pub use crate::gen_opts::*;
 pub use crate::opts::*;
 pub use crate::opts2::*;
 

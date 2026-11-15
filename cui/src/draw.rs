@@ -286,10 +286,107 @@ impl<'a> crate::Ui<'a> {
     }
 
     /// Persistent per-widget storage keyed by an id (C's `cui_state`).
-    /// CUI zeroes the memory on first use and garbage-collects it after
-    /// roughly five seconds of not being drawn. `T` must be plain copyable
-    /// data whose all-zero bit pattern is a valid value.
-    pub fn state<T: Copy + Default>(&mut self, id: u32) -> &'a mut T {
-        unsafe { &mut *(ffi::cui_state(self.ctx, id, core::mem::size_of::<T>()) as *mut T) }
+    ///
+    /// The value starts as `T::default()` and CUI garbage-collects it (the
+    /// next use starts from `T::default()` again) after roughly five seconds
+    /// of not being asked for. The reference borrows `self`, so it cannot be
+    /// held across another `Ui` call or alias a second `state` borrow.
+    ///
+    /// # Panics
+    ///
+    /// When `id` already holds a value of a different type `T`, or `T` is
+    /// over-aligned for C's allocator. (The id space is shared with CUI's
+    /// own widgets: use hashes of your own names, not small integers.)
+    pub fn state<T: Copy + Default + 'static>(&mut self, id: u32) -> &mut T {
+        assert!(
+            core::mem::align_of::<StateSlot<T>>() <= 16,
+            "Ui::state: the type is over-aligned for C's allocator"
+        );
+        let slot = unsafe { ffi::cui_state(self.ctx, id, core::mem::size_of::<StateSlot<T>>()) } as *mut StateSlot<T>;
+        assert!(!slot.is_null() && slot.is_aligned());
+        let tag = type_tag::<T>();
+        // SAFETY: `slot` is C-owned memory of at least `size_of::<StateSlot<T>>()`
+        // bytes, aligned (checked above), and zero-filled when fresh, so the
+        // tag reads as 0 then. No reference into it survives past the borrow
+        // of `self`; C only reallocates it on a later `cui_state` call.
+        unsafe {
+            match (*slot).tag {
+                0 => slot.write(StateSlot { tag, value: T::default() }),
+                t if t == tag => {}
+                _ => panic!(
+                    "Ui::state: id {id:#x} already holds a value of another type (or collides with a CUI widget's own state)"
+                ),
+            }
+            &mut (*slot).value
+        }
+    }
+}
+
+/// What `Ui::state` keeps in C's allocation: a hash of the value's type
+/// (0 = fresh, as C zeroes new memory) in front of the value itself.
+#[repr(C)]
+struct StateSlot<T> {
+    tag: u64,
+    value: T,
+}
+
+fn type_tag<T: 'static>() -> u64 {
+    use core::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    core::any::TypeId::of::<T>().hash(&mut h);
+    h.finish() | 1 // never 0
+}
+
+#[cfg(test)]
+mod state_tests {
+    use crate::arena::Arena;
+    use crate::Ui;
+    use cui_sys as ffi;
+
+    fn with_ui(f: impl FnOnce(&mut Ui)) {
+        let desc = ffi::cui_ctx_desc { no_default_fonts: true, ..Default::default() };
+        let ctx = unsafe { ffi::cui_create(&desc) };
+        assert!(!ctx.is_null());
+        let arena = Arena::new();
+        f(&mut Ui::new(ctx, &arena));
+        unsafe { ffi::cui_destroy(ctx) };
+    }
+
+    #[test]
+    fn starts_at_default_and_persists() {
+        with_ui(|ui| {
+            assert_eq!(*ui.state::<u32>(7), 0);
+            *ui.state::<u32>(7) = 41;
+            *ui.state::<u32>(7) += 1;
+            assert_eq!(*ui.state::<u32>(7), 42);
+        });
+    }
+
+    #[test]
+    fn ids_are_independent_and_default_is_not_zero_bits() {
+        #[derive(Clone, Copy, Default, PartialEq, Debug)]
+        struct Pair {
+            label: &'static str, // all-zero bits would be an invalid &str
+            n: i32,
+        }
+        with_ui(|ui| {
+            *ui.state::<bool>(1) = true;
+            assert!(!*ui.state::<bool>(2));
+            let p = *ui.state::<Pair>(3);
+            assert_eq!(p, Pair { label: "", n: 0 });
+        });
+    }
+
+    #[test]
+    fn a_different_type_under_the_same_id_panics() {
+        with_ui(|ui| {
+            *ui.state::<u8>(9) = 5;
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                // would otherwise read 5u8 back as a bool: not a valid bool
+                let _ = *ui.state::<bool>(9);
+            }));
+            assert!(r.is_err());
+            assert_eq!(*ui.state::<u8>(9), 5);
+        });
     }
 }

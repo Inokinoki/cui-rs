@@ -737,14 +737,6 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_now_playing_ex(self.ctx, self.arena.cstr(id.as_ref()), np, opts) }
     }
 
-    /// One time code input: `length` boxes; code must hold length + 1 bytes.
-    pub fn otp_input(&self, id: impl AsRef<str>, code: &mut String, length: i32) -> bool {
-        crate::begin_c_string(code, 63);
-        let r = unsafe { ffi::cui_otp_input(self.ctx, self.arena.cstr(id.as_ref()), code.as_mut_ptr() as *mut c_char, length) };
-        crate::ext::sync_buffer(code);
-        r
-    }
-
     /// Password strength meter (0 weak .. 4 strong). Returns the score.
     pub fn password_strength(&self, password: impl AsRef<str>) -> i32 {
         unsafe { ffi::cui_password_strength(self.ctx, self.arena.cstr(password.as_ref())) }

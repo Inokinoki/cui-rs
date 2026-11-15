@@ -90,6 +90,10 @@ pub(crate) fn begin_c_string(value: &mut String, reserve: usize) {
     if value.capacity() == 0 {
         value.reserve(reserve);
     }
+    if value.capacity() == value.len() {
+        // a full buffer has no room for the terminating NUL
+        value.reserve(1);
+    }
     let cap = value.capacity();
     // NUL-terminate the text and fill the rest of the buffer.
     unsafe { value.as_mut_vec().resize(cap, 0) };
@@ -1174,6 +1178,23 @@ mod c_string_tests {
         c_write(value.as_mut_ptr(), b"a\xffb\0");
         sync_c_string(&mut value);
         assert_eq!(value, "a\u{fffd}b");
+    }
+
+    #[test]
+    fn a_full_buffer_still_gets_room_for_the_nul() {
+        // len == capacity: nothing to resize into, so CUI's strlen would
+        // run off the end of the allocation
+        let mut value = String::with_capacity(3);
+        value.push_str("abc");
+        let cap_before = value.capacity();
+        assert_eq!(cap_before, value.len(), "test setup: the String must be exactly full");
+        begin_c_string(&mut value, 64);
+        assert!(value.capacity() > 3);
+        let bytes = unsafe { core::slice::from_raw_parts(value.as_ptr(), value.len()) };
+        assert_eq!(&bytes[..3], b"abc");
+        assert_eq!(bytes[3], 0);
+        sync_c_string(&mut value);
+        assert_eq!(value, "abc");
     }
 
     #[test]

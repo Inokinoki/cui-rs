@@ -830,13 +830,26 @@ impl TableColumn<'_> {
 }
 
 /// Sort state of a table, owned by the app and passed by reference.
+///
+/// `#[repr(C)]`: C writes through a pointer to this as a `cui_table_sort`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(C)]
 pub struct TableSort {
     /// The column's index in the `columns` slice passed to `ui.table_begin`.
     pub column: i32,
     /// Sort largest first.
     pub descending: bool,
 }
+
+// The cast to `*mut cui_table_sort` in `Table::flatten` is only sound while
+// the two layouts agree.
+const _: () = {
+    use core::mem::{align_of, offset_of, size_of};
+    assert!(size_of::<TableSort>() == size_of::<ffi::cui_table_sort>());
+    assert!(align_of::<TableSort>() == align_of::<ffi::cui_table_sort>());
+    assert!(offset_of!(TableSort, column) == offset_of!(ffi::cui_table_sort, column));
+    assert!(offset_of!(TableSort, descending) == offset_of!(ffi::cui_table_sort, descending));
+};
 
 /// Options for `ui.table_begin` (C's `cui_table_opts`).
 #[derive(Debug, Default)]

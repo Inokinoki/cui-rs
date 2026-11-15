@@ -12,7 +12,7 @@ set -u
 
 dir=${1:?usage: smoke.sh <directory-with-example-binaries>}
 shift 2>/dev/null || true
-examples=${*:-"assistant caffeine dashboard finance gallery hello mail music notes settings todo tracker"}
+examples=${*:-"assistant caffeine dashboard finance gallery hello mail music notes settings todo todo_view tracker"}
 
 : "${SMOKE_OUT:=/tmp/cui-smoke}"
 mkdir -p "$SMOKE_OUT"

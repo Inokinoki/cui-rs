@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Added:
+
+- **`view!`**, a declarative front end (new crate `cui-rs-macros`, behind the
+  default `macros` feature; publish it first). It expands to the nested
+  closures and opts structs you would write by hand. Opts types are also
+  reachable as `cui::view::*`. See the `view` module docs and
+  `examples/todo_view.rs`.
+
 Needs the matching unreleased `cui-sys` (publish `cui-sys` first). Soundness fixes —
 each was reachable from safe code — plus the follow-through for the
 corrected `cui-sys` signatures (see its changelog).

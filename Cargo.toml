@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cui-sys", "cui"]
+members = ["cui-sys", "cui", "cui-macros"]
 
 [workspace.package]
 edition = "2021"

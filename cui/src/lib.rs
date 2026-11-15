@@ -64,6 +64,12 @@ mod icons;
 mod opts;
 mod opts2;
 
+/// Opts types under the names the `view!` macro uses.
+#[cfg_attr(feature = "macros", doc = include_str!("view.md"))]
+pub mod view;
+#[cfg(feature = "macros")]
+pub use cui_rs_macros::view;
+
 pub use arena::Arena;
 pub use draw::*;
 pub use ext::{

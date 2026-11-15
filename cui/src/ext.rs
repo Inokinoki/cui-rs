@@ -425,7 +425,7 @@ impl<'a> Ui<'a> {
             ffi::cui_blame_ex(
                 self.ctx,
                 self.cs(&id),
-                ids as *mut c_char,
+                ids,
                 line_commit.as_ptr(),
                 line_commit.len() as i32,
                 if commits.is_empty() { core::ptr::null() } else { commits.as_ptr() },
@@ -461,7 +461,7 @@ impl<'a> Ui<'a> {
                 self.cs(&id),
                 flags.as_mut_ptr(),
                 flags.len() as i32,
-                env_ids as *mut c_char,
+                env_ids,
                 envs.len() as i32,
                 o,
             )
@@ -566,7 +566,7 @@ impl<'a> Ui<'a> {
         assert!(!items.is_empty() && selected.len() >= items.len());
         let ids = self.arena.cstr_array(items);
         unsafe {
-            ffi::cui_multi_select_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, selected.as_mut_ptr(), o)
+            ffi::cui_multi_select_ex(self.ctx, self.cs(&id), ids, items.len() as i32, selected.as_mut_ptr(), o)
         }
     }
 
@@ -584,7 +584,7 @@ impl<'a> Ui<'a> {
             ffi::cui_pipeline_ex(
                 self.ctx,
                 self.cs(&id),
-                ids as *mut c_char,
+                ids,
                 stages.len() as i32,
                 jobs.as_ptr(),
                 jobs.len() as i32,
@@ -623,7 +623,7 @@ impl<'a> Ui<'a> {
         let ids = self.arena.cstr_array(axes);
         let flat: Vec<ffi::cui_series> = series.iter().map(|s| s.flatten(self.arena)).collect();
         unsafe {
-            ffi::cui_radar_chart_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, ids as *mut c_char, axes.len() as i32, o)
+            ffi::cui_radar_chart_ex(self.ctx, self.cs(&id), flat.as_ptr(), flat.len() as i32, ids, axes.len() as i32, o)
         }
     }
 
@@ -676,7 +676,7 @@ impl<'a> Ui<'a> {
         assert!(!nodes.is_empty() && !links.is_empty());
         let ids = self.arena.cstr_array(nodes);
         unsafe {
-            ffi::cui_sankey_ex(self.ctx, self.cs(&id), ids as *mut c_char, nodes.len() as i32, links.as_ptr(), links.len() as i32, o)
+            ffi::cui_sankey_ex(self.ctx, self.cs(&id), ids, nodes.len() as i32, links.as_ptr(), links.len() as i32, o)
         }
     }
 
@@ -693,14 +693,14 @@ impl<'a> Ui<'a> {
     pub fn split_button(&mut self, label: impl AsRef<str>, items: &[&str], o: &ffi::cui_split_button_opts) -> i32 {
         assert!(!items.is_empty());
         let ids = self.arena.cstr_array(items);
-        unsafe { ffi::cui_split_button_ex(self.ctx, self.cs(&label), ids as *mut c_char, items.len() as i32, o) }
+        unsafe { ffi::cui_split_button_ex(self.ctx, self.cs(&label), ids, items.len() as i32, o) }
     }
 
     /// Process steps (C's `cui_stepper`).
     pub fn stepper(&mut self, steps: &[&str], current: i32) {
         assert!(!steps.is_empty());
         let ids = self.arena.cstr_array(steps);
-        unsafe { ffi::cui_stepper(self.ctx, ids as *mut c_char, steps.len() as i32, current) }
+        unsafe { ffi::cui_stepper(self.ctx, ids, steps.len() as i32, current) }
     }
 
     /// Tag input (C's `cui_tag_input`). Tags are comma separated in `value`.
@@ -731,7 +731,7 @@ impl<'a> Ui<'a> {
         assert!(!labels.is_empty() && values.len() >= labels.len());
         let ids = self.arena.cstr_array(labels);
         unsafe {
-            ffi::cui_toggle_group_ex(self.ctx, self.cs(&id), ids as *mut c_char, labels.len() as i32, values.as_mut_ptr(), o)
+            ffi::cui_toggle_group_ex(self.ctx, self.cs(&id), ids, labels.len() as i32, values.as_mut_ptr(), o)
         }
     }
 
@@ -751,7 +751,7 @@ impl<'a> Ui<'a> {
     pub fn wheel_picker(&mut self, id: impl AsRef<str>, items: &[&str], index: &mut i32, o: &ffi::cui_wheel_opts) -> bool {
         assert!(!items.is_empty());
         let ids = self.arena.cstr_array(items);
-        unsafe { ffi::cui_wheel_picker_ex(self.ctx, self.cs(&id), ids as *mut c_char, items.len() as i32, index, o) }
+        unsafe { ffi::cui_wheel_picker_ex(self.ctx, self.cs(&id), ids, items.len() as i32, index, o) }
     }
 
     /// A key/value editor (C's `cui_kv_editor`). `count` tracks the used
@@ -806,7 +806,7 @@ impl<'a> Ui<'a> {
         assert!(!words.is_empty());
         let ids = self.arena.cstr_array(words);
         let fo = o.flatten(self.arena);
-        unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids as *mut c_char, words.len() as i32, interval, &fo) }
+        unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids, words.len() as i32, interval, &fo) }
     }
 }
 

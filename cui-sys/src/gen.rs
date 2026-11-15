@@ -6,7 +6,7 @@ use core::ffi::{c_char, c_int, c_void};
 
 use super::*;
 
-// The id and rectangle of the most recent component (for tooltips, popovers).
+// cui_alert_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_alert_opts {
@@ -15,6 +15,16 @@ pub struct cui_alert_opts {
     pub tone: c_int,
     pub icon: *const c_char,
     pub dismissible: bool,
+}
+
+// cui_allocator
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_allocator {
+    pub alloc: Option<unsafe extern "C" fn(usize, *mut c_void) -> *mut c_void>,
+    pub realloc: Option<unsafe extern "C" fn(*mut c_void, usize, *mut c_void) -> *mut c_void>,
+    pub free: Option<unsafe extern "C" fn(*mut c_void, *mut c_void)>,
+    pub user: *mut c_void,
 }
 
 // cui_api_endpoint
@@ -30,7 +40,7 @@ pub struct cui_api_endpoint {
     pub param_count: i32,
 }
 
-// lowest price in the period
+// cui_api_explorer_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_api_explorer_opts {
@@ -40,7 +50,7 @@ pub struct cui_api_explorer_opts {
     pub selected: *mut i32,
 }
 
-// price at the end of the period
+// cui_api_explorer_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_api_explorer_result {
@@ -48,7 +58,7 @@ pub struct cui_api_explorer_result {
     pub try_it: i32,
 }
 
-// a thick arc filled to the value instead of a needle
+// Endpoints grouped by tag, each with its method, its path (parameters
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_api_param {
@@ -59,7 +69,7 @@ pub struct cui_api_param {
     pub description: *const c_char,
 }
 
-// CUI_TREE_*
+// Announcement banner across the top of a view. Collapses smoothly when
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_banner_opts {
@@ -70,7 +80,7 @@ pub struct cui_banner_opts {
     pub dismissible: bool,
 }
 
-// Spotlight style command palette. Returns the index of the chosen command,
+// Bar list: ranked horizontal bars. Rows are keyed by label, so when the
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_bar_list_opts {
@@ -82,7 +92,7 @@ pub struct cui_bar_list_opts {
     pub color: cui_color,
 }
 
-// from the band before (or min) up to `to`
+// Source with who last changed each line: lines from one commit share one
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_blame_commit {
@@ -92,7 +102,7 @@ pub struct cui_blame_commit {
     pub time: i64,
 }
 
-// the value and the tick labels, default "%.0f"
+// cui_blame_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_blame_opts {
@@ -104,7 +114,7 @@ pub struct cui_blame_opts {
     pub first_line: i32,
 }
 
-// degrees of arc, default 240 (90 to 300)
+// cui_blame_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_blame_result {
@@ -112,7 +122,7 @@ pub struct cui_blame_result {
     pub hovered: i32,
 }
 
-// the row Shift ranges start from, optional (in and out like cursor)
+// Week calendar: seven day columns on an hour grid. Drag an event to move
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_cal_event {
@@ -124,7 +134,7 @@ pub struct cui_cal_event {
     pub tone: c_int,
 }
 
-// screen points per image pixel; 0 fits the image in the view
+// Calendar heatmap: one cell per day from start, weeks as columns, in five
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_calendar_heatmap_opts {
@@ -135,7 +145,7 @@ pub struct cui_calendar_heatmap_opts {
     pub unit: *const c_char,
 }
 
-// Connected buttons. Put buttons between begin and end.
+// Candlestick chart: open, high, low and close per period with volume under
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_candle {
@@ -146,14 +156,14 @@ pub struct cui_candle {
     pub volume: f32,
 }
 
-// Icon button that copies text to the clipboard and confirms with a check.
+// cui_candlestick_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_candlestick_opts {
     pub _pad: i32,
     pub width: cui_size,
     pub height: f32,
-    pub labels: *mut c_char,
+    pub labels: *const *const c_char,
     pub format: *const c_char,
     pub overlays: *const cui_series,
     pub overlay_count: i32,
@@ -163,7 +173,7 @@ pub struct cui_candlestick_opts {
     pub down: cui_color,
 }
 
-// number of `annotations`
+// Card stack: a deck where the top card can be flicked away left or right.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_card_stack_opts {
@@ -173,7 +183,7 @@ pub struct cui_card_stack_opts {
     pub visible: i32,
 }
 
-// x axis labels
+// Carousel: slides that you swipe, drag, scroll or page with the arrows
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_carousel_opts {
@@ -186,7 +196,7 @@ pub struct cui_carousel_opts {
     pub loop_: bool,
 }
 
-// names for type-ahead, optional
+// Onboarding checklist: a card with progress and steps. The first open step
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_check_step {
@@ -196,7 +206,7 @@ pub struct cui_check_step {
     pub done: bool,
 }
 
-// passed to `label` as its first argument
+// cui_checklist_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_checklist_opts {
@@ -205,7 +215,7 @@ pub struct cui_checklist_opts {
     pub description: *const c_char,
 }
 
-// Single line text field. Returns CUI_CHANGED / CUI_SUBMITTED (Enter) flags.
+// Radio cards: larger selectable cards for choices that need a description
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_choice {
@@ -215,7 +225,7 @@ pub struct cui_choice {
     pub badge: *const c_char,
 }
 
-// build times, errors, latency: a fall is good news, shown in green
+// cui_code_editor_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_code_editor_opts {
@@ -234,7 +244,7 @@ pub struct cui_code_editor_opts {
     pub mark_count: i32,
 }
 
-// Accordion / disclosure. Content animates its height.
+// cui_code_editor_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_code_editor_result {
@@ -253,7 +263,7 @@ pub struct cui_code_editor_result {
     pub find_index: i32,
 }
 
-// filled with the tone's color instead of a light tint of it
+// Code block with syntax highlighting (lang: "c", "cpp", "js", "ts",
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_code_opts {
@@ -268,7 +278,7 @@ pub struct cui_code_opts {
     pub no_header: bool,
 }
 
-// a dot at `x`, `y`, labelled beside it
+// cui_comment_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_comment_opts {
@@ -281,7 +291,7 @@ pub struct cui_comment_opts {
     pub badge: *const c_char,
 }
 
-// cards of the deck that show at once, default 3
+// Version history: the branch lanes drawn beside each commit, newest first,
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_commit {
@@ -299,7 +309,7 @@ impl Default for cui_commit {
     }
 }
 
-// cards of the deck that show at once, default 3
+// cui_commit_graph_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_commit_graph_opts {
@@ -309,7 +319,7 @@ pub struct cui_commit_graph_opts {
     pub selected: *mut i32,
 }
 
-// Odometer: a number whose digits roll to their new values.
+// cui_commit_graph_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_commit_graph_result {
@@ -318,7 +328,7 @@ pub struct cui_commit_graph_result {
     pub hovered: i32,
 }
 
-// fixed y range when min != max
+// Before and after: drag the divider to compare two images. *pos is 0..1.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_compare_opts {
@@ -330,7 +340,7 @@ pub struct cui_compare_opts {
     pub aspect: f32,
 }
 
-// Sidebar navigation item with a gliding selection highlight shared by all
+// Two step destructive button: the first click morphs it into a confirm
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_confirm_opts {
@@ -342,7 +352,7 @@ pub struct cui_confirm_opts {
     pub timeout: f32,
 }
 
-// ---- Tree table and path bar ----
+// Confirm popover: a small question anchored to the previous component.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_confirm_popover_opts {
@@ -355,7 +365,7 @@ pub struct cui_confirm_popover_opts {
     pub placement: c_int,
 }
 
-// sortable headers set it; sort each level yourself (cui_tree_sort)
+// Countdown: days, hours, minutes and seconds as tiles whose digits roll.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_countdown_opts {
@@ -364,7 +374,7 @@ pub struct cui_countdown_opts {
     pub compact: bool,
 }
 
-// Images
+// Odometer: a number whose digits roll to their new values.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_counter_opts {
@@ -376,7 +386,7 @@ pub struct cui_counter_opts {
     pub group_thousands: bool,
 }
 
-// printf format for the y axis labels and the tooltip
+// Test coverage by folder and file: the files' paths make the tree, each
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_coverage_file {
@@ -389,7 +399,7 @@ pub struct cui_coverage_file {
     pub functions_hit: i32,
 }
 
-// printf format for the y axis labels and the tooltip
+// cui_coverage_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_coverage_opts {
@@ -400,7 +410,7 @@ pub struct cui_coverage_opts {
     pub high: f32,
 }
 
-// printf format for the y axis labels and the tooltip
+// cui_coverage_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_coverage_result {
@@ -408,7 +418,7 @@ pub struct cui_coverage_result {
     pub lines: f32,
 }
 
-// shows dots instead of the text, with an eye button that reveals it
+// Cropper: a crop rectangle over a picture, in image pixels. Drag inside to
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_cropper_opts {
@@ -420,7 +430,19 @@ pub struct cui_cropper_opts {
     pub min_size: f32,
 }
 
-// show every unchanged line
+// cui_ctx_desc
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct cui_ctx_desc {
+    pub renderer: cui_renderer_iface,
+    pub allocator: cui_allocator,
+    pub theme: c_int,
+    pub accent: c_int,
+    pub no_default_fonts: bool,
+    pub direction: c_int,
+}
+
+// cui_curve_key
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_curve_key {
@@ -433,7 +455,7 @@ pub struct cui_curve_key {
     pub mode: u8,
 }
 
-// default fill
+// cui_curve_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_curve_opts {
@@ -454,7 +476,7 @@ pub struct cui_curve_opts {
     pub playhead: f32,
 }
 
-// the selected change, -1 none
+// cui_curve_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_curve_result {
@@ -467,7 +489,7 @@ pub struct cui_curve_result {
     pub hover_y: f32,
 }
 
-// CUI_ALIGN_DEFAULT: columns stretch their children, rows center them.
+// cui_date
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_date {
@@ -476,7 +498,7 @@ pub struct cui_date {
     pub day: i32,
 }
 
-// CUI_ALIGN_DEFAULT: columns stretch their children, rows center them.
+// cui_date_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_date_opts {
@@ -486,7 +508,7 @@ pub struct cui_date_opts {
     pub width: cui_size,
 }
 
-// re-sort every sibling list by *sort
+// Date ranges. A zero start means nothing is chosen.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_date_range {
@@ -494,7 +516,7 @@ pub struct cui_date_range {
     pub end: cui_date,
 }
 
-// re-sort every sibling list by *sort
+// cui_date_range_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_date_range_opts {
@@ -505,7 +527,7 @@ pub struct cui_date_range_opts {
     pub no_presets: bool,
 }
 
-// optional: links and task toggles the markdown reported
+// cui_diagnostic
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diagnostic {
@@ -518,7 +540,7 @@ pub struct cui_diagnostic {
     pub code: *const c_char,
 }
 
-// rows take keyboard focus and show the hand cursor (pass the chosen row's state to `cui_table_row`)
+// The same diff without a view. Old lines [old_start, old_start + old_count)
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diff_hunk {
@@ -528,7 +550,7 @@ pub struct cui_diff_hunk {
     pub new_count: i32,
 }
 
-// muted text at the right edge, e.g. a time or a count
+// cui_diff_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diff_opts {
@@ -547,7 +569,7 @@ pub struct cui_diff_opts {
     pub size: f32,
 }
 
-// Charts
+// Word marks between two versions of one line, as byte ranges (a length of -1
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diff_range {
@@ -555,7 +577,7 @@ pub struct cui_diff_range {
     pub length: i32,
 }
 
-// Virtual list: only the visible rows are built, so lists with a million
+// cui_diff_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diff_result {
@@ -571,7 +593,7 @@ pub struct cui_diff_result {
     pub approximate: bool,
 }
 
-// rows at least 36 points tall instead of 44
+// cui_diff_row
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diff_row {
@@ -582,7 +604,7 @@ pub struct cui_diff_row {
     pub hidden: i32,
 }
 
-// Begin a row. Returns true when the row is clicked.
+// cui_diff_stats
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_diff_stats {
@@ -594,7 +616,7 @@ pub struct cui_diff_stats {
     pub approximate: bool,
 }
 
-// cui_doc_tab
+// Document tabs: editor style tabs. Clicking selects (*selected is
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_doc_tab {
@@ -624,7 +646,7 @@ pub struct cui_doc_tabs_result {
     pub move_to: i32,
 }
 
-// one icon per menu item, in the order of the items; `NULL` for none
+// cui_dock_item_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_dock_item_opts {
@@ -634,7 +656,7 @@ pub struct cui_dock_item_opts {
     pub badge: i32,
 }
 
-// one icon per menu item, in the order of the items; `NULL` for none
+// Dock: a row of icons that grow as the pointer passes, with labels and a
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_dock_opts {
@@ -643,7 +665,7 @@ pub struct cui_dock_opts {
     pub magnify: f32,
 }
 
-// cui_dock_panel_opts
+// Returns true while the panel's content should be built; then call
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_dock_panel_opts {
@@ -652,7 +674,7 @@ pub struct cui_dock_panel_opts {
     pub dirty: bool,
 }
 
-// cui_dockspace_opts
+// Dockspace: an IDE style workspace that lays out your panels in a tree of
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_dockspace_opts {
@@ -665,7 +687,7 @@ pub struct cui_dockspace_opts {
     pub shortcuts: bool,
 }
 
-// a count on the icon ("9+" above 9); 0 for none
+// cui_draw_cmd
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_draw_cmd {
@@ -675,7 +697,7 @@ pub struct cui_draw_cmd {
     pub index_count: u32,
 }
 
-// only the selected tab shows its label; the others show just their icon
+// cui_draw_data
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_draw_data {
@@ -691,7 +713,7 @@ pub struct cui_draw_data {
     pub font_atlas: usize,
 }
 
-// seconds since 1970 (UTC); 0 unknown
+// Dropzone: drop files from the OS, or click to browse. Returns the number
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_dropzone_opts {
@@ -705,7 +727,7 @@ pub struct cui_dropzone_opts {
     pub compact: bool,
 }
 
-// On the next frame: select bytes anchor..cursor, focus and scroll there.
+// Emoji picker: search, groups with tabs, recent emoji, skin tones and a preview with the
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_emoji_picker_opts {
@@ -719,13 +741,13 @@ pub struct cui_emoji_picker_opts {
     pub placeholder: *const c_char,
     pub empty_text: *const c_char,
     pub hint: *const c_char,
-    pub group_names: *mut c_char,
+    pub group_names: *const *const c_char,
     pub no_search: bool,
     pub no_preview: bool,
     pub no_tone: bool,
 }
 
-// Tree table: an expandable tree with columns (a file explorer, a scene
+// Expandable card: a card whose header opens a body with a height spring.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_expandable_card_opts {
@@ -736,7 +758,7 @@ pub struct cui_expandable_card_opts {
     pub badge_tone: c_int,
 }
 
-// cui_expandable_text_opts
+// Text clamped to a few lines with a fade and Show more / Show less.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_expandable_text_opts {
@@ -747,7 +769,7 @@ pub struct cui_expandable_text_opts {
     pub fade_to: cui_color,
 }
 
-// True while the menu of separator *segment is showing: build menu items
+// cui_fader_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_fader_opts {
@@ -767,7 +789,7 @@ pub struct cui_fader_opts {
     pub disabled: bool,
 }
 
-// draws the marker at `target`
+// cui_feature_flag
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_feature_flag {
@@ -783,7 +805,7 @@ impl Default for cui_feature_flag {
     }
 }
 
-// a thick arc filled to the value instead of a needle
+// cui_feature_flags_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_feature_flags_opts {
@@ -792,7 +814,7 @@ pub struct cui_feature_flags_opts {
     pub height: f32,
 }
 
-// a thick arc filled to the value instead of a needle
+// cui_feature_flags_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_feature_flags_result {
@@ -811,14 +833,14 @@ pub struct cui_file_browser_opts {
     pub folders_only: bool,
     pub hidden: bool,
     pub no_places: bool,
-    pub places: *mut c_char,
+    pub places: *const *const c_char,
     pub place_count: i32,
     pub list: cui_file_list_fn,
     pub list_user: *mut c_void,
     pub max_entries: i32,
 }
 
-// Queue a toast. Returns a handle; cui_toast_action_clicked(handle) tells
+// cui_file_browser_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_file_browser_result {
@@ -828,7 +850,7 @@ pub struct cui_file_browser_result {
     pub error: bool,
 }
 
-// Inline alert. Returns false once dismissed (when dismissible).
+// cui_file_picker_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_file_picker_opts {
@@ -844,13 +866,13 @@ pub struct cui_file_picker_opts {
     pub list_user: *mut c_void,
 }
 
-// What happened this frame: one of CUI_TOUR_*.
+// Filter bar: a search field, a chip per active filter (click it to pick
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_filter_field {
     pub name: *const c_char,
     pub icon: *const c_char,
-    pub options: *mut c_char,
+    pub options: *const *const c_char,
     pub option_count: i32,
 }
 
@@ -875,7 +897,7 @@ pub struct cui_flame_result {
     pub zoomed: i32,
 }
 
-// cui_flame_span
+// Flame graph / profiler timeline: time runs left to right, call depth top to
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_flame_span {
@@ -895,7 +917,7 @@ pub struct cui_flame_view {
     pub scroll: f32,
 }
 
-// default the width it gets and 360
+// Funnel: stages narrowing by value, with the conversion between them.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_funnel_opts {
@@ -906,7 +928,7 @@ pub struct cui_funnel_opts {
     pub color: cui_color,
 }
 
-// number of `options`
+// cui_gantt_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gantt_opts {
@@ -918,7 +940,7 @@ pub struct cui_gantt_opts {
     pub read_only: bool,
 }
 
-// the field's name, on its chip and in the "+ Filter" menu
+// Gantt chart: a task list beside a timeline of bars. Drag a bar to move
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gantt_task {
@@ -932,7 +954,7 @@ pub struct cui_gantt_task {
     pub milestone: bool,
 }
 
-// most tags the field holds; once reached it takes no more typing. 0 means no limit
+// Radial gauge: one value on a dial with colored bands, labelled ticks, a
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gauge_band {
@@ -940,7 +962,7 @@ pub struct cui_gauge_band {
     pub tone: c_int,
 }
 
-// the search hit its limit: correct, maybe not the shortest
+// pos 0..1
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gradient_opts {
@@ -950,7 +972,7 @@ pub struct cui_gradient_opts {
     pub selected: *mut i32,
 }
 
-// the search hit its limit: correct, maybe not the shortest
+// cui_gradient_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gradient_result {
@@ -960,7 +982,7 @@ pub struct cui_gradient_result {
     pub selected: i32,
 }
 
-// the search hit its limit: correct, maybe not the shortest
+// Gradient editor: a color ramp over a checkerboard (so alpha shows) with
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gradient_stop {
@@ -968,7 +990,7 @@ pub struct cui_gradient_stop {
     pub color: cui_color,
 }
 
-// Reorderable list: drag rows to reorder. `order` holds your item indices in
+// Text painted with a gradient from one color to another; animate makes it drift.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_gradient_text_opts {
@@ -981,7 +1003,7 @@ pub struct cui_gradient_text_opts {
     pub width: cui_size,
 }
 
-// Ticker: items that scroll by continuously, pausing on hover.
+// cui_graph_edge
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_graph_edge {
@@ -989,7 +1011,7 @@ pub struct cui_graph_edge {
     pub to: i32,
 }
 
-// commas between thousands: 48210 shows as 48,210
+// Nodes and directed edges laid out in layers (each edge points to a later
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_graph_node {
@@ -998,7 +1020,7 @@ pub struct cui_graph_node {
     pub tone: c_int,
 }
 
-// text after the label in medium weight, e.g. a price; may be `NULL`
+// cui_graph_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_graph_opts {
@@ -1009,7 +1031,7 @@ pub struct cui_graph_opts {
     pub selected: *mut i32,
 }
 
-// a fall in `delta` is good news: it shows green, and a rise red
+// cui_graph_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_graph_result {
@@ -1018,7 +1040,7 @@ pub struct cui_graph_result {
     pub hovered: i32,
 }
 
-// Guided tour: a spotlight on one control at a time, with a card beside it
+// A virtualized table for large data: sticky header, resizable and sortable
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_grid_column {
@@ -1030,7 +1052,7 @@ pub struct cui_grid_column {
     pub priority: i32,
 }
 
-// heading of the step's card; `NULL` or "" leaves it out
+// cui_grid_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_grid_opts {
@@ -1046,13 +1068,13 @@ pub struct cui_grid_opts {
     pub anchor: *mut i32,
 }
 
-// color the image is multiplied by; unset draws it as it is
+// Heatmap: a rows x cols matrix (values[row * cols + col]) on one hue,
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_heatmap_opts {
     pub _pad: i32,
-    pub row_labels: *mut c_char,
-    pub col_labels: *mut c_char,
+    pub row_labels: *const *const c_char,
+    pub col_labels: *const *const c_char,
     pub cell: f32,
     pub min: f32,
     pub max: f32,
@@ -1061,7 +1083,7 @@ pub struct cui_heatmap_opts {
     pub width: cui_size,
 }
 
-// ---- Diff viewer ----
+// Hex viewer: offsets, bytes in hex and the same bytes as ASCII, in the code
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_hex_range {
@@ -1084,7 +1106,7 @@ pub struct cui_hex_result {
     pub copied: bool,
 }
 
-// ---- Diff viewer ----
+// The selected bytes. length 0 means nothing is selected; cursor is the byte
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_hex_selection {
@@ -1110,7 +1132,7 @@ pub struct cui_hex_view_opts {
     pub size: f32,
 }
 
-// default fill
+// Range slider over a histogram of the data it filters.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_histogram_opts {
@@ -1119,7 +1141,7 @@ pub struct cui_histogram_opts {
     pub format: *const c_char,
 }
 
-// the points, x and y in data units
+// Event counts over time, stacked by series (log levels, status classes), as
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_histogram_series {
@@ -1128,7 +1150,7 @@ pub struct cui_histogram_series {
     pub tone: c_int,
 }
 
-// ------------------------------------------------------------------------
+// Hold to confirm: a destructive action that fills while held and fires when
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_hold_opts {
@@ -1138,7 +1160,7 @@ pub struct cui_hold_opts {
     pub variant: c_int,
 }
 
-// ---- Tree table and path bar ----
+// Hover card: rich content that appears when the pointer rests on the
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_hover_card_opts {
@@ -1148,7 +1170,7 @@ pub struct cui_hover_card_opts {
     pub delay: f32,
 }
 
-// Elastic slider: the track stretches like rubber when dragged past its ends.
+// cui_image_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_image_opts {
@@ -1159,7 +1181,7 @@ pub struct cui_image_opts {
     pub tint: cui_color,
 }
 
-// ------------------------------------------------------------------------
+// Image viewer: zoom and pan a picture. The wheel (or a pinch, which comes
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_image_view {
@@ -1168,7 +1190,7 @@ pub struct cui_image_view {
     pub cy: f32,
 }
 
-// ------------------------------------------------------------------------
+// cui_image_viewer_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_image_viewer_opts {
@@ -1180,7 +1202,7 @@ pub struct cui_image_viewer_opts {
     pub checkerboard: bool,
 }
 
-// patterns that files must match, e.g. "*.png;*.jpg"; folders always show
+// Inline edit: text that turns into a field in place. Click (or Enter when
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_inline_edit_opts {
@@ -1191,7 +1213,7 @@ pub struct cui_inline_edit_opts {
     pub width: cui_size,
 }
 
-// smaller headings and tighter spacing, for chat bubbles
+// Property inspector: labelled rows in folding groups, a label column on the
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_inspector_opts {
@@ -1200,7 +1222,7 @@ pub struct cui_inspector_opts {
     pub label_width: f32,
 }
 
-// rounded square instead of a circle
+// JSON viewer: a collapsible tree with typed colors and item counts.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_json_opts {
@@ -1209,7 +1231,7 @@ pub struct cui_json_opts {
     pub max_height: f32,
 }
 
-// one bool per row; adds a checkbox column
+// cui_kanban_column_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_kanban_column_opts {
@@ -1219,7 +1241,7 @@ pub struct cui_kanban_column_opts {
     pub width: f32,
 }
 
-// 0 always shown; when the grid is too narrow, columns with a
+// Kanban board: columns of cards you drag between columns and within them.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_kanban_move {
@@ -1229,7 +1251,7 @@ pub struct cui_kanban_move {
     pub to_index: i32,
 }
 
-// a file double-clicked or Entered, as a full path; valid this frame
+// Shortcut recorder: click and press a key combination to record it.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_key_combo {
@@ -1237,7 +1259,7 @@ pub struct cui_key_combo {
     pub key: c_int,
 }
 
-// caption in the top right corner, default "After"
+// A keyboard with your shortcuts on it: each bound key shows its action and
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_keymap_binding {
@@ -1246,19 +1268,19 @@ pub struct cui_keymap_binding {
     pub category: i32,
 }
 
-// the images' width / height: they are cropped to fill, never stretched
+// cui_keymap_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_keymap_opts {
     pub _pad: i32,
     pub width: cui_size,
-    pub categories: *mut c_char,
+    pub categories: *const *const c_char,
     pub category_count: i32,
     pub mods: *mut i32,
     pub no_function_row: bool,
 }
 
-// the images' width / height: they are cropped to fill, never stretched
+// cui_keymap_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_keymap_result {
@@ -1266,7 +1288,7 @@ pub struct cui_keymap_result {
     pub conflicts: i32,
 }
 
-// segment clicked (here or in the "..." menu), else -1
+// Knob, fader and level meter: the controls of audio, synth and mixer panels.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_knob_opts {
@@ -1284,7 +1306,7 @@ pub struct cui_knob_opts {
     pub color: cui_color,
 }
 
-// shown after the author's name; on your own messages after `status`
+// cui_kv_editor_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_kv_editor_opts {
@@ -1297,7 +1319,7 @@ pub struct cui_kv_editor_opts {
     pub width: cui_size,
 }
 
-// right aligned, accent bubble
+// Rows of key = value pairs: HTTP headers, query parameters, environment
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_kv_pair {
@@ -1313,7 +1335,7 @@ impl Default for cui_kv_pair {
     }
 }
 
-// cui_level_meter_opts
+// Level meter: bars that jump up to each new peak and fall back at `decay`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_level_meter_opts {
@@ -1329,7 +1351,7 @@ pub struct cui_level_meter_opts {
     pub decay: f32,
 }
 
-// default primary
+// cui_loader_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_loader_opts {
@@ -1361,7 +1383,7 @@ impl Default for cui_log_buffer {
     }
 }
 
-// ---- Code editor ----
+// cui_log_line
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_log_line {
@@ -1371,7 +1393,7 @@ pub struct cui_log_line {
     pub level: u8,
 }
 
-// a highlighted range of bytes: color 0 is the accent, 1 to 6 the series colors
+// cui_log_view_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_log_view_opts {
@@ -1383,7 +1405,7 @@ pub struct cui_log_view_opts {
     pub size: f32,
 }
 
-// rounded square instead of a circle
+// Markdown view: renders your markdown text (UTF-8) as native content, every
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_markdown_opts {
@@ -1397,7 +1419,7 @@ pub struct cui_markdown_opts {
     pub compact: bool,
 }
 
-// Empty state. Returns true when its action button is clicked.
+// cui_markdown_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_markdown_result {
@@ -1409,7 +1431,7 @@ pub struct cui_markdown_result {
     pub height: f32,
 }
 
-// "c", "cpp", "js", "ts", "python", "rust", "go", "json", "shell" or "text" (no colors); shown in the title bar
+// One menu of the bar. Returns true while its items should be built; call
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_menu_bar_menu_opts {
@@ -1419,7 +1441,7 @@ pub struct cui_menu_bar_menu_opts {
     pub disabled: bool,
 }
 
-// ------------------------------------------------------------------------
+// Menu bar: File / Edit / View along the top of a window. Each menu holds
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_menu_bar_opts {
@@ -1427,7 +1449,7 @@ pub struct cui_menu_bar_opts {
     pub no_border: bool,
 }
 
-// function that lists a folder; set it to browse something other than the local disk
+// Money field: shows the amount with thousands separators, edits as plain
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_money_opts {
@@ -1440,7 +1462,7 @@ pub struct cui_money_opts {
     pub hint: *const c_char,
 }
 
-// Editable text cell: double click (or Enter on the cursor row) to edit,
+// Month calendar: a month grid with events. All-day and multi-day events
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_month_event {
@@ -1452,7 +1474,7 @@ pub struct cui_month_event {
     pub tone: c_int,
 }
 
-// The same editable text, inside the current cell (after an avatar, say).
+// cui_month_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_month_opts {
@@ -1460,13 +1482,13 @@ pub struct cui_month_opts {
     pub selected: *mut cui_date,
     pub first_weekday: i32,
     pub cell_height: f32,
-    pub month_names: *mut c_char,
-    pub day_names: *mut c_char,
+    pub month_names: *const *const c_char,
+    pub day_names: *const *const c_char,
     pub hour12: bool,
     pub today: cui_date,
 }
 
-// Tree cell: indentation, a disclosure chevron and a label, for tree tables
+// cui_month_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_month_result {
@@ -1476,20 +1498,20 @@ pub struct cui_month_result {
     pub month_changed: bool,
 }
 
-// nodes to load children for (each now has CUI_TREE_LOADING), valid this frame
+// Multi-select: a field with chips for the chosen items and a list with
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_multi_select_opts {
     pub _pad: i32,
     pub label: *const c_char,
     pub placeholder: *const c_char,
-    pub icons: *mut c_char,
+    pub icons: *const *const c_char,
     pub searchable: bool,
     pub max_chips: i32,
     pub width: cui_size,
 }
 
-// points per second, default 40
+// HTTP requests as a table with a timing bar each: queued, DNS, connect, TLS,
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_net_request {
@@ -1508,7 +1530,7 @@ impl Default for cui_net_request {
     }
 }
 
-// default "Open", "Save" or "Choose a folder"
+// pan in points; zoom 0 means 1
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_node_editor_opts {
@@ -1521,7 +1543,7 @@ pub struct cui_node_editor_opts {
     pub minimap: bool,
 }
 
-// e.g. "Images"
+// A node at canvas position (*x, *y), updated while it is dragged. Returns
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_node_opts {
@@ -1530,7 +1552,7 @@ pub struct cui_node_opts {
     pub icon: *const c_char,
 }
 
-// path: the folder shown, yours; the browser writes it as you move around.
+// Node editor: nodes with input and output pins on a canvas that pans and
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_node_view {
@@ -1539,7 +1561,7 @@ pub struct cui_node_view {
     pub zoom: f32,
 }
 
-// seconds before it disarms, default 3
+// Now playing card: artwork, title, artist, a scrubber and transport buttons.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_now_playing {
@@ -1552,7 +1574,7 @@ pub struct cui_now_playing {
     pub playing: bool,
 }
 
-// Button that shows the result of the work it started: idle, a spinner while
+// cui_now_playing_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_now_playing_opts {
@@ -1561,7 +1583,7 @@ pub struct cui_now_playing_opts {
     pub compact: bool,
 }
 
-// hides the x in the corner (Esc and a click outside still close it unless `persistent`)
+// Path bar: a breadcrumb for file and scene paths. Segments are clickable,
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_path_bar_opts {
@@ -1575,7 +1597,7 @@ pub struct cui_path_bar_opts {
     pub no_edit: bool,
 }
 
-// Modal dialog. Shown while *open is true; closing sets it to false.
+// cui_path_bar_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_path_bar_result {
@@ -1584,7 +1606,7 @@ pub struct cui_path_bar_result {
     pub editing: bool,
 }
 
-// passed to `list` as its first argument
+// A row with a pin on the left (input) or right (output). type picks the pin
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_pin_opts {
@@ -1592,7 +1614,7 @@ pub struct cui_pin_opts {
     pub type_: i32,
 }
 
-// the like count, shown beside the heart; changed with `*liked`. May be `NULL`
+// cui_pipeline_job
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_pipeline_job {
@@ -1603,7 +1625,7 @@ pub struct cui_pipeline_job {
     pub allow_failure: bool,
 }
 
-// adds "edited" after the time
+// cui_pipeline_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_pipeline_opts {
@@ -1612,7 +1634,7 @@ pub struct cui_pipeline_opts {
     pub selected: *mut i32,
 }
 
-// small badge after the author's name, e.g. "Author"
+// cui_pipeline_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_pipeline_result {
@@ -1620,7 +1642,7 @@ pub struct cui_pipeline_result {
     pub hovered: i32,
 }
 
-// cui_platform_iface
+// Platform services. The built-in backends set these.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_platform_iface {
@@ -1632,7 +1654,7 @@ pub struct cui_platform_iface {
     pub draw_emoji: Option<unsafe extern "C" fn(*mut c_void, *const c_char, i32, i32, *mut u8) -> bool>,
 }
 
-// clip children to the box
+// Popover anchored to the previous component. Toggle it with
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_popover_opts {
@@ -1643,7 +1665,7 @@ pub struct cui_popover_opts {
     pub gap: f32,
 }
 
-// first line, e.g. "PEAK 203 MG"; `NULL` for a line with no label
+// Presence: who is here now. Overlapping avatars with a colored ring each,
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_presence_user {
@@ -1653,7 +1675,7 @@ pub struct cui_presence_user {
     pub idle: bool,
 }
 
-// bouncing dots
+// cui_problems_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_problems_opts {
@@ -1663,7 +1685,7 @@ pub struct cui_problems_opts {
     pub no_toolbar: bool,
 }
 
-// bouncing dots
+// cui_problems_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_problems_result {
@@ -1672,7 +1694,7 @@ pub struct cui_problems_result {
     pub shown: i32,
 }
 
-// URL of the link under the pointer, or NULL; frame memory
+// cui_prop_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_prop_opts {
@@ -1688,17 +1710,17 @@ pub struct cui_prop_opts {
     pub checkbox: bool,
 }
 
-// picture to show instead of the initials
+// cui_query_field
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_query_field {
     pub name: *const c_char,
     pub type_: c_int,
-    pub choices: *mut c_char,
+    pub choices: *const *const c_char,
     pub choice_count: i32,
 }
 
-// away: the avatar dims, its ring turns gray and the tooltip adds "(away)"
+// cui_query_node
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_query_node {
@@ -1716,7 +1738,7 @@ impl Default for cui_query_node {
     }
 }
 
-// ------------------------------------------------------------------------
+// cui_query_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_query_opts {
@@ -1726,7 +1748,7 @@ pub struct cui_query_opts {
     pub read_only: bool,
 }
 
-// Returns true when the view changed.
+// Radar chart: series over shared axes (series[i].values[axis]).
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_radar_opts {
@@ -1737,7 +1759,7 @@ pub struct cui_radar_opts {
     pub no_legend: bool,
 }
 
-// most tags the field holds; once reached it takes no more typing. 0 means no limit
+// from the band before (or min) up to `to`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_radial_gauge_opts {
@@ -1755,7 +1777,7 @@ pub struct cui_radial_gauge_opts {
     pub no_needle: bool,
 }
 
-// Multi-line text area with word wrap.
+// cui_radio_cards_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_radio_cards_opts {
@@ -1763,7 +1785,7 @@ pub struct cui_radio_cards_opts {
     pub columns: i32,
 }
 
-// page is 0 based
+// Reactions: icon pills with counts. Clicking toggles `active` and adjusts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_reaction {
@@ -1772,7 +1794,7 @@ pub struct cui_reaction {
     pub active: bool,
 }
 
-// the item's amount: its area, length or share, by chart (activity rings: 1 is a full turn)
+// cui_regex_match
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_regex_match {
@@ -1790,7 +1812,7 @@ impl Default for cui_regex_match {
     }
 }
 
-// value at the outer ring; 0 picks a round number above the largest value
+// A pattern field with flags over a test text: every match is highlighted in
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_regex_tester_opts {
@@ -1800,7 +1822,7 @@ pub struct cui_regex_tester_opts {
     pub flags: *mut i32,
 }
 
-// value at the outer ring; 0 picks a round number above the largest value
+// cui_regex_tester_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_regex_tester_result {
@@ -1809,7 +1831,7 @@ pub struct cui_regex_tester_result {
     pub error: *const c_char,
 }
 
-// cui_renderer_iface
+// How CUI talks to a renderer. The built-in renderers fill this in for you
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_renderer_iface {
@@ -1819,7 +1841,7 @@ pub struct cui_renderer_iface {
     pub texture_destroy: Option<unsafe extern "C" fn(*mut c_void, usize)>,
 }
 
-// Bar list: ranked horizontal bars. Rows are keyed by label, so when the
+// cui_request_bar_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_request_bar_opts {
@@ -1829,7 +1851,7 @@ pub struct cui_request_bar_opts {
     pub placeholder: *const c_char,
 }
 
-// shows only this many rows from the top; 0 shows all
+// cui_request_bar_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_request_bar_result {
@@ -1838,7 +1860,7 @@ pub struct cui_request_bar_result {
     pub changed: bool,
 }
 
-// Radio cards: larger selectable cards for choices that need a description
+// Activity rings: concentric progress rings; values past 1 keep winding.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_rings_opts {
@@ -1850,7 +1872,7 @@ pub struct cui_rings_opts {
     pub legend: bool,
 }
 
-// Path bar: a breadcrumb for file and scene paths. Segments are clickable,
+// Ruler slider: a tape measure that slides under a fixed marker, with
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_ruler_opts {
@@ -1863,7 +1885,7 @@ pub struct cui_ruler_opts {
     pub width: cui_size,
 }
 
-// smallest side, image pixels; default 16
+// Sankey: flows between nodes; columns follow the links from the sources.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_sankey_link {
@@ -1872,7 +1894,7 @@ pub struct cui_sankey_link {
     pub value: f32,
 }
 
-// Returns true when the crop changed.
+// cui_sankey_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_sankey_opts {
@@ -1883,7 +1905,7 @@ pub struct cui_sankey_opts {
     pub node_width: f32,
 }
 
-// cards per row; 0 puts up to 3 choices in one row and more in 2 columns
+// cui_scatter_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_scatter_opts {
@@ -1897,7 +1919,7 @@ pub struct cui_scatter_opts {
     pub no_legend: bool,
 }
 
-// small accent badge beside the title, e.g. "Popular"; `NULL` for none
+// Scatter (or bubble) chart: points per series, optional sizes.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_scatter_series {
@@ -1908,7 +1930,7 @@ pub struct cui_scatter_series {
     pub color: cui_color,
 }
 
-// hides the row of page dots under the slides
+// A cron schedule edited the friendly way: every N minutes, hourly at a
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_schedule_opts {
@@ -1919,7 +1941,7 @@ pub struct cui_schedule_opts {
     pub next_count: i32,
 }
 
-// past the last slide comes the first again, and back from the first the last
+// cui_schedule_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_schedule_result {
@@ -1928,7 +1950,7 @@ pub struct cui_schedule_result {
     pub next: i64,
 }
 
-// full paths for the sidebar, each shown by its last part; at most 6
+// Scrub field: drag sideways anywhere on it to change the value (Shift for
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_scrub_opts {
@@ -1940,7 +1962,7 @@ pub struct cui_scrub_opts {
     pub width: cui_size,
 }
 
-// the selected entry as a full path, or NULL; valid this frame
+// cui_shortcut_recorder_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_shortcut_recorder_opts {
@@ -1949,7 +1971,7 @@ pub struct cui_shortcut_recorder_opts {
     pub width: cui_size,
 }
 
-// cui_signature_opts
+// Signature pad: draw with the mouse or a pen. The strokes are kept for you;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_signature_opts {
@@ -1960,7 +1982,7 @@ pub struct cui_signature_opts {
     pub ink: cui_color,
 }
 
-// ------------------------------------------------------------------------
+// Speed dial: a round floating action button that fans out related actions.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_speed_action {
@@ -1968,7 +1990,7 @@ pub struct cui_speed_action {
     pub label: *const c_char,
 }
 
-// ------------------------------------------------------------------------
+// cui_speed_dial_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_speed_dial_opts {
@@ -1978,7 +2000,7 @@ pub struct cui_speed_dial_opts {
     pub tooltip: *const c_char,
 }
 
-// heading above a run of commands with the same group, shown while the search is empty
+// Split bar: one bar split into parts, with a legend of values and shares.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_split_bar_opts {
@@ -1989,7 +2011,7 @@ pub struct cui_split_bar_opts {
     pub no_legend: bool,
 }
 
-// ------------------------------------------------------------------------
+// Split button: a main action with a menu of related actions on the chevron.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_split_button_opts {
@@ -1997,11 +2019,11 @@ pub struct cui_split_button_opts {
     pub variant: c_int,
     pub size: c_int,
     pub icon: *const c_char,
-    pub item_icons: *mut c_char,
+    pub item_icons: *const *const c_char,
     pub disabled: bool,
 }
 
-// ------------------------------------------------------------------------
+// Spotlight card: a soft light follows the pointer across the card and lights
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_spotlight_opts {
@@ -2014,7 +2036,7 @@ pub struct cui_spotlight_opts {
     pub beam: bool,
 }
 
-// Waffle: a 10 x 10 grid of squares split by share, with a legend.
+// An exception and its call stack: the error's type and message, then each
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_stack_frame {
@@ -2023,12 +2045,12 @@ pub struct cui_stack_frame {
     pub line: i32,
     pub column: i32,
     pub external: bool,
-    pub source: *mut c_char,
+    pub source: *const *const c_char,
     pub source_count: i32,
     pub source_first: i32,
 }
 
-// rows of squares, at most 60; default 10
+// cui_stack_trace_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_stack_trace_opts {
@@ -2039,14 +2061,14 @@ pub struct cui_stack_trace_opts {
     pub lang: *const c_char,
 }
 
-// Split bar: one bar split into parts, with a legend of values and shares.
+// cui_stack_trace_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_stack_trace_result {
     pub clicked: i32,
 }
 
-// points; taller content scrolls. 0 shows everything
+// Status bar: a thin bar along the bottom of a window, with a hairline on
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_status_bar_opts {
@@ -2054,7 +2076,7 @@ pub struct cui_status_bar_opts {
     pub no_border: bool,
 }
 
-// items with the same group name share one highlight; `NULL` puts them in one common group
+// cui_status_button_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_status_button_opts {
@@ -2067,7 +2089,7 @@ pub struct cui_status_button_opts {
     pub size: c_int,
 }
 
-// ---- Markdown view ----
+// cui_status_item_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_status_item_opts {
@@ -2078,7 +2100,7 @@ pub struct cui_status_item_opts {
     pub disabled: bool,
 }
 
-// ---- Markdown view ----
+// A small progress bar with an optional label. value is 0..1.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_status_progress_opts {
@@ -2088,7 +2110,7 @@ pub struct cui_status_progress_opts {
     pub width: f32,
 }
 
-// seconds since the last frame
+// Text the components show, for another language. CUI keeps the pointer (the
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_strings {
@@ -2106,7 +2128,7 @@ impl Default for cui_strings {
     }
 }
 
-// Popover anchored to the previous component. Toggle it with
+// Swipe actions: drag a row sideways (or swipe on a trackpad) to reveal
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_swipe_action {
@@ -2115,7 +2137,7 @@ pub struct cui_swipe_action {
     pub tone: c_int,
 }
 
-// clicking an item turns it on and every other one off, like radio buttons
+// Bottom tab bar for compact layouts, with a pill that glides to the selection.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tab_bar_item {
@@ -2124,7 +2146,7 @@ pub struct cui_tab_bar_item {
     pub badge: i32,
 }
 
-// items that have an icon show only the icon, with their label as the tooltip
+// cui_tab_bar_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tab_bar_opts {
@@ -2133,7 +2155,7 @@ pub struct cui_tab_bar_opts {
     pub labels_on_selected_only: bool,
 }
 
-// Search field with a search icon and a clear button.
+// Tag input: tags are stored comma separated in buf. Enter or comma adds the
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tag_opts {
@@ -2144,7 +2166,7 @@ pub struct cui_tag_opts {
     pub width: cui_size,
 }
 
-// font size, default 13
+// cui_terminal_buffer
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_terminal_buffer {
@@ -2168,7 +2190,7 @@ impl Default for cui_terminal_buffer {
     }
 }
 
-// default fill
+// Terminal: program output with ANSI colors over an input line with a
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_terminal_line {
@@ -2177,7 +2199,7 @@ pub struct cui_terminal_line {
     pub cols: u32,
 }
 
-// the editor or its find bar has the keyboard
+// cui_terminal_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_terminal_opts {
@@ -2189,7 +2211,7 @@ pub struct cui_terminal_opts {
     pub no_input: bool,
 }
 
-// lines, and bytes of text
+// cui_terminal_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_terminal_result {
@@ -2197,7 +2219,7 @@ pub struct cui_terminal_result {
     pub interrupt: bool,
 }
 
-// size of the flow: sets the link's thickness
+// cui_test_explorer_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_test_explorer_opts {
@@ -2206,7 +2228,7 @@ pub struct cui_test_explorer_opts {
     pub height: f32,
 }
 
-// size of the flow: sets the link's thickness
+// cui_test_explorer_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_test_explorer_result {
@@ -2220,7 +2242,7 @@ pub struct cui_test_explorer_result {
     pub total: i32,
 }
 
-// Sankey: flows between nodes; columns follow the links from the sources.
+// Test results as a tree: suites fold, each test shows its status and time,
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_test_item {
@@ -2231,7 +2253,7 @@ pub struct cui_test_item {
     pub message: *const c_char,
 }
 
-// build times, errors, latency: a fall is good news, shown in green
+// a highlighted range of bytes: color 0 is the accent, 1 to 6 the series colors
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_text_mark {
@@ -2251,7 +2273,7 @@ pub struct cui_text_metrics {
     pub line_height: f32,
 }
 
-// PNG/JPEG via stb_image
+// Ticker: items that scroll by continuously, pausing on hover.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_ticker_item {
@@ -2261,7 +2283,7 @@ pub struct cui_ticker_item {
     pub lower_is_better: bool,
 }
 
-// color the image is multiplied by; unset draws it as it is
+// a fall is good: shown green
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_ticker_opts {
@@ -2270,7 +2292,7 @@ pub struct cui_ticker_opts {
     pub height: f32,
 }
 
-// items that have an icon show only the icon, with their label as the tooltip
+// Control tile: a large toggle with an icon, a label and a state line.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tile_opts {
@@ -2282,7 +2304,7 @@ pub struct cui_tile_opts {
     pub wide: bool,
 }
 
-// optional, one per point: makes a bubble chart, each bubble sized against the largest
+// cui_time_histogram_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_time_histogram_opts {
@@ -2292,7 +2314,7 @@ pub struct cui_time_histogram_opts {
     pub utc: bool,
 }
 
-// number of `points` (and of `sizes`)
+// cui_time_histogram_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_time_histogram_result {
@@ -2300,7 +2322,7 @@ pub struct cui_time_histogram_result {
     pub hovered: i32,
 }
 
-// depth of the current row, 0 at the top
+// Time picker: a field that opens hour and minute columns. hour is 0..23.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_time_opts {
@@ -2311,7 +2333,7 @@ pub struct cui_time_opts {
     pub width: cui_size,
 }
 
-// hidden unchanged lines, starting at old_line / new_line
+// cui_timeline_clip
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_timeline_clip {
@@ -2322,7 +2344,7 @@ pub struct cui_timeline_clip {
     pub selected: bool,
 }
 
-// The same diff without a view. Old lines [old_start, old_start + old_count)
+// cui_timeline_editor_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_timeline_editor_opts {
@@ -2344,7 +2366,7 @@ pub struct cui_timeline_editor_opts {
     pub free_drag: bool,
 }
 
-// flags
+// cui_timeline_editor_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_timeline_editor_result {
@@ -2368,7 +2390,7 @@ pub struct cui_timeline_editor_result {
     pub hovered_key: i32,
 }
 
-// fold rows: lines hidden
+// cui_timeline_track
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_timeline_track {
@@ -2387,7 +2409,7 @@ pub struct cui_timeline_track {
     pub clip_count: i32,
 }
 
-// fold rows: lines hidden
+// cui_timeline_view
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_timeline_view {
@@ -2396,7 +2418,7 @@ pub struct cui_timeline_view {
     pub scroll: f32,
 }
 
-// children pending: an open node shows a spinner row; clear it when loaded
+// Table of contents for a scroll area: highlights the section in view on a
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_toc_item {
@@ -2405,18 +2427,18 @@ pub struct cui_toc_item {
     pub level: i32,
 }
 
-// ------------------------------------------------------------------------
+// Toggle group: a row of toggles (bold, italic...). values[i] is toggled
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_toggle_group_opts {
     pub _pad: i32,
-    pub icons: *mut c_char,
+    pub icons: *const *const c_char,
     pub exclusive: bool,
     pub icon_only: bool,
     pub size: c_int,
 }
 
-// no title bar, even with a lang
+// cui_tool_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tool_opts {
@@ -2428,7 +2450,7 @@ pub struct cui_tool_opts {
     pub disabled: bool,
 }
 
-// scrolls beyond this, default none
+// Toolbar: a row of compact icon buttons, toggles, separators and small text
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_toolbar_opts {
@@ -2436,7 +2458,7 @@ pub struct cui_toolbar_opts {
     pub no_border: bool,
 }
 
-// inherited by default; mirrors horizontal layout and padding
+// cui_tour_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tour_opts {
@@ -2450,7 +2472,7 @@ pub struct cui_tour_opts {
     pub count_format: *const c_char,
 }
 
-// inherited by default; mirrors horizontal layout and padding
+// Guided tour: a spotlight on one control at a time, with a card beside it
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tour_step {
@@ -2460,7 +2482,7 @@ pub struct cui_tour_step {
     pub placement: c_int,
 }
 
-// hue of the scale, default the accent
+// cui_trace_marker
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_trace_marker {
@@ -2469,7 +2491,7 @@ pub struct cui_trace_marker {
     pub tone: c_int,
 }
 
-// Calendar heatmap: one cell per day from start, weeks as columns, in five
+// cui_trace_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_trace_opts {
@@ -2481,7 +2503,7 @@ pub struct cui_trace_opts {
     pub marker_count: i32,
 }
 
-// size of a day's square in points, default 11
+// cui_trace_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_trace_result {
@@ -2490,7 +2512,7 @@ pub struct cui_trace_result {
     pub hovered: i32,
 }
 
-// value range, default the data's
+// cui_trace_span
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_trace_span {
@@ -2502,7 +2524,7 @@ pub struct cui_trace_span {
     pub color_key: u32,
 }
 
-// one label per column, under the grid; labels that would overlap are skipped
+// A tracing timeline: one lane per thread, process or service, each with its
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_trace_track {
@@ -2510,7 +2532,7 @@ pub struct cui_trace_track {
     pub collapsed: bool,
 }
 
-// hue of the scale, default the accent
+// cui_trace_view
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_trace_view {
@@ -2521,7 +2543,7 @@ pub struct cui_trace_view {
     pub mark_end: f64,
 }
 
-// an icon button (the ellipsis unless `icon` is set) with the label as its tooltip
+// cui_tree_node
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tree_node {
@@ -2531,7 +2553,7 @@ pub struct cui_tree_node {
     pub flags: u32,
 }
 
-// keyboard keycap, e.g. "Ctrl K"
+// Tree view node.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tree_opts {
@@ -2541,7 +2563,7 @@ pub struct cui_tree_opts {
     pub selected: bool,
 }
 
-// a check mark at the right edge of the item
+// cui_tree_table_events
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tree_table_events {
@@ -2554,7 +2576,7 @@ pub struct cui_tree_table_events {
     pub sort_changed: bool,
 }
 
-// an icon button (the ellipsis unless `icon` is set) with the label as its tooltip
+// cui_tree_table_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_tree_table_opts {
@@ -2570,7 +2592,7 @@ pub struct cui_tree_table_opts {
     pub user: *mut c_void,
 }
 
-// Returns true when the view changed.
+// cui_treemap_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_treemap_opts {
@@ -2580,7 +2602,7 @@ pub struct cui_treemap_opts {
     pub format: *const c_char,
 }
 
-// names and shares beside the rings
+// cui_uptime_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_uptime_opts {
@@ -2589,7 +2611,7 @@ pub struct cui_uptime_opts {
     pub last_day: cui_date,
 }
 
-// names and shares beside the rings
+// cui_uptime_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_uptime_result {
@@ -2597,7 +2619,7 @@ pub struct cui_uptime_result {
     pub day: i32,
 }
 
-// small muted text under `center`; shown only with `center`
+// A status page: each service with its current state, its uptime over the
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_uptime_service {
@@ -2606,7 +2628,7 @@ pub struct cui_uptime_service {
     pub day_count: i32,
 }
 
-// a count badge on the icon ("99+" above 99); 0 for none
+// cui_vertex
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_vertex {
@@ -2628,7 +2650,7 @@ pub struct cui_vertex {
     pub border_color: cui_color,
 }
 
-// not resizable
+// cui_voice_orb_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_voice_orb_opts {
@@ -2637,7 +2659,7 @@ pub struct cui_voice_orb_opts {
     pub color: cui_color,
 }
 
-// ------------------------------------------------------------------------
+// Waffle: a 10 x 10 grid of squares split by share, with a legend.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_waffle_opts {
@@ -2648,7 +2670,7 @@ pub struct cui_waffle_opts {
     pub format: *const c_char,
 }
 
-// ------------------------------------------------------------------------
+// cui_waterfall_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_waterfall_opts {
@@ -2660,7 +2682,7 @@ pub struct cui_waterfall_opts {
     pub loaded: f64,
 }
 
-// Every chart below has a hover tooltip, animates in once, follows the theme
+// cui_waterfall_result
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_waterfall_result {
@@ -2669,7 +2691,7 @@ pub struct cui_waterfall_result {
     pub hovered: i32,
 }
 
-// resting look, default secondary
+// Waveform: bars from peaks (0..1). With progress, the played part is
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_waveform_opts {
@@ -2681,7 +2703,7 @@ pub struct cui_waveform_opts {
     pub color: cui_color,
 }
 
-// true when the row was clicked
+// cui_week_opts
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_week_opts {
@@ -2693,7 +2715,7 @@ pub struct cui_week_opts {
     pub read_only: bool,
 }
 
-// Sorts every sibling list (stable) by cmp, relinking the nodes. Returns
+// join_left / join_right square off the selection band so wheels placed
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct cui_wheel_opts {
@@ -2706,60 +2728,60 @@ pub struct cui_wheel_opts {
 }
 
 // ---- enum constants ----
-// anon115341
-pub const CUI_REGEX_ICASE: i32 = 1;
-pub const CUI_REGEX_MULTILINE: i32 = 2;
-pub const CUI_REGEX_DOTALL: i32 = 4;
-// anon128337
-pub const CUI_SHADE_TEXT: i32 = 0;
-pub const CUI_SHADE_RRECT: i32 = 1;
-pub const CUI_SHADE_SHADOW: i32 = 2;
-pub const CUI_SHADE_IMAGE: i32 = 3;
-pub const CUI_SHADE_SOLID: i32 = 4;
-// anon20905
-pub const CUI_FONT_BODY: i32 = 0;
-pub const CUI_FONT_MEDIUM: i32 = 1;
-pub const CUI_FONT_DISPLAY: i32 = 2;
-pub const CUI_FONT_MONO: i32 = 3;
-pub const CUI_FONT_ICONS: i32 = 4;
-// anon29350
-pub const CUI_CHANGED: i32 = 1;
-pub const CUI_SUBMITTED: i32 = 2;
-pub const CUI_FOCUSED: i32 = 4;
-pub const CUI_BLURRED: i32 = 8;
-// anon33272
-pub const CUI_TOUR_NONE: i32 = 0;
-pub const CUI_TOUR_NEXT: i32 = 1;
-pub const CUI_TOUR_BACK: i32 = 2;
-pub const CUI_TOUR_DONE: i32 = 3;
-pub const CUI_TOUR_SKIPPED: i32 = 4;
-// anon49509
-pub const CUI_TREE_HAS_CHILDREN: i32 = 0;
-pub const CUI_TREE_OPEN: i32 = 1;
-pub const CUI_TREE_SELECTED: i32 = 2;
-pub const CUI_TREE_LOADING: i32 = 3;
-// anon58893
+// anon105410
 pub const CUI_DIFF_IGNORE_EOL: i32 = 1;
-// anon60027
+// anon107673
 pub const CUI_COMMENT_LIKE: i32 = 1;
 pub const CUI_COMMENT_REPLY: i32 = 2;
-// anon71919
+// anon130863
 pub const CUI_PLAYER_TOGGLE: i32 = 1;
 pub const CUI_PLAYER_PREV: i32 = 2;
 pub const CUI_PLAYER_NEXT: i32 = 4;
 pub const CUI_PLAYER_SEEK: i32 = 8;
-// anon74161
+// anon135256
 pub const CUI_RESPONSE_COPY: i32 = 1;
 pub const CUI_RESPONSE_REGENERATE: i32 = 2;
 pub const CUI_RESPONSE_UP: i32 = 4;
 pub const CUI_RESPONSE_DOWN: i32 = 8;
 pub const CUI_RESPONSE_SHARE: i32 = 16;
-// anon75481
+// anon137424
 pub const CUI_COMPOSER_SEND: i32 = 1;
 pub const CUI_COMPOSER_STOP: i32 = 2;
 pub const CUI_COMPOSER_ATTACH: i32 = 4;
 pub const CUI_COMPOSER_REMOVE: i32 = 8;
 pub const CUI_COMPOSER_MODEL: i32 = 16;
+// anon234996
+pub const CUI_REGEX_ICASE: i32 = 1;
+pub const CUI_REGEX_MULTILINE: i32 = 2;
+pub const CUI_REGEX_DOTALL: i32 = 4;
+// anon260964
+pub const CUI_SHADE_TEXT: i32 = 0;
+pub const CUI_SHADE_RRECT: i32 = 1;
+pub const CUI_SHADE_SHADOW: i32 = 2;
+pub const CUI_SHADE_IMAGE: i32 = 3;
+pub const CUI_SHADE_SOLID: i32 = 4;
+// anon28348
+pub const CUI_FONT_BODY: i32 = 0;
+pub const CUI_FONT_MEDIUM: i32 = 1;
+pub const CUI_FONT_DISPLAY: i32 = 2;
+pub const CUI_FONT_MONO: i32 = 3;
+pub const CUI_FONT_ICONS: i32 = 4;
+// anon41666
+pub const CUI_CHANGED: i32 = 1;
+pub const CUI_SUBMITTED: i32 = 2;
+pub const CUI_FOCUSED: i32 = 4;
+pub const CUI_BLURRED: i32 = 8;
+// anon48792
+pub const CUI_TOUR_NONE: i32 = 0;
+pub const CUI_TOUR_NEXT: i32 = 1;
+pub const CUI_TOUR_BACK: i32 = 2;
+pub const CUI_TOUR_DONE: i32 = 3;
+pub const CUI_TOUR_SKIPPED: i32 = 4;
+// anon78992
+pub const CUI_TREE_HAS_CHILDREN: i32 = 1;
+pub const CUI_TREE_OPEN: i32 = 2;
+pub const CUI_TREE_SELECTED: i32 = 4;
+pub const CUI_TREE_LOADING: i32 = 8;
 // cui_accent
 pub const CUI_ACCENT_NEUTRAL: i32 = 0;
 pub const CUI_ACCENT_VIOLET: i32 = 1;
@@ -2942,10 +2964,10 @@ pub const CUI_LOG_WARN: i32 = 3;
 pub const CUI_LOG_ERROR: i32 = 4;
 pub const CUI_LOG_LEVEL_COUNT: i32 = 5;
 // cui_mod
-pub const CUI_MOD_SHIFT: i32 = 0;
-pub const CUI_MOD_CTRL: i32 = 1;
-pub const CUI_MOD_ALT: i32 = 2;
-pub const CUI_MOD_SUPER: i32 = 3;
+pub const CUI_MOD_SHIFT: i32 = 1;
+pub const CUI_MOD_CTRL: i32 = 2;
+pub const CUI_MOD_ALT: i32 = 4;
+pub const CUI_MOD_SUPER: i32 = 8;
 // cui_mouse_button
 pub const CUI_MOUSE_LEFT: i32 = 0;
 pub const CUI_MOUSE_RIGHT: i32 = 1;
@@ -3072,616 +3094,415 @@ pub const CUI_VOICE_THINKING: i32 = 2;
 pub const CUI_VOICE_SPEAKING: i32 = 3;
 
 extern "C" {
-    // inline code
+    // Accordion / disclosure. Content animates its height.
     pub fn cui_accordion_begin(ui: *mut cui_ctx, title: *const c_char, open: *mut bool) -> bool;
-    // keyboard keycap, e.g. "Ctrl K"
     pub fn cui_accordion_end(ui: *mut cui_ctx, );
-    // the card's heading, in medium weight; wraps when long
     pub fn cui_activity_rings_ex(ui: *mut cui_ctx, id: *const c_char, rings: *const cui_viz_item, count: i32, opts: *const cui_rings_opts) -> i32;
-    // Rectangle of any component or box id from the latest layout.
+    // Inline alert. Returns false once dismissed (when dismissible).
     pub fn cui_alert_ex(ui: *mut cui_ctx, title: *const c_char, opts: *const cui_alert_opts) -> bool;
-    // a count badge on the icon ("99+" above 99); 0 for none
+    // Animation helpers. Values move toward target with a spring and request
     pub fn cui_animate(ui: *mut cui_ctx, id: u32, target: f32) -> f32;
-    // a count badge on the icon ("99+" above 99); 0 for none
+    // smooth, no overshoot
     pub fn cui_animate_spring(ui: *mut cui_ctx, id: u32, target: f32, duration: f32, bounce: f32) -> f32;
-    // amount traded in the period, drawn as a bar under the candle; 0 for none
     pub fn cui_api_explorer_ex(ui: *mut cui_ctx, id: *const c_char, endpoints: *const cui_api_endpoint, count: i32, opts: *const cui_api_explorer_opts) -> cui_api_explorer_result;
-    // default fill and 380
+    // Avatar upload: a round avatar that takes a dropped image, with a camera
     pub fn cui_avatar_upload(ui: *mut cui_ctx, id: *const c_char, name: *const c_char, image: *mut usize, size: f32) -> i32;
-    // the first top level node, default 0
     pub fn cui_banner_ex(ui: *mut cui_ctx, text: *const c_char, open: *mut bool, opts: *const cui_banner_opts) -> bool;
-    // ------------------------------------------------------------------------
     pub fn cui_bar_list_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_bar_list_opts) -> i32;
-    // colored stretches of the arc, each from the one before up to its `to`; at most 16
-    pub fn cui_blame_ex(ui: *mut cui_ctx, id: *const c_char, lines: *mut c_char, line_commit: *const i32, line_count: i32, commits: *const cui_blame_commit, commit_count: i32, opts: *const cui_blame_opts) -> cui_blame_result;
-    // ------------------------------------------------------------------------
+    pub fn cui_blame_ex(ui: *mut cui_ctx, id: *const c_char, lines: *const *const c_char, line_commit: *const i32, line_count: i32, commits: *const cui_blame_commit, commit_count: i32, opts: *const cui_blame_opts) -> cui_blame_result;
+    // Connected buttons. Put buttons between begin and end.
     pub fn cui_button_group_begin(ui: *mut cui_ctx, );
-    // ------------------------------------------------------------------------
     pub fn cui_button_group_end(ui: *mut cui_ctx, );
-    // CUI_ALIGN_DEFAULT: columns stretch their children, rows center them.
     pub fn cui_calendar(ui: *mut cui_ctx, id: *const c_char, value: *mut cui_date) -> bool;
-    // default the width it gets and 360
     pub fn cui_calendar_heatmap_ex(ui: *mut cui_ctx, id: *const c_char, start: cui_date, values: *const f32, days: i32, opts: *const cui_calendar_heatmap_opts) -> i32;
-    // seconds the button must be held before it fires, default 1.2
+    // Returns the candle under the crosshair (pointer or keys), or -1.
     pub fn cui_candlestick_ex(ui: *mut cui_ctx, id: *const c_char, candles: *const cui_candle, count: i32, opts: *const cui_candlestick_opts) -> i32;
-    // number of `annotations`
     pub fn cui_card_stack_begin(ui: *mut cui_ctx, id: *const c_char, count: i32, opts: *const cui_card_stack_opts);
-    // Images
     pub fn cui_card_stack_end(ui: *mut cui_ctx, ) -> i32;
-    // number of `annotations`
     pub fn cui_card_stack_item_begin(ui: *mut cui_ctx, depth: i32);
-    // number of `annotations`
     pub fn cui_card_stack_item_end(ui: *mut cui_ctx, );
-    // bar chart
     pub fn cui_carousel_begin(ui: *mut cui_ctx, id: *const c_char, count: i32, index: *mut i32, opts: *const cui_carousel_opts) -> bool;
-    // fixed y range when min != max
     pub fn cui_carousel_end(ui: *mut cui_ctx, );
-    // value format for axis and tooltip, default "%.0f"
     pub fn cui_carousel_slide_begin(ui: *mut cui_ctx, );
-    // value format for axis and tooltip, default "%.0f"
     pub fn cui_carousel_slide_end(ui: *mut cui_ctx, );
-    // a vertical line at `x`, labelled at its top
     pub fn cui_chat_divider(ui: *mut cui_ctx, label: *const c_char);
-    // a node opened or closed this frame, else -1
     pub fn cui_checklist_ex(ui: *mut cui_ctx, id: *const c_char, steps: *mut cui_check_step, count: i32, opts: *const cui_checklist_opts) -> i32;
-    // rounded square instead of a circle
     pub fn cui_code_block_ex(ui: *mut cui_ctx, id: *const c_char, code: *const c_char, opts: *const cui_code_opts);
-    // a node without children: no chevron, a file icon, and `*open` is left alone
     pub fn cui_code_editor_ex(ui: *mut cui_ctx, id: *const c_char, buf: *mut c_char, cap: usize, opts: *const cui_code_editor_opts) -> cui_code_editor_result;
-    // the node created by the last cui_tree_begin was clicked
+    // Opens the find bar with query and selects the next match (NULL closes).
     pub fn cui_code_editor_find(ui: *mut cui_ctx, id: *const c_char, query: *const c_char);
-    // drawn with the active background and medium weight text
+    // On the editor's next frame: put the caret at a line and column (1 based),
     pub fn cui_code_editor_goto(ui: *mut cui_ctx, id: *const c_char, line: i32, column: i32);
-    // drawn with the active background and medium weight text
+    // On the next frame: select bytes anchor..cursor, focus and scroll there.
     pub fn cui_code_editor_select(ui: *mut cui_ctx, id: *const c_char, anchor: i32, cursor: i32);
-    // identity for scroll state etc. (defaults to an automatic id)
     pub fn cui_color_picker(ui: *mut cui_ctx, id: *const c_char, value: *mut cui_color) -> bool;
-    // a value, in the chart's value units
     pub fn cui_comment_ex(ui: *mut cui_ctx, id: *const c_char, author: *const c_char, text: *const c_char, opts: *const cui_comment_opts) -> i32;
-    // commas between thousands: 48210 shows as 48,210
     pub fn cui_commit_graph_ex(ui: *mut cui_ctx, id: *const c_char, commits: *const cui_commit, count: i32, opts: *const cui_commit_graph_opts) -> cui_commit_graph_result;
-    // the current page: medium weight text, and the group's highlight glides to it
     pub fn cui_confirm_button_ex(ui: *mut cui_ctx, label: *const c_char, opts: *const cui_confirm_opts) -> bool;
     pub fn cui_confirm_popover_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_confirm_popover_opts) -> bool;
-    // default "Click to confirm"
     pub fn cui_control_tile_ex(ui: *mut cui_ctx, label: *const c_char, on: *mut bool, opts: *const cui_tile_opts) -> bool;
-    // the keyboard node, optional (in and out)
     pub fn cui_countdown_ex(ui: *mut cui_ctx, id: *const c_char, seconds_left: f64, opts: *const cui_countdown_opts);
-    // PNG/JPEG via stb_image
     pub fn cui_counter_ex(ui: *mut cui_ctx, id: *const c_char, value: f64, opts: *const cui_counter_opts);
-    // Radial gauge: one value on a dial with colored bands, labelled ticks, a
     pub fn cui_coverage_ex(ui: *mut cui_ctx, id: *const c_char, files: *const cui_coverage_file, count: i32, opts: *const cui_coverage_opts) -> cui_coverage_result;
-    // caption in the top left corner, default "Before"
+    pub fn cui_create(desc: *const cui_ctx_desc) -> *mut cui_ctx;
+    // "Every weekday at 09:30", in frame memory; NULL when invalid.
     pub fn cui_cron_describe(ui: *mut cui_ctx, cron: *const c_char) -> *const c_char;
-    // Before and after: drag the divider to compare two images. *pos is 0..1.
+    // The first time after `after` (Unix seconds) the expression matches, in the
     pub fn cui_cron_next(cron: *const c_char, after: i64, utc_offset: i32, next: *mut i64) -> bool;
-    // textarea: height in points; negative fills the space
+    // Returns true when the crop changed.
     pub fn cui_cropper_ex(ui: *mut cui_ctx, id: *const c_char, tex: usize, image_w: i32, image_h: i32, crop: *mut cui_rect, opts: *const cui_cropper_opts) -> bool;
-    // folded rows shown, and the unchanged lines they hide
     pub fn cui_curve_editor_ex(ui: *mut cui_ctx, id: *const c_char, keys: *mut cui_curve_key, count: *mut i32, capacity: i32, opts: *const cui_curve_opts) -> cui_curve_result;
-    // a text changed and was diffed this frame
+    // The curve's value at x: exactly what the editor draws. keys sorted by x.
     pub fn cui_curve_eval(keys: *const cui_curve_key, count: i32, x: f32) -> f32;
-    // the card, default 300
     pub fn cui_data_grid_begin_ex(ui: *mut cui_ctx, id: *const c_char, columns: *const cui_grid_column, column_count: i32, row_count: i32, first: *mut i32, last: *mut i32, opts: *const cui_grid_opts) -> bool;
-    // default "Next", "Back", "Done"
+    // true when the row was clicked
     pub fn cui_data_grid_cell(ui: *mut cui_ctx, );
-    // the step count, default "%d of %d" (step, then total)
+    // Editable text cell: double click (or Enter on the cursor row) to edit,
     pub fn cui_data_grid_cell_edit(ui: *mut cui_ctx, buf: *mut c_char, cap: usize) -> bool;
-    // default "Next", "Back", "Done"
+    // next cell; put components inside
     pub fn cui_data_grid_cell_text(ui: *mut cui_ctx, text: *const c_char);
-    // the step count, default "%d of %d" (step, then total)
+    // The same editable text, inside the current cell (after an avatar, say).
     pub fn cui_data_grid_edit(ui: *mut cui_ctx, buf: *mut c_char, cap: usize) -> bool;
-    // What happened this frame: one of CUI_TOUR_*.
     pub fn cui_data_grid_end(ui: *mut cui_ctx, );
-    // the spotlighted control ignores the pointer too
     pub fn cui_data_grid_row(ui: *mut cui_ctx, row: i32) -> bool;
-    // The first cell: indentation, guides, the chevron, an icon and the name
+    // days since 1970-01-01
     pub fn cui_date_from_days(days: i32) -> cui_date;
-    // Options for every container. All fields are optional.
     pub fn cui_date_picker_ex(ui: *mut cui_ctx, id: *const c_char, value: *mut cui_date, opts: *const cui_date_opts) -> bool;
-    // The next row in view: returns its node, or -1 when done. Then build its
     pub fn cui_date_range_picker_ex(ui: *mut cui_ctx, id: *const c_char, range: *mut cui_date_range, opts: *const cui_date_range_opts) -> bool;
-    // CUI_ALIGN_DEFAULT: columns stretch their children, rows center them.
+    // month 1..12
     pub fn cui_date_today() -> cui_date;
-    // The first cell: indentation, guides, the chevron, an icon and the name
     pub fn cui_date_to_days(d: cui_date) -> i32;
-    // Next cell; put any components inside, or use cui_table_cell_text.
+    // flags
     pub fn cui_diff_compute(old_text: *const c_char, old_len: usize, new_text: *const c_char, new_len: usize, flags: u32, hunks: *mut cui_diff_hunk, cap: i32, stats: *mut cui_diff_stats) -> i32;
-    // default fill
     pub fn cui_diff_view_ex(ui: *mut cui_ctx, id: *const c_char, old_text: *const c_char, new_text: *const c_char, opts: *const cui_diff_opts) -> cui_diff_result;
-    // rows take keyboard focus and show the hand cursor (pass the chosen row's state to `cui_table_row`)
     pub fn cui_diff_view_rows(ui: *mut cui_ctx, id: *const c_char, rows: *mut cui_diff_row, first: i32, cap: i32) -> i32;
-    // shown in the legend and in the hover tooltip
     pub fn cui_diff_words(old_line: *const c_char, old_len: i32, new_line: *const c_char, new_len: i32, old_ranges: *mut cui_diff_range, old_count: *mut i32, new_ranges: *mut cui_diff_range, new_count: *mut i32, cap: i32) -> bool;
-    // one icon per menu item, in the order of the items; `NULL` for none
     pub fn cui_dock_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_dock_opts);
-    // Toggle group: a row of toggles (bold, italic...). values[i] is toggled
     pub fn cui_dock_end(ui: *mut cui_ctx, );
-    // one icon per menu item, in the order of the items; `NULL` for none
     pub fn cui_dock_item_ex(ui: *mut cui_ctx, icon: *const c_char, label: *const c_char, opts: *const cui_dock_item_opts) -> bool;
     pub fn cui_dock_load(ui: *mut cui_ctx, id: *const c_char, text: *const c_char) -> bool;
     pub fn cui_dock_panel_begin_ex(ui: *mut cui_ctx, title: *const c_char, open: *mut bool, opts: *const cui_dock_panel_opts) -> bool;
     pub fn cui_dock_panel_end(ui: *mut cui_ctx, );
+    // Saved layout: one line, e.g.
     pub fn cui_dock_save(ui: *mut cui_ctx, id: *const c_char, buf: *mut c_char, cap: usize) -> usize;
-    // Toggle group: a row of toggles (bold, italic...). values[i] is toggled
     pub fn cui_dock_separator(ui: *mut cui_ctx, );
     pub fn cui_dockspace_begin_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_dockspace_opts);
     pub fn cui_dockspace_end(ui: *mut cui_ctx, );
     pub fn cui_doc_tabs_ex(ui: *mut cui_ctx, id: *const c_char, tabs: *const cui_doc_tab, count: i32, selected: *mut i32, opts: *const cui_doc_tabs_opts) -> cui_doc_tabs_result;
-    // On the editor's next frame: put the caret at a line and column (1 based),
+    // the font (or platform) can draw it
     pub fn cui_draw_emoji(ui: *mut cui_ctx, utf8: *const c_char, len: i32, r: cui_rect);
-    // a light travels around the card's edge all the time
     pub fn cui_draw_image(ui: *mut cui_ctx, tex: usize, r: cui_rect, uv: cui_rect, radius: cui_corners, tint: cui_color);
-    // the gradient drifts along the text
     pub fn cui_draw_polyline(ui: *mut cui_ctx, points: *const cui_vec2, count: i32, thickness: f32, color: cui_color, closed: bool);
-    // Lists a folder into out (names copied into names). Returns the number of
     pub fn cui_dropzone_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_dropzone_opts) -> i32;
-    // On the editor's next frame: put the caret at a line and column (1 based),
     pub fn cui_emoji(ui: *mut cui_ctx, utf8: *const c_char, size: f32);
-    // with the find bar open: matches, and which one is selected (1 based, 0 none)
+    // ---- Emoji ----
     pub fn cui_emoji_font_load_file(ui: *mut cui_ctx, path: *const c_char) -> bool;
-    // with the find bar open: matches, and which one is selected (1 based, 0 none)
     pub fn cui_emoji_font_load_memory(ui: *mut cui_ctx, data: *const c_void, size: usize, copy: bool) -> bool;
-    // with the find bar open: matches, and which one is selected (1 based, 0 none)
     pub fn cui_emoji_font_load_system(ui: *mut cui_ctx, ) -> bool;
-    // ---- Diff viewer ----
     pub fn cui_emoji_picker_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_emoji_picker_opts) -> *const c_char;
-    // with the find bar open: matches, and which one is selected (1 based, 0 none)
     pub fn cui_emoji_supported(ui: *mut cui_ctx, utf8: *const c_char, len: i32) -> bool;
-    // the table sets and clears it
     pub fn cui_expandable_card_begin(ui: *mut cui_ctx, title: *const c_char, open: *mut bool, opts: *const cui_expandable_card_opts) -> bool;
-    // children pending: an open node shows a spinner row; clear it when loaded
     pub fn cui_expandable_card_end(ui: *mut cui_ctx, );
     pub fn cui_expandable_text_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_expandable_text_opts) -> bool;
-    // True while the menu of separator *segment is showing: build menu items
     pub fn cui_fader_ex(ui: *mut cui_ctx, id: *const c_char, value: *mut f32, min: f32, max: f32, opts: *const cui_fader_opts) -> bool;
-    // a thick arc filled to the value instead of a needle
-    pub fn cui_feature_flags_ex(ui: *mut cui_ctx, id: *const c_char, flags: *mut cui_feature_flag, count: i32, envs: *mut c_char, env_count: i32, opts: *const cui_feature_flags_opts) -> cui_feature_flags_result;
-    // Queue a toast. Returns a handle; cui_toast_action_clicked(handle) tells
+    pub fn cui_feature_flags_ex(ui: *mut cui_ctx, id: *const c_char, flags: *mut cui_feature_flag, count: i32, envs: *const *const c_char, env_count: i32, opts: *const cui_feature_flags_opts) -> cui_feature_flags_result;
+    // path: the folder shown, yours; the browser writes it as you move around.
     pub fn cui_file_browser_ex(ui: *mut cui_ctx, id: *const c_char, path: *mut c_char, path_cap: usize, opts: *const cui_file_browser_opts) -> cui_file_browser_result;
     pub fn cui_file_drag_active(ui: *mut cui_ctx, ) -> bool;
-    // ------------------------------------------------------------------------
+    // True once, with the chosen path in out, when the dialog is confirmed;
     pub fn cui_file_picker_ex(ui: *mut cui_ctx, id: *const c_char, open: *mut bool, out: *mut c_char, out_cap: usize, opts: *const cui_file_picker_opts) -> bool;
-    // What happened this frame: one of CUI_TOUR_*.
     pub fn cui_filter_bar(ui: *mut cui_ctx, id: *const c_char, fields: *const cui_filter_field, count: i32, selected: *mut u32, search: *mut c_char, search_cap: usize) -> bool;
-    // Diff viewer: compares two versions of a text line by line, side by side or
+    // selected: index into spans, -1 for none (may be NULL).
     pub fn cui_flame_graph_ex(ui: *mut cui_ctx, id: *const c_char, spans: *const cui_flame_span, count: i32, view: *mut cui_flame_view, selected: *mut i32, opts: *const cui_flame_opts) -> cui_flame_result;
-    // syntax colors, as cui_code_block: "c", "js", "python", ...
+    // Sorts spans into the order the graph needs: by depth, then start (longer
     pub fn cui_flame_sort(spans: *mut cui_flame_span, count: i32);
-    // a header above the sides, e.g. file names, with the +/- summary
+    // Where a span was drawn in the latest frame, in points (zero size when out
     pub fn cui_flame_span_rect(ui: *mut cui_ctx, flame: u32, span: *const cui_flame_span) -> cui_rect;
     pub fn cui_fs_list(user: *mut c_void, path: *const c_char, out: *mut cui_file_entry, cap: i32, names: *mut c_char, names_cap: usize, hidden: bool) -> i32;
-    // width / height to keep, 0 for free
     pub fn cui_funnel_ex(ui: *mut cui_ctx, id: *const c_char, stages: *const cui_viz_item, count: i32, opts: *const cui_funnel_opts) -> i32;
-    // ---- Tree table and path bar ----
     pub fn cui_gantt_ex(ui: *mut cui_ctx, id: *const c_char, tasks: *mut cui_gantt_task, count: i32, origin: cui_date, days: i32, opts: *const cui_gantt_opts) -> i32;
-    // Elastic slider: the track stretches like rubber when dragged past its ends.
     pub fn cui_gauge(ui: *mut cui_ctx, label: *const c_char, value: f32, size: f32);
-    // optional, defaults to malloc/free
     pub fn cui_get_cursor(ui: *mut cui_ctx, ) -> c_int;
-    // Control tile: a large toggle with an icon, a label and a state line.
+    // Valid after cui_end_frame until the next cui_begin_frame.
     pub fn cui_get_draw_data(ui: *mut cui_ctx, ) -> *const cui_draw_data;
-    // ------------------------------------------------------------------------
     pub fn cui_get_strings(ui: *mut cui_ctx, ) -> *const cui_strings;
-    // linear sample peaks, one per channel, for a level meter beside the track; `NULL` for none
+    // Create after the GL context is current. `loader` resolves GL functions
     pub fn cui_gl_create(loader: cui_gl_loader) -> *mut c_void;
-    // entries in `meter`, up to 8; a dB fader's range sets the meter's scale
     pub fn cui_gl_destroy(r: *mut c_void);
-    // entries in `meter`, up to 8; a dB fader's range sets the meter's scale
     pub fn cui_gl_iface(r: *mut c_void) -> cui_renderer_iface;
-    // entries in `meter`, up to 8; a dB fader's range sets the meter's scale
+    // True when the OpenGL driver draws on the CPU (Mesa llvmpipe, SwiftShader and the
     pub fn cui_gl_is_software(r: *const c_void) -> bool;
-    // entries in `meter`, up to 8; a dB fader's range sets the meter's scale
+    // Reads the bound framebuffer into a top-down RGBA buffer.
     pub fn cui_gl_read_pixels(r: *mut c_void, width: i32, height: i32, rgba: *mut c_void);
-    // entries in `meter`, up to 8; a dB fader's range sets the meter's scale
+    // Renders into the currently bound framebuffer. Set clear to false when
     pub fn cui_gl_render(r: *mut c_void, dd: *const cui_draw_data, clear: bool);
-    // the search hit its limit: correct, maybe not the shortest
     pub fn cui_gradient_editor_ex(ui: *mut cui_ctx, id: *const c_char, stops: *mut cui_gradient_stop, count: *mut i32, capacity: i32, opts: *const cui_gradient_opts) -> cui_gradient_result;
-    // The rows the view shows after folding, e.g. to put a comment button beside
+    // The color at t: exactly what the ramp shows (each channel, alpha too,
     pub fn cui_gradient_eval(stops: *const cui_gradient_stop, count: i32, t: f32) -> cui_color;
-    // Circular progress with the value in the middle.
     pub fn cui_gradient_text_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_gradient_text_opts);
-    // a fall is good: shown green
     pub fn cui_graph_view_ex(ui: *mut cui_ctx, id: *const c_char, nodes: *const cui_graph_node, node_count: i32, edges: *const cui_graph_edge, edge_count: i32, opts: *const cui_graph_opts) -> cui_graph_result;
-    // Image viewer: zoom and pan a picture. The wheel (or a pinch, which comes
     pub fn cui_heatmap_ex(ui: *mut cui_ctx, id: *const c_char, values: *const f32, rows: i32, cols: i32, opts: *const cui_heatmap_opts) -> i32;
+    // sel may be NULL: the view then keeps the selection itself.
     pub fn cui_hex_view_ex(ui: *mut cui_ctx, id: *const c_char, data: *const u8, size: usize, sel: *mut cui_hex_selection, opts: *const cui_hex_view_opts) -> cui_hex_result;
+    // Go to offset: on the view's next frame its cursor moves to offset, that byte
     pub fn cui_hex_view_goto(ui: *mut cui_ctx, id: *const c_char, offset: usize);
-    // separators open a menu of the next segment's siblings
     pub fn cui_histogram_slider_ex(ui: *mut cui_ctx, label: *const c_char, bins: *const f32, bin_count: i32, lo: *mut f32, hi: *mut f32, min: f32, max: f32, opts: *const cui_histogram_opts) -> bool;
-    // ------------------------------------------------------------------------
     pub fn cui_hold_button_ex(ui: *mut cui_ctx, label: *const c_char, opts: *const cui_hold_opts) -> bool;
-    // ---- Tree table and path bar ----
     pub fn cui_hover_card_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_hover_card_opts) -> bool;
-    // ---- Tree table and path bar ----
     pub fn cui_hover_card_end(ui: *mut cui_ctx, );
-    // Activity rings: concentric progress rings; values past 1 keep winding.
+    // "Not Found"; "" when unknown
     pub fn cui_http_method_name(method: i32) -> *const c_char;
-    // Activity rings: concentric progress rings; values past 1 keep winding.
     pub fn cui_http_reason(status: i32) -> *const c_char;
-    // number of `annotations`
     pub fn cui_image_compare_ex(ui: *mut cui_ctx, id: *const c_char, before: usize, after: usize, pos: *mut f32, opts: *const cui_compare_opts) -> bool;
-    // Elastic slider: the track stretches like rubber when dragged past its ends.
+    // Images
     pub fn cui_image_create(ui: *mut cui_ctx, w: i32, h: i32, rgba: *const c_void) -> usize;
-    // Elastic slider: the track stretches like rubber when dragged past its ends.
+    // PNG/JPEG via stb_image
     pub fn cui_image_destroy(ui: *mut cui_ctx, tex: usize);
-    // Text input
     pub fn cui_image_ex(ui: *mut cui_ctx, tex: usize, opts: *const cui_image_opts);
-    // Elastic slider: the track stretches like rubber when dragged past its ends.
     pub fn cui_image_load(ui: *mut cui_ctx, path: *const c_char, w: *mut i32, h: *mut i32) -> usize;
-    // error text below (red)
+    // Returns true when the view changed.
     pub fn cui_image_viewer_ex(ui: *mut cui_ctx, id: *const c_char, tex: usize, image_w: i32, image_h: i32, view: *mut cui_image_view, opts: *const cui_image_viewer_opts) -> bool;
-    // the sidebar of places
     pub fn cui_inline_edit_ex(ui: *mut cui_ctx, id: *const c_char, buf: *mut c_char, cap: usize, opts: *const cui_inline_edit_opts) -> i32;
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
-    pub fn cui_input_file_drop(ui: *mut cui_ctx, paths: *mut c_char, count: i32, x: f32, y: f32);
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
+    pub fn cui_input_file_drop(ui: *mut cui_ctx, paths: *const *const c_char, count: i32, x: f32, y: f32);
+    // Files dragged from the OS: hover while a drag is over the window (where the
     pub fn cui_input_file_hover(ui: *mut cui_ctx, hovering: bool, x: f32, y: f32);
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
     pub fn cui_input_focus(ui: *mut cui_ctx, window_focused: bool);
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
+    // in lines; +dy scrolls up
     pub fn cui_input_key(ui: *mut cui_ctx, key: c_int, down: bool, mods: i32);
-    // ------------------------------------------------------------------------
     pub fn cui_input_mouse_button(ui: *mut cui_ctx, button: c_int, down: bool);
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
     pub fn cui_input_mouse_leave(ui: *mut cui_ctx, );
-    // ------------------------------------------------------------------------
     pub fn cui_input_mouse_move(ui: *mut cui_ctx, x: f32, y: f32);
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
     pub fn cui_input_scroll(ui: *mut cui_ctx, dx: f32, dy: f32);
-    // How CUI talks to a renderer. The built-in renderers fill this in for you
     pub fn cui_input_text(ui: *mut cui_ctx, utf8: *const c_char);
-    // smaller headings and tighter spacing, for chat bubbles
     pub fn cui_inspector_begin_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_inspector_opts) -> bool;
-    // URL of the link clicked (or activated with Enter) this frame, or NULL; frame memory
     pub fn cui_inspector_end(ui: *mut cui_ctx, );
-    // URL of the link under the pointer, or NULL; frame memory
+    // A folding group header. Build its rows only when this returns true (it
     pub fn cui_inspector_group(ui: *mut cui_ctx, title: *const c_char, open: *mut bool) -> bool;
-    // rounded square instead of a circle
     pub fn cui_json_view_ex(ui: *mut cui_ctx, id: *const c_char, json: *const c_char, opts: *const cui_json_opts) -> bool;
-    // optional; a click on a sortable header updates it and the header shows its arrow. Sort the rows yourself
     pub fn cui_kanban_begin(ui: *mut cui_ctx, id: *const c_char);
-    // with selected: rows still select (click, Shift, Ctrl) but no checkbox column
+    // true: "+" clicked
     pub fn cui_kanban_card_begin(ui: *mut cui_ctx, card_id: i32) -> bool;
-    // with selected: rows still select (click, Shift, Ctrl) but no checkbox column
+    // true when clicked
     pub fn cui_kanban_card_end(ui: *mut cui_ctx, );
-    // optional; a click on a sortable header updates it and the header shows its arrow. Sort the rows yourself
     pub fn cui_kanban_column_begin_ex(ui: *mut cui_ctx, title: *const c_char, card_count: i32, opts: *const cui_kanban_column_opts) -> bool;
-    // the row Shift ranges start from, optional (in and out like cursor)
     pub fn cui_kanban_column_end(ui: *mut cui_ctx, );
-    // the row Shift ranges start from, optional (in and out like cursor)
     pub fn cui_kanban_end(ui: *mut cui_ctx, move_: *mut cui_kanban_move) -> bool;
-    // Card stack: a deck where the top card can be flicked away left or right.
     pub fn cui_keymap_ex(ui: *mut cui_ctx, id: *const c_char, bindings: *const cui_keymap_binding, count: i32, opts: *const cui_keymap_opts) -> cui_keymap_result;
-    // path: the folder shown, yours; the browser writes it as you move around.
     pub fn cui_key_name(key: c_int) -> *const c_char;
-    // the bar is showing its text field for typing a path
     pub fn cui_knob_ex(ui: *mut cui_ctx, id: *const c_char, value: *mut f32, min: f32, max: f32, opts: *const cui_knob_opts) -> bool;
-    // shows the avatar (others) and status (mine)
     pub fn cui_kv_editor_ex(ui: *mut cui_ctx, id: *const c_char, pairs: *mut cui_kv_pair, count: *mut i32, capacity: i32, opts: *const cui_kv_editor_opts) -> bool;
+    // Returns true when the clip light was clicked to clear it.
     pub fn cui_level_meter_ex(ui: *mut cui_ctx, id: *const c_char, levels: *const f32, channels: i32, opts: *const cui_level_meter_opts) -> bool;
-    // default primary
     pub fn cui_loader_ex(ui: *mut cui_ctx, opts: *const cui_loader_opts);
-    pub fn cui_log_append(buf: *mut cui_log_buffer, level: c_int, fmt: *const c_char);
+    pub fn cui_log_append(buf: *mut cui_log_buffer, level: c_int, fmt: *const c_char, ...);
+    // Appends len bytes (-1: up to the terminator) stamped with time.
     pub fn cui_log_append_text(buf: *mut cui_log_buffer, level: c_int, time: f64, text: *const c_char, len: i32);
-    pub fn cui_log_appendv(buf: *mut cui_log_buffer, level: c_int, fmt: *const c_char, ap: c_void);
     pub fn cui_log_clear(buf: *mut cui_log_buffer);
     pub fn cui_log_init(buf: *mut cui_log_buffer, lines: *mut cui_log_line, line_cap: i32, text: *mut c_char, text_cap: usize);
-    // a highlighted range of bytes: color 0 is the accent, 1 to 6 the series colors
+    // Toolbar: level filters, a search field that filters and highlights,
     pub fn cui_log_view_ex(ui: *mut cui_ctx, id: *const c_char, buf: *mut cui_log_buffer, opts: *const cui_log_view_opts);
-    // values for a sparkline under the value; needs at least 2
+    // Writes a reported task toggle into text ('x' or ' ' between the brackets).
     pub fn cui_markdown_apply_task(text: *mut c_char, result: *const cui_markdown_result) -> bool;
-    // text shown instead of the percentage, e.g. "+12 this week"; `delta` still sets arrow and color
     pub fn cui_markdown_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_markdown_opts) -> cui_markdown_result;
+    // CUI_TEXT_SHAPING optionally shapes static RTL lines; see docs/integration.md.
     pub fn cui_measure_text(ui: *mut cui_ctx, font: i32, size: f32, text: *const c_char, len: i32) -> cui_text_metrics;
-    // Code block with syntax highlighting (lang: "c", "cpp", "js", "ts",
     pub fn cui_menu_bar_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_menu_bar_opts);
-    // Code block with syntax highlighting (lang: "c", "cpp", "js", "ts",
     pub fn cui_menu_bar_end(ui: *mut cui_ctx, );
-    // a column of line numbers on the left
     pub fn cui_menu_bar_menu_begin(ui: *mut cui_ctx, label: *const c_char, opts: *const cui_menu_bar_menu_opts) -> bool;
-    // scrolls beyond this, default none
     pub fn cui_menu_bar_menu_end(ui: *mut cui_ctx, );
-    // inline code
     pub fn cui_meter(ui: *mut cui_ctx, label: *const c_char, used: f32, total: f32, unit: *const c_char);
-    // default 20,000
     pub fn cui_money_input_ex(ui: *mut cui_ctx, id: *const c_char, value: *mut f64, opts: *const cui_money_opts) -> bool;
-    // Tree cell: indentation, a disclosure chevron and a label, for tree tables
     pub fn cui_month_calendar_ex(ui: *mut cui_ctx, id: *const c_char, month: *mut cui_date, events: *const cui_month_event, count: i32, opts: *const cui_month_opts) -> cui_month_result;
-    // re-sort every sibling list by *sort
-    pub fn cui_multi_select_ex(ui: *mut cui_ctx, id: *const c_char, items: *mut c_char, count: i32, selected: *mut bool, opts: *const cui_multi_select_opts) -> bool;
+    pub fn cui_multi_select_ex(ui: *mut cui_ctx, id: *const c_char, items: *const *const c_char, count: i32, selected: *mut bool, opts: *const cui_multi_select_opts) -> bool;
+    // Seconds until CUI wants a frame (for caret blink, tooltips, toasts).
     pub fn cui_next_wakeup(ui: *mut cui_ctx, ) -> f32;
-    // function that lists a folder (the local disk unless set); default `cui_fs_list`
+    // width default 184
     pub fn cui_node_begin_ex(ui: *mut cui_ctx, node_id: i32, x: *mut f32, y: *mut f32, title: *const c_char, opts: *const cui_node_opts) -> bool;
-    // True once, with the chosen path in out, when the dialog is confirmed;
+    // A row for ordinary components. They are laid out at 100% and scaled with
     pub fn cui_node_content_begin(ui: *mut cui_ctx, );
-    // True once, with the chosen path in out, when the dialog is confirmed;
     pub fn cui_node_content_end(ui: *mut cui_ctx, );
-    // True once, with the chosen path in out, when the dialog is confirmed;
     pub fn cui_node_deleted(ui: *mut cui_ctx, node_id: *mut i32) -> bool;
-    // the folder to start in, default the current directory
     pub fn cui_node_editor_begin_ex(ui: *mut cui_ctx, id: *const c_char, view: *mut cui_node_view, opts: *const cui_node_editor_opts) -> bool;
-    // e.g. "*.png;*.jpg"
     pub fn cui_node_editor_end(ui: *mut cui_ctx, );
-    // passed to `list` as its first argument
     pub fn cui_node_end(ui: *mut cui_ctx, );
-    // True once, with the chosen path in out, when the dialog is confirmed;
     pub fn cui_node_input_ex(ui: *mut cui_ctx, pin_id: i32, label: *const c_char, opts: *const cui_pin_opts) -> bool;
-    // True once, with the chosen path in out, when the dialog is confirmed;
+    // A link from an output pin to an input pin. Returns true while it is selected.
     pub fn cui_node_link(ui: *mut cui_ctx, link_id: i32, from_pin: i32, to_pin: i32) -> bool;
-    // True once, with the chosen path in out, when the dialog is confirmed;
+    // What the user did this frame, one event per call; call them after
     pub fn cui_node_link_created(ui: *mut cui_ctx, from_pin: *mut i32, to_pin: *mut i32) -> bool;
-    // True once, with the chosen path in out, when the dialog is confirmed;
     pub fn cui_node_link_removed(ui: *mut cui_ctx, link_id: *mut i32) -> bool;
-    // True once, with the chosen path in out, when the dialog is confirmed;
     pub fn cui_node_output_ex(ui: *mut cui_ctx, pin_id: i32, label: *const c_char, opts: *const cui_pin_opts) -> bool;
-    // default "Failed"
     pub fn cui_now_playing_ex(ui: *mut cui_ctx, id: *const c_char, np: *mut cui_now_playing, opts: *const cui_now_playing_opts) -> i32;
-    // muted text after the value, before the - and + buttons, e.g. "kg"
+    // One time code input: `length` boxes; code must hold length + 1 bytes.
     pub fn cui_otp_input(ui: *mut cui_ctx, id: *const c_char, code: *mut c_char, length: i32) -> bool;
-    // combobox: filter options by typing
+    // Password strength meter (0 weak .. 4 strong). Returns the score.
     pub fn cui_password_strength(ui: *mut cui_ctx, password: *const c_char) -> i32;
-    // A right-aligned row for dialog actions.
-    pub fn cui_path_bar_ex(ui: *mut cui_ctx, id: *const c_char, segments: *mut c_char, count: i32, opts: *const cui_path_bar_opts) -> cui_path_bar_result;
-    // A right-aligned row for dialog actions.
+    pub fn cui_path_bar_ex(ui: *mut cui_ctx, id: *const c_char, segments: *const *const c_char, count: i32, opts: *const cui_path_bar_opts) -> cui_path_bar_result;
+    // True while the menu of separator *segment is showing: build menu items
     pub fn cui_path_bar_menu_begin(ui: *mut cui_ctx, id: *const c_char, segment: *mut i32) -> bool;
-    // A right-aligned row for dialog actions.
     pub fn cui_path_bar_menu_end(ui: *mut cui_ctx, );
-    // Lists a folder into out (names copied into names). Returns the number of
     pub fn cui_path_has_extension(path: *const c_char, accept: *const c_char) -> bool;
-    // small badge after the author's name, e.g. "Author"
-    pub fn cui_pipeline_ex(ui: *mut cui_ctx, id: *const c_char, stages: *mut c_char, stage_count: i32, jobs: *const cui_pipeline_job, job_count: i32, opts: *const cui_pipeline_opts) -> cui_pipeline_result;
-    // inherited by default; mirrors horizontal layout and padding
+    // job indices, or -1
+    pub fn cui_pipeline_ex(ui: *mut cui_ctx, id: *const c_char, stages: *const *const c_char, stage_count: i32, jobs: *const cui_pipeline_job, job_count: i32, opts: *const cui_pipeline_opts) -> cui_pipeline_result;
     pub fn cui_popover_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_popover_opts) -> bool;
-    // identity of the card, for its hover state (defaults to an automatic id)
     pub fn cui_popover_close(ui: *mut cui_ctx, id: *const c_char);
-    // inherited by default; mirrors horizontal layout and padding
     pub fn cui_popover_end(ui: *mut cui_ctx, );
-    // left and right padding in points; 0 uses `pad`
     pub fn cui_popover_is_open(ui: *mut cui_ctx, id: *const c_char) -> bool;
-    // identity of the card, for its hover state (defaults to an automatic id)
     pub fn cui_popover_open(ui: *mut cui_ctx, id: *const c_char);
-    // e.g. CUI_FILL up to max_width: fills narrow screens, stops on wide ones
     pub fn cui_popover_toggle(ui: *mut cui_ctx, id: *const c_char);
-    // the line, dot and label in the accent color
     pub fn cui_presence(ui: *mut cui_ctx, id: *const c_char, users: *const cui_presence_user, count: i32, max_visible: i32, size: f32);
-    // Comment with replies. depth indents replies under a connector line.
     pub fn cui_problems_ex(ui: *mut cui_ctx, id: *const c_char, diags: *const cui_diagnostic, count: i32, opts: *const cui_problems_opts) -> cui_problems_result;
-    // Writes a reported task toggle into text ('x' or ' ' between the brackets).
     pub fn cui_prop_bool_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut bool, opts: *const cui_prop_opts) -> bool;
-    // ---- Code editor ----
+    // A swatch and hex value that opens the color picker.
     pub fn cui_prop_color_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut cui_color, opts: *const cui_prop_opts) -> bool;
-    // Writes a reported task toggle into text ('x' or ' ' between the brackets).
-    pub fn cui_prop_enum_ex(ui: *mut cui_ctx, label: *const c_char, items: *mut c_char, count: i32, index: *mut i32, opts: *const cui_prop_opts) -> bool;
-    // height of the view in the latest layout
+    pub fn cui_prop_enum_ex(ui: *mut cui_ctx, label: *const c_char, items: *const *const c_char, count: i32, index: *mut i32, opts: *const cui_prop_opts) -> bool;
     pub fn cui_prop_float_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut f32, opts: *const cui_prop_opts) -> bool;
-    // height of the view in the latest layout
     pub fn cui_prop_int_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut i32, opts: *const cui_prop_opts) -> bool;
-    // height of the view in the latest layout
     pub fn cui_prop_text_ex(ui: *mut cui_ctx, label: *const c_char, buf: *mut c_char, cap: usize, opts: *const cui_prop_opts) -> bool;
-    // ---- Code editor ----
+    // Compact X, Y (Z, W) scrub fields side by side; value holds 2, 3 or 4 floats.
     pub fn cui_prop_vec_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut f32, components: i32, opts: *const cui_prop_opts) -> bool;
-    // ------------------------------------------------------------------------
     pub fn cui_query_builder_ex(ui: *mut cui_ctx, id: *const c_char, fields: *const cui_query_field, field_count: i32, nodes: *mut cui_query_node, count: *mut i32, capacity: i32, opts: *const cui_query_opts) -> bool;
-    // hides the previous and next arrows that show on hover
-    pub fn cui_query_match(fields: *const cui_query_field, field_count: i32, nodes: *const cui_query_node, count: i32, values: *mut c_char) -> bool;
-    // Carousel: slides that you swipe, drag, scroll or page with the arrows
+    // values[i] is the record's value for field i, as text ("1", "true", "open").
+    pub fn cui_query_match(fields: *const cui_query_field, field_count: i32, nodes: *const cui_query_node, count: i32, values: *const *const c_char) -> bool;
+    // the operators of a type: text "is", "is not", "contains", "does not contain",
     pub fn cui_query_op_name(type_: c_int, op: i32) -> *const c_char;
-    // Carousel: slides that you swipe, drag, scroll or page with the arrows
     pub fn cui_query_text(fields: *const cui_query_field, field_count: i32, nodes: *const cui_query_node, count: i32, out: *mut c_char, cap: usize) -> usize;
-    // Returns true when the view changed.
-    pub fn cui_radar_chart_ex(ui: *mut cui_ctx, id: *const c_char, series: *const cui_series, count: i32, axes: *mut c_char, axis_count: i32, opts: *const cui_radar_opts) -> i32;
-    // Connected buttons. Put buttons between begin and end.
+    pub fn cui_radar_chart_ex(ui: *mut cui_ctx, id: *const c_char, series: *const cui_series, count: i32, axes: *const *const c_char, axis_count: i32, opts: *const cui_radar_opts) -> i32;
     pub fn cui_radial_gauge_ex(ui: *mut cui_ctx, id: *const c_char, value: f32, min: f32, max: f32, opts: *const cui_radial_gauge_opts);
-    // Search field with a search icon and a clear button.
     pub fn cui_radio_cards_ex(ui: *mut cui_ctx, id: *const c_char, choices: *const cui_choice, count: i32, index: *mut i32, opts: *const cui_radio_cards_opts) -> bool;
-    // re-sort every sibling list by *sort
+    // One or two months side by side; click a start and an end.
     pub fn cui_range_calendar(ui: *mut cui_ctx, id: *const c_char, range: *mut cui_date_range, months: i32) -> bool;
-    // Load a TrueType/OpenType font. The data must stay alive if copy is false.
     pub fn cui_range_slider(ui: *mut cui_ctx, label: *const c_char, lo: *mut f32, hi: *mut f32, min: f32, max: f32) -> bool;
-    // Replace one of the built-in roles (e.g. use your brand font as CUI_FONT_BODY).
     pub fn cui_rating(ui: *mut cui_ctx, id: *const c_char, value: *mut i32, max: i32) -> bool;
-    // Menus and popovers
     pub fn cui_reactions(ui: *mut cui_ctx, id: *const c_char, items: *mut cui_reaction, count: i32) -> i32;
-    // value at the outer ring; 0 picks a round number above the largest value
-    pub fn cui_regex_search(pattern: *const c_char, flags: i32, text: *const c_char, len: i32, from: i32, m: *mut cui_regex_match, error: *const c_char) -> i32;
-    // Funnel: stages narrowing by value, with the conversion between them.
+    pub fn cui_regex_search(pattern: *const c_char, flags: i32, text: *const c_char, len: i32, from: i32, m: *mut cui_regex_match, error: *mut *const c_char) -> i32;
     pub fn cui_regex_tester_ex(ui: *mut cui_ctx, id: *const c_char, pattern: *mut c_char, pattern_cap: usize, text: *mut c_char, text_cap: usize, opts: *const cui_regex_tester_opts) -> cui_regex_tester_result;
-    // month 1..12
+    // Reorderable list: drag rows to reorder. `order` holds your item indices in
     pub fn cui_reorder_begin(ui: *mut cui_ctx, id: *const c_char, order: *mut i32, count: i32);
-    // month 1..12
     pub fn cui_reorder_end(ui: *mut cui_ctx, ) -> bool;
-    // month 1..12
     pub fn cui_reorder_item_begin(ui: *mut cui_ctx, position: i32);
-    // month 1..12
     pub fn cui_reorder_item_end(ui: *mut cui_ctx, );
-    // keeps the items in the order given instead of sorting them largest first
     pub fn cui_request_bar_ex(ui: *mut cui_ctx, id: *const c_char, method: *mut i32, url: *mut c_char, cap: usize, opts: *const cui_request_bar_opts) -> cui_request_bar_result;
+    // Asks for a frame within this many seconds even with no input, for things
     pub fn cui_request_wakeup(ui: *mut cui_ctx, seconds: f32);
-    // keeps the items in the order given instead of sorting them largest first
     pub fn cui_response_status(ui: *mut cui_ctx, status: i32, seconds: f64, bytes: f64);
-    // what editing starts with, default the segments joined by "/"
     pub fn cui_ruler_slider_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut f32, min: f32, max: f32, opts: *const cui_ruler_opts) -> bool;
-    // ------------------------------------------------------------------------
-    pub fn cui_sankey_ex(ui: *mut cui_ctx, id: *const c_char, nodes: *mut c_char, node_count: i32, links: *const cui_sankey_link, link_count: i32, opts: *const cui_sankey_opts) -> i32;
-    // Tag input: tags are stored comma separated in buf. Enter or comma adds the
+    pub fn cui_sankey_ex(ui: *mut cui_ctx, id: *const c_char, nodes: *const *const c_char, node_count: i32, links: *const cui_sankey_link, link_count: i32, opts: *const cui_sankey_opts) -> i32;
     pub fn cui_scatter_chart_ex(ui: *mut cui_ctx, id: *const c_char, series: *const cui_scatter_series, count: i32, opts: *const cui_scatter_opts) -> i32;
-    // past the last slide comes the first again, and back from the first the last
     pub fn cui_schedule_picker_ex(ui: *mut cui_ctx, id: *const c_char, cron: *mut c_char, cap: usize, opts: *const cui_schedule_opts) -> cui_schedule_result;
-    // entries in `places`; with `places` NULL the sidebar shows home, desktop, documents, downloads and the root
     pub fn cui_scrub_ex(ui: *mut cui_ctx, label: *const c_char, value: *mut f32, min: f32, max: f32, opts: *const cui_scrub_opts) -> bool;
-    // optional, defaults to malloc/free
     pub fn cui_set_platform(ui: *mut cui_ctx, platform: *const cui_platform_iface);
     pub fn cui_set_renderer(ui: *mut cui_ctx, renderer: *const cui_renderer_iface);
-    // ------------------------------------------------------------------------
     pub fn cui_set_strings(ui: *mut cui_ctx, strings: *const cui_strings);
-    // muted text at the right of the title, e.g. "2h ago"
+    // Text with a highlight sweeping across it, for "Thinking..." states.
     pub fn cui_shimmer_text_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_text_fx_opts);
-    // path: the folder shown, yours; the browser writes it as you move around.
     pub fn cui_shortcut_label(ui: *mut cui_ctx, combo: cui_key_combo) -> *const c_char;
-    // the folder could not be read
     pub fn cui_shortcut_recorder_ex(ui: *mut cui_ctx, id: *const c_char, combo: *mut cui_key_combo, opts: *const cui_shortcut_recorder_opts) -> bool;
-    // seconds since 1970 (UTC); 0 unknown
     pub fn cui_signature_clear(ui: *mut cui_ctx, id: *const c_char);
-    // File browser and file picker (an open or save dialog drawn by CUI, like
     pub fn cui_signature_pad_ex(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_signature_opts) -> bool;
-    // bytes
-    pub fn cui_signature_points(ui: *mut cui_ctx, id: *const c_char, points: *const cui_vec2, stroke_ends: *const i32, stroke_count: *mut i32) -> i32;
-    // ------------------------------------------------------------------------
+    pub fn cui_signature_points(ui: *mut cui_ctx, id: *const c_char, points: *mut *const cui_vec2, stroke_ends: *mut *const i32, stroke_count: *mut i32) -> i32;
     pub fn cui_skeleton(ui: *mut cui_ctx, width: cui_size, height: f32);
-    // ------------------------------------------------------------------------
     pub fn cui_speed_dial_ex(ui: *mut cui_ctx, id: *const c_char, actions: *const cui_speed_action, count: i32, opts: *const cui_speed_dial_opts) -> i32;
-    // Text
     pub fn cui_spinner(ui: *mut cui_ctx, size: f32);
-    // Spotlight style command palette. Returns the index of the chosen command,
     pub fn cui_split_bar_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_split_bar_opts) -> i32;
-    // ------------------------------------------------------------------------
-    pub fn cui_split_button_ex(ui: *mut cui_ctx, label: *const c_char, items: *mut c_char, count: i32, opts: *const cui_split_button_opts) -> i32;
-    // ------------------------------------------------------------------------
+    pub fn cui_split_button_ex(ui: *mut cui_ctx, label: *const c_char, items: *const *const c_char, count: i32, opts: *const cui_split_button_opts) -> i32;
     pub fn cui_spotlight_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_spotlight_opts);
-    // ------------------------------------------------------------------------
     pub fn cui_spotlight_end(ui: *mut cui_ctx, );
-    // Split bar: one bar split into parts, with a legend of values and shares.
     pub fn cui_stack_trace_ex(ui: *mut cui_ctx, id: *const c_char, frames: *const cui_stack_frame, count: i32, opts: *const cui_stack_trace_opts) -> cui_stack_trace_result;
-    // a small dot under the icon
-    pub fn cui_state_on_free(ui: *mut cui_ctx, id: u32);
-    // points; taller content scrolls. 0 shows everything
+    pub fn cui_state_on_free(ui: *mut cui_ctx, id: u32, fn_: Option<unsafe extern "C" fn(*mut cui_ctx, *mut c_void)>);
     pub fn cui_status_bar_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_status_bar_opts);
-    // ---- Markdown view ----
     pub fn cui_status_bar_end(ui: *mut cui_ctx, );
-    // ---- Markdown view ----
+    // A small clickable item ("Ln 12, Col 4", "UTF-8"). Returns true when clicked.
     pub fn cui_status_bar_item_ex(ui: *mut cui_ctx, label: *const c_char, opts: *const cui_status_item_opts) -> bool;
     pub fn cui_status_bar_progress_ex(ui: *mut cui_ctx, value: f32, opts: *const cui_status_progress_opts);
-    // ---- Markdown view ----
     pub fn cui_status_bar_spacer(ui: *mut cui_ctx, );
-    // ---- Markdown view ----
+    // A message; `tone` colors its icon.
     pub fn cui_status_bar_text_ex(ui: *mut cui_ctx, text: *const c_char, opts: *const cui_status_item_opts);
-    // page is 0 based
     pub fn cui_status_button_ex(ui: *mut cui_ctx, label: *const c_char, status: c_int, opts: *const cui_status_button_opts) -> bool;
-    // defaults to CUI_COLOR_BORDER when border > 0
-    pub fn cui_stepper(ui: *mut cui_ctx, steps: *mut c_char, count: i32, current: i32);
-    // the value arc, default the control color
+    // page is 0 based
+    pub fn cui_stepper(ui: *mut cui_ctx, steps: *const *const c_char, count: i32, current: i32);
     pub fn cui_sw_create() -> *mut c_void;
-    // the value arc, default the control color
     pub fn cui_sw_destroy(r: *mut c_void);
-    // under a vertical fader, before a horizontal one; the id when NULL
+    // Texture callbacks to pass to cui_create / cui_set_renderer.
     pub fn cui_sw_iface(r: *mut c_void) -> cui_renderer_iface;
     pub fn cui_swipe_item_begin(ui: *mut cui_ctx, id: *const c_char, left: *const cui_swipe_action, left_count: i32, right: *const cui_swipe_action, right_count: i32);
     pub fn cui_swipe_item_end(ui: *mut cui_ctx, ) -> i32;
-    // double-click value, default 0 (clamped to the range)
     pub fn cui_sw_last_damage(r: *const c_void, x: *mut i32, y: *mut i32, w: *mut i32, h: *mut i32) -> bool;
-    // default "%.1f"
+    // Renders draw data into a pixel buffer of width x height. stride is in bytes.
     pub fn cui_sw_render(r: *mut c_void, dd: *const cui_draw_data, pixels: *mut c_void, width: i32, height: i32, stride: i32, format: c_int);
-    // the track runs left to right, with the label before it, instead of bottom to top
+    // Incremental rendering: when the same buffer is passed again, with what the last
     pub fn cui_sw_set_incremental(r: *mut c_void, on: bool);
-    // the track runs left to right, with the label before it, instead of bottom to top
+    // Number of worker threads (1 = single threaded, default: number of cores up to 8).
     pub fn cui_sw_set_threads(r: *mut c_void, threads: i32);
-    // items that have an icon show only the icon, with their label as the tooltip
     pub fn cui_tab_bar_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_tab_bar_item, count: i32, selected: *mut i32, opts: *const cui_tab_bar_opts) -> bool;
-    // Square/round button with only an icon. Give it a tooltip so it has a name.
-    pub fn cui_table_cell_textf(ui: *mut cui_ctx, fmt: *const c_char);
-    // muted text after the value, before the - and + buttons, e.g. "kg"
+    pub fn cui_table_cell_textf(ui: *mut cui_ctx, fmt: *const c_char, ...);
     pub fn cui_tag_input_ex(ui: *mut cui_ctx, id: *const c_char, buf: *mut c_char, cap: usize, opts: *const cui_tag_opts) -> bool;
-    // an edit did not fit in the capacity and was dropped
     pub fn cui_terminal_clear(t: *mut cui_terminal_buffer);
-    // the bracket beside the caret and its partner, byte offsets, or -1
     pub fn cui_terminal_ex(ui: *mut cui_ctx, id: *const c_char, t: *mut cui_terminal_buffer, opts: *const cui_terminal_opts) -> cui_terminal_result;
-    // ranges to highlight (search results, regex matches), sorted by start
     pub fn cui_terminal_init(t: *mut cui_terminal_buffer, text: *mut c_char, text_cap: usize, lines: *mut cui_terminal_line, line_cap: i32);
-    // the text changed this frame
-    pub fn cui_terminal_printf(t: *mut cui_terminal_buffer, fmt: *const c_char);
-    // number of `marks`
+    // len -1: up to the terminator
+    pub fn cui_terminal_printf(t: *mut cui_terminal_buffer, fmt: *const c_char, ...);
     pub fn cui_terminal_write(t: *mut cui_terminal_buffer, data: *const c_char, len: i32);
-    // width of the node bars in points, default 12
     pub fn cui_test_explorer_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_test_item, count: i32, opts: *const cui_test_explorer_opts) -> cui_test_explorer_result;
-    // user text scale multiplier (default 1)
-    pub fn cui_textf(ui: *mut cui_ctx, fmt: *const c_char);
-    // the final item: no connector line below its dot and no space after it
+    pub fn cui_textf(ui: *mut cui_ctx, fmt: *const c_char, ...);
+    // Words fade and rise into place one after another, when first shown and
     pub fn cui_text_reveal_ex(ui: *mut cui_ctx, id: *const c_char, text: *const c_char, opts: *const cui_text_fx_opts);
-    // Popover anchored to the previous component. Toggle it with
+    // Theme switcher: light, dark and (optionally) system, as a compact icon
     pub fn cui_theme_switcher(ui: *mut cui_ctx, mode: *mut i32, with_system: bool) -> bool;
-    // Popover anchored to the previous component. Toggle it with
+    // Sun and moon icon button that toggles the theme with a morph.
     pub fn cui_theme_toggle(ui: *mut cui_ctx, ) -> bool;
-    // color the image is multiplied by; unset draws it as it is
     pub fn cui_ticker_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_ticker_item, count: i32, opts: *const cui_ticker_opts);
-    // Sorts every sibling list (stable) by cmp, relinking the nodes. Returns
+    // Time dial: a clock face. Drag the hand to set hours, then minutes.
     pub fn cui_time_dial(ui: *mut cui_ctx, id: *const c_char, hour: *mut i32, minute: *mut i32, size: f32) -> bool;
-    // title under the x axis; also names the x value in the tooltip
     pub fn cui_time_histogram_ex(ui: *mut cui_ctx, id: *const c_char, start: f64, bucket_seconds: f64, buckets: i32, series: *const cui_histogram_series, series_count: i32, sel_start: *mut f64, sel_end: *mut f64, opts: *const cui_time_histogram_opts) -> cui_time_histogram_result;
-    // Word marks between two versions of one line, as byte ranges (a length of -1
+    // time: the playhead in seconds (may be NULL).
     pub fn cui_timeline_editor_ex(ui: *mut cui_ctx, id: *const c_char, tracks: *mut cui_timeline_track, count: i32, time: *mut f32, opts: *const cui_timeline_editor_opts) -> cui_timeline_editor_result;
-    // Sorts every sibling list (stable) by cmp, relinking the nodes. Returns
     pub fn cui_time_picker_ex(ui: *mut cui_ctx, id: *const c_char, hour: *mut i32, minute: *mut i32, opts: *const cui_time_opts) -> bool;
-    // -1 when it has none, or none loaded yet
     pub fn cui_toc(ui: *mut cui_ctx, scroll_id: *const c_char, items: *const cui_toc_item, count: i32) -> i32;
-    // CUI_TREE_*
     pub fn cui_toc_anchor(ui: *mut cui_ctx, anchor: *const c_char);
-    // ------------------------------------------------------------------------
-    pub fn cui_toggle_group_ex(ui: *mut cui_ctx, id: *const c_char, labels: *mut c_char, count: i32, values: *mut bool, opts: *const cui_toggle_group_opts) -> bool;
-    // no title bar, even with a lang
+    pub fn cui_toggle_group_ex(ui: *mut cui_ctx, id: *const c_char, labels: *const *const c_char, count: i32, values: *mut bool, opts: *const cui_toggle_group_opts) -> bool;
     pub fn cui_toolbar_begin(ui: *mut cui_ctx, id: *const c_char, opts: *const cui_toolbar_opts);
-    // JSON viewer: a collapsible tree with typed colors and item counts.
     pub fn cui_toolbar_button_ex(ui: *mut cui_ctx, icon: *const c_char, opts: *const cui_tool_opts) -> bool;
-    // no title bar, even with a lang
     pub fn cui_toolbar_end(ui: *mut cui_ctx, );
-    // levels of the tree that start open, default 2
     pub fn cui_toolbar_separator(ui: *mut cui_ctx, );
-    // points; taller content scrolls. 0 shows everything
     pub fn cui_toolbar_spacer(ui: *mut cui_ctx, );
-    // Card: a bordered surface with generous padding.
-    pub fn cui_tour_ex(ui: *mut cui_ctx, id: *const c_char, steps: *const cui_tour_step, count: i32, step: *mut i32, opts: *const cui_tour_opts) -> i32;
-    // the item's amount: its area, length or share, by chart (activity rings: 1 is a full turn)
-    pub fn cui_trace_sort(spans: *mut cui_trace_span, count: i32);
-    // Treemap: rectangles with areas proportional to their values.
-    pub fn cui_trace_view_ex(ui: *mut cui_ctx, id: *const c_char, tracks: *mut cui_trace_track, track_count: i32, spans: *const cui_trace_span, span_count: i32, view: *mut cui_trace_view, selected: *mut i32, opts: *const cui_trace_opts) -> cui_trace_result;
-    // ------------------------------------------------------------------------
-    pub fn cui_tree_begin(ui: *mut cui_ctx, label: *const c_char, open: *mut bool, opts: *const cui_tree_opts) -> bool;
     // What happened this frame: one of CUI_TOUR_*.
+    pub fn cui_tour_ex(ui: *mut cui_ctx, id: *const c_char, steps: *const cui_tour_step, count: i32, step: *mut i32, opts: *const cui_tour_opts) -> i32;
+    pub fn cui_trace_sort(spans: *mut cui_trace_span, count: i32);
+    pub fn cui_trace_view_ex(ui: *mut cui_ctx, id: *const c_char, tracks: *mut cui_trace_track, track_count: i32, spans: *const cui_trace_span, span_count: i32, view: *mut cui_trace_view, selected: *mut i32, opts: *const cui_trace_opts) -> cui_trace_result;
+    pub fn cui_tree_begin(ui: *mut cui_ctx, label: *const c_char, open: *mut bool, opts: *const cui_tree_opts) -> bool;
+    // Tree cell: indentation, a disclosure chevron and a label, for tree tables
     pub fn cui_tree_cell(ui: *mut cui_ctx, label: *const c_char, depth: i32, has_children: bool, open: *mut bool, icon: *const c_char) -> bool;
-    // ------------------------------------------------------------------------
     pub fn cui_tree_clicked(ui: *mut cui_ctx, ) -> bool;
-    // Buttons
     pub fn cui_tree_end(ui: *mut cui_ctx, );
-    // Returns true when the view changed.
     pub fn cui_treemap_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_treemap_opts) -> i32;
-    // default 440
-    pub fn cui_tree_sort(nodes: *mut cui_tree_node, node_count: i32, root: i32, user: *mut c_void) -> i32;
-    // a check mark at the right edge of the item
-    pub fn cui_tree_table_begin_ex(ui: *mut cui_ctx, id: *const c_char, columns: *const cui_grid_column, column_count: i32, nodes: *mut cui_tree_node, node_count: i32, opts: *const cui_tree_table_opts);
-    // ------------------------------------------------------------------------
-    pub fn cui_tree_table_depth(ui: *mut cui_ctx, ) -> i32;
-    // ------------------------------------------------------------------------
-    pub fn cui_tree_table_end(ui: *mut cui_ctx, ) -> cui_tree_table_events;
-    // Dialogs, sheets, toasts, alerts
-    pub fn cui_tree_table_name(ui: *mut cui_ctx, label: *const c_char, icon: *const c_char);
-    // ------------------------------------------------------------------------
-    pub fn cui_tree_table_row(ui: *mut cui_ctx, ) -> i32;
-    // a dashed horizontal line at the value `y`, labelled at its end
-    pub fn cui_typing_indicator(ui: *mut cui_ctx, name: *const c_char);
-    // Scatter (or bubble) chart: points per series, optional sizes.
-    pub fn cui_uptime_ex(ui: *mut cui_ctx, id: *const c_char, services: *const cui_uptime_service, count: i32, opts: *const cui_uptime_opts) -> cui_uptime_result;
-    // width of each ring in points; 0 uses a tenth of `size`, at least 8
-    pub fn cui_url_params(url: *const c_char, pairs: *mut cui_kv_pair, cap: i32) -> i32;
-    // width of each ring in points; 0 uses a tenth of `size`, at least 8
-    pub fn cui_url_set_params(url: *mut c_char, cap: usize, pairs: *const cui_kv_pair, count: i32) -> bool;
-    // the one main action
-    pub fn cui_virtual_list_begin(ui: *mut cui_ctx, id: *const c_char, count: i32, row_height: f32, height: cui_size, first: *mut i32, last: *mut i32);
-    // the one main action
-    pub fn cui_virtual_list_end(ui: *mut cui_ctx, );
-    // not resizable
-    pub fn cui_voice_orb_ex(ui: *mut cui_ctx, id: *const c_char, state: c_int, level: f32, opts: *const cui_voice_orb_opts) -> bool;
-    // the command's text in the list; what typing in the palette searches
-    pub fn cui_waffle_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_waffle_opts) -> i32;
-    // Heatmap: a rows x cols matrix (values[row * cols + col]) on one hue,
-    pub fn cui_waterfall_ex(ui: *mut cui_ctx, id: *const c_char, requests: *const cui_net_request, count: i32, opts: *const cui_waterfall_opts) -> cui_waterfall_result;
-    // seconds before it disarms, default 3
-    pub fn cui_waveform_ex(ui: *mut cui_ctx, id: *const c_char, peaks: *const f32, count: i32, progress: *mut f32, opts: *const cui_waveform_opts) -> bool;
-    // next cell; put components inside
-    pub fn cui_week_calendar_ex(ui: *mut cui_ctx, id: *const c_char, week_start: cui_date, events: *mut cui_cal_event, count: i32, opts: *const cui_week_opts) -> i32;
     // Sorts every sibling list (stable) by cmp, relinking the nodes. Returns
-    pub fn cui_wheel_picker_ex(ui: *mut cui_ctx, id: *const c_char, items: *mut c_char, count: i32, index: *mut i32, opts: *const cui_wheel_opts) -> bool;
-    // the final item: no connector line below its dot and no space after it
-    pub fn cui_word_rotate_ex(ui: *mut cui_ctx, id: *const c_char, words: *mut c_char, count: i32, interval: f32, opts: *const cui_text_fx_opts);
-    // values to mark and label beside the track, e.g. dB marks; at most 32
+    pub fn cui_tree_sort(nodes: *mut cui_tree_node, node_count: i32, root: i32, cmp: Option<unsafe extern "C" fn(*mut c_void, i32, i32) -> i32>, user: *mut c_void) -> i32;
+    pub fn cui_tree_table_begin_ex(ui: *mut cui_ctx, id: *const c_char, columns: *const cui_grid_column, column_count: i32, nodes: *mut cui_tree_node, node_count: i32, opts: *const cui_tree_table_opts);
+    pub fn cui_tree_table_depth(ui: *mut cui_ctx, ) -> i32;
+    // depth of the current row, 0 at the top
+    pub fn cui_tree_table_end(ui: *mut cui_ctx, ) -> cui_tree_table_events;
+    // The first cell: indentation, guides, the chevron, an icon and the name
+    pub fn cui_tree_table_name(ui: *mut cui_ctx, label: *const c_char, icon: *const c_char);
+    // The next row in view: returns its node, or -1 when done. Then build its
+    pub fn cui_tree_table_row(ui: *mut cui_ctx, ) -> i32;
+    // "Today"
+    pub fn cui_typing_indicator(ui: *mut cui_ctx, name: *const c_char);
+    pub fn cui_uptime_ex(ui: *mut cui_ctx, id: *const c_char, services: *const cui_uptime_service, count: i32, opts: *const cui_uptime_opts) -> cui_uptime_result;
+    pub fn cui_url_params(url: *const c_char, pairs: *mut cui_kv_pair, cap: i32) -> i32;
+    // returns the pairs written
+    pub fn cui_url_set_params(url: *mut c_char, cap: usize, pairs: *const cui_kv_pair, count: i32) -> bool;
+    // Virtual list: only the visible rows are built, so lists with a million
+    pub fn cui_virtual_list_begin(ui: *mut cui_ctx, id: *const c_char, count: i32, row_height: f32, height: cui_size, first: *mut i32, last: *mut i32);
+    pub fn cui_virtual_list_end(ui: *mut cui_ctx, );
+    pub fn cui_voice_orb_ex(ui: *mut cui_ctx, id: *const c_char, state: c_int, level: f32, opts: *const cui_voice_orb_opts) -> bool;
+    pub fn cui_waffle_ex(ui: *mut cui_ctx, id: *const c_char, items: *const cui_viz_item, count: i32, opts: *const cui_waffle_opts) -> i32;
+    pub fn cui_waterfall_ex(ui: *mut cui_ctx, id: *const c_char, requests: *const cui_net_request, count: i32, opts: *const cui_waterfall_opts) -> cui_waterfall_result;
+    pub fn cui_waveform_ex(ui: *mut cui_ctx, id: *const c_char, peaks: *const f32, count: i32, progress: *mut f32, opts: *const cui_waveform_opts) -> bool;
+    pub fn cui_week_calendar_ex(ui: *mut cui_ctx, id: *const c_char, week_start: cui_date, events: *mut cui_cal_event, count: i32, opts: *const cui_week_opts) -> i32;
+    pub fn cui_wheel_picker_ex(ui: *mut cui_ctx, id: *const c_char, items: *const *const c_char, count: i32, index: *mut i32, opts: *const cui_wheel_opts) -> bool;
+    // One word at a time; the next one rolls up into place and the width follows.
+    pub fn cui_word_rotate_ex(ui: *mut cui_ctx, id: *const c_char, words: *const *const c_char, count: i32, interval: f32, opts: *const cui_text_fx_opts);
+    // Writes a PNG file (RGBA pixels). Returns false on failure.
     pub fn cui_write_png(path: *const c_char, rgba: *const c_void, width: i32, height: i32, stride: i32) -> bool;
 }

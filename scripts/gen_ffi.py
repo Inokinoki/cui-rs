@@ -40,13 +40,26 @@ PRIM = {"bool": "bool", "float": "f32", "double": "f64", "int": "i32",
 
 
 def strip_comments(text):
+    """Blanks /* */ and // comments with same-length whitespace (newlines
+    kept), so every offset in the result is also an offset in the original
+    text. Returns (blanked text, [(start, end-of-body, body)]) for /* */."""
     out, comments, i, n = [], [], 0, len(text)
+
+    def blank(a, b):
+        return "".join("\n" if c == "\n" else " " for c in text[a:b])
+
     while i < n:
         if text.startswith("/*", i):
             j = text.find("*/", i + 2)
             j = n if j < 0 else j
             comments.append((i, j, text[i + 2:j].strip()))
+            out.append(blank(i, min(j + 2, n)))
             i = j + 2
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+            out.append(blank(i, j))
+            i = j
         elif text[i] == '"':
             j = i + 1
             while j < n and text[j] != '"':
@@ -59,12 +72,15 @@ def strip_comments(text):
     return "".join(out), comments
 
 
-def doc_before(comments, pos, limit=600):
-    best, best_at = "", -1
+def doc_before(comments, pos, text, limit=600):
+    """The comment directly above the declaration at `pos`: only whitespace
+    (blanked comments included) may lie between its end and `pos`."""
+    best = ""
     for start, end, c in comments:
-        if end <= pos and pos - end < limit and not c.startswith("==") and not c.startswith("Generated"):
-            if end > best_at and len(c) > 3:
-                best, best_at = c, end
+        if end + 2 <= pos and pos - end < limit and not c.startswith("==") \
+                and not c.startswith("Generated") and len(c) > 3 \
+                and text[end + 2:pos].strip() == "":
+            best = c
     return best
 
 
@@ -88,25 +104,73 @@ def split_params(params):
     return out
 
 
+def split_ctype(text):
+    """'const char *const *' -> ('char', base_const, [const-after-star, ...]).
+    The const that follows a star qualifies that pointer itself, so it is the
+    pointee constness of the NEXT star outward."""
+    toks = re.findall(r"\*|\w+", text)
+    base, base_const, after = [], False, []
+    for t in toks:
+        if t == "*":
+            after.append(False)
+        elif t == "const":
+            if after:
+                after[-1] = True
+            else:
+                base_const = True
+        elif after:
+            raise SystemExit(f"unsupported C type: {text!r}")
+        else:
+            base.append(t)
+    return " ".join(base), base_const, after
+
+
+class P(tuple):
+    """(core type, name, kind) with the pieces the emitters need on top.
+
+    kind: "value" | "const_ptr" | "mut_ptr" (one level; core is the pointee
+    with const stripped) | "multi" (two or more levels; `ctext` keeps every
+    qualifier) | "fnptr" (`ret (*name)(args)`; `ret`/`args` hold the text)."""
+
+    def __new__(cls, core, name, kind, ctext="", ret="", args=""):
+        o = super().__new__(cls, (core, name, kind))
+        o.ctext, o.ret, o.args = ctext, ret, args
+        return o
+
+
 def parse_param(p):
+    """Parses one parameter or field declaration; None when it does not parse
+    (callers that must not drop things go through `must_param`)."""
     p = " ".join(p.split())
+    # function pointers: "void (*fn)(cui_ctx *ui, void *data)"
+    m = re.match(r"^(.+?)\(\s*\*\s*(\w+)\s*\)\s*\((.*)\)$", p)
+    if m:
+        return P(p, m.group(2), "fnptr", ret=m.group(1).strip(), args=m.group(3))
     # array declarators: "char key[64]" / "bool on[CUI_FLAG_ENVS]" — the array
     # suffix travels with the type so the struct emitter can size it
     m = re.match(r"(.+?)\b(\w+)\s*((?:\[\s*\w+\s*\])+)$", p)
     if m:
         ptype, name, arr = m.group(1).strip(), m.group(2), re.sub(r"\s", "", m.group(3))
         core = re.sub(r"\bconst\b", "", ptype).strip()
-        return (f"{core}{arr}", name, "value")
+        return P(f"{core}{arr}", name, "value")
     m = re.match(r"(.+?)\b(\w+)$", p)
     if not m:
         return None
     ptype, name = m.group(1).strip(), m.group(2)
     if ptype.endswith("*"):
-        mut = not re.search(r"\bconst\b", ptype)
-        inner = re.sub(r"\bconst\b", "", ptype).rstrip("*").strip()
-        return (inner, name, "mut_ptr" if mut else "const_ptr")
+        base, base_const, after = split_ctype(ptype)
+        if len(after) >= 2:
+            return P(base, name, "multi", ctext=ptype)
+        return P(base, name, "const_ptr" if base_const else "mut_ptr", ctext=ptype)
     core = re.sub(r"\bconst\b", "", ptype).strip()
-    return (core, name, "value")
+    return P(core, name, "value")
+
+
+def must_param(p, where):
+    r = parse_param(p)
+    if r is None:
+        raise SystemExit(f"cannot parse {where}: {p!r}")
+    return r
 
 
 def expand_field(f):
@@ -157,8 +221,43 @@ class Header:
         for m in re.finditer(r"#define (cui_\w+)\(([^)]*)\)\s+((?:[^\\\n]|\\\n)*)", t):
             self.macros[m.group(1)] = m.group(3)
         # integer #defines, e.g. CUI_FLAG_ENVS: array sizes in struct fields
-        for m in re.finditer(r"#define[ \t]+(CUI_\w+)[ \t]+(\d+)[ \t]*(?:$|//|/\*)", t, re.M):
+        for m in re.finditer(r"#define[ \t]+(CUI_\w+)[ \t]+(\d+)[ \t]*$", t, re.M):
             self.defines[m.group(1)] = m.group(2)
+        self._resolve_enums()
+
+    def _resolve_enums(self):
+        """enum_vals: {enum name: [(member, value)]}; const_env: member -> value.
+        Initializers are evaluated (ints, shifts, |, +, -, parens, earlier
+        members and integer #defines); anything else is a hard error."""
+        self.const_env = {k: int(v) for k, v in self.defines.items()}
+        self.enum_vals = {}
+        for name, (entries, _pos) in sorted(self.enums.items(), key=lambda kv: kv[1][1]):
+            v, out = 0, []
+            for mem, expr in entries:
+                if expr:
+                    v = self.eval_const(expr.lstrip("=").strip(), mem)
+                out.append((mem, v))
+                self.const_env[mem] = v
+                v += 1
+            self.enum_vals[name] = out
+
+    def eval_const(self, expr, where):
+        e = re.sub(r"\b(0[xX][0-9a-fA-F]+|\d+)[uUlL]+\b", r"\1", expr)
+        if not re.fullmatch(r"[\w\s()<>|&+\-*~^]+", e):
+            raise SystemExit(f"enum {where}: unsupported initializer {expr!r}")
+
+        def sub(m):
+            w = m.group(0)
+            if w[0].isdigit():
+                return w
+            if w not in self.const_env:
+                raise SystemExit(f"enum {where}: unknown name {w!r} in {expr!r}")
+            return str(self.const_env[w])
+
+        try:
+            return int(eval(re.sub(r"\b\w+\b", sub, e), {"__builtins__": {}}, {}))
+        except SyntaxError:
+            raise SystemExit(f"enum {where}: cannot evaluate {expr!r}")
 
     def _add(self, kind, body, name, pos):
         if kind == "enum":
@@ -357,9 +456,17 @@ def main():
         fields, pos = h.structs[t]
         needed[t] = (fields, pos)
         for f in fields:
-            core = parse_param(f)
-            if core:
-                add_type(core[0])
+            # every cui_* name in the field text, function-pointer
+            # parameter types included
+            for t2 in re.findall(r"\bcui_\w+\b", f):
+                add_type(t2)
+
+    # va_list has no Rust spelling (and no portable ABI): such functions
+    # (cui_log_appendv) are not bound; the variadic sibling is.
+    va = [f for f in new_fns if "va_list" in h.functions[f][1]]
+    for f in va:
+        print(f"skipping {f}: takes a va_list", file=sys.stderr)
+    new_fns = [f for f in new_fns if f not in va]
 
     for fn in new_fns:
         ret, params, _ = h.functions[fn]
@@ -374,14 +481,13 @@ def main():
     # ---- ffi type resolution ----
     def ffi_type(ctype):
         ctype = ctype.strip()
-        if ctype.endswith("*"):
-            m = re.match(r"(.*?)(const\s*)?\*$", ctype)
-            inner = re.sub(r"\bconst\b", "", ctype[:-1]).strip()
-            it = ffi_type(inner)
-            if it.startswith("*"):
-                return it
-            const = (m and m.group(2)) or "const" in ctype.split("*")[0]
-            return f"*const {it}" if const else f"*mut {it}"
+        if "*" in ctype:
+            base, base_const, after = split_ctype(ctype)
+            rt = ffi_type(base)
+            for i in range(len(after)):
+                const = base_const if i == 0 else after[i - 1]
+                rt = f"*const {rt}" if const else f"*mut {rt}"
+            return rt
         if ctype in PRIM:
             return PRIM[ctype]
         if ctype == "char":
@@ -391,7 +497,8 @@ def main():
         if ctype == "void":
             return "c_void"
         if ctype in ("va_list", "..."):
-            return "c_void"
+            raise SystemExit("va_list/variadic types have no Rust spelling; "
+                             "skip the function (variadics are emitted as `...`)")
         if ctype in ("cui_gl_renderer", "cui_sw_renderer"):
             return "c_void"
         if ctype in ("uint8_t", "unsigned char"):
@@ -412,23 +519,40 @@ def main():
             return "c_int"
         if ctype.startswith("cui_") or ctype.startswith("cui__"):
             return ctype
-        raise SystemExit(f"unmapped ffi type: {ctype!r} in struct {tname} field {fname}")
+        raise SystemExit(f"unmapped ffi type: {ctype!r}")
 
     def rust_ctype(ctype):
         """C type text (possibly a pointer) -> Rust type text."""
-        t = ctype.strip()
-        ptr = ""
-        while t.endswith("*"):
-            ptr += "*"
-            t = t[:-1].strip()
-        const = "const" in t
-        t = re.sub(r"\bconst\b", "", t).strip()
-        rt = ffi_type(t)
-        if not ptr:
-            return rt
-        if rt.startswith("*"):
-            return rt + "*" * (len(ptr) - 1)
-        return ("*const " if const else "*mut ") + rt
+        return ffi_type(ctype)
+
+    def param_rust_type(p):
+        """Full Rust type of a parsed parameter/field (never drops a level)."""
+        ctype, _, kind = p
+        if kind == "fnptr":
+            return fnptr_type(p.ret, p.args)
+        if kind == "multi":
+            return ffi_type(p.ctext)
+        rt = ffi_type(ctype)
+        if kind == "mut_ptr":
+            return f"*mut {rt}"
+        if kind == "const_ptr":
+            return f"*const {rt}"
+        return rt
+
+    def fnptr_type(ret, args):
+        """`Option<unsafe extern "C" fn(..) -> R>` for a C function pointer."""
+        ftypes = []
+        for prm in split_params(args):
+            if prm.strip() == "void":
+                continue
+            if prm.strip() == "...":
+                raise SystemExit(f"variadic function pointer: ({args})")
+            pp = parse_param(prm) or parse_param(prm + " _a")  # unnamed param
+            if pp is None:
+                raise SystemExit(f"cannot parse function-pointer parameter {prm!r}")
+            ftypes.append(param_rust_type(pp))
+        ret_txt = "" if ret.strip() == "void" else " -> " + ffi_type(ret.strip())
+        return f'Option<unsafe extern "C" fn({", ".join(ftypes)}){ret_txt}>'
 
 
     # A pointer param followed by an adjacent int is an array; if that int is
@@ -466,31 +590,15 @@ def main():
     ffi.append("use super::*;")
     ffi.append("")
 
-    def enum_value(name):
-        # resolves an enum member to its integer value (implicit counters too)
-        for entries, _pos in h.enums.values():
-            v = 0
-            for ename, expr in entries:
-                if expr:
-                    try:
-                        v = int(expr, 0)
-                    except ValueError:
-                        v = v  # non-numeric expressions are beyond the probe
-                if ename == name:
-                    return v
-                v += 1
-        return None
-
     def dim_of(d):
         if d.isdigit():
             return d
-        if d in h.defines:
-            return h.defines[d]
-        v = enum_value(d)
-        return str(v) if v is not None else d
+        if d in h.const_env:
+            return str(h.const_env[d])
+        raise SystemExit(f"unknown array dimension {d!r}")
 
     for tname, (cfields, pos) in sorted(needed.items()):
-        doc = doc_before(h.comments, pos)
+        doc = doc_before(h.comments, pos, h.text)
         ffi.append("// " + (doc.splitlines()[0].strip()[:110] if doc else tname))
         ffi.append("#[repr(C)]")
         has_array = any(re.search(r"\[\s*\w+\s*\]", f) for f in cfields)
@@ -498,45 +606,17 @@ def main():
         ffi.append(f"pub struct {tname} {{")
         for cf in cfields:
             for f in expand_field(cf):
-                p = parse_param(f)
-                if p is None:
-                    # function-pointer field: `ret (*name)(params)` — emit a
-                    # real Option<unsafe extern "C" fn(..)> so the struct keeps
-                    # C's layout (dropping the field would shift every field
-                    # after it)
-                    fm = re.match(r"(.+?)\s*\(\s*\*\s*(\w+)\s*\)\s*\((.*)\)$", " ".join(f.split()))
-                    if fm:
-                        ftypes = []
-                        ok = True
-                        for prm in split_params(fm.group(3)):
-                            if prm.strip() in ("", "void"):
-                                continue
-                            pp = parse_param(prm)
-                            if pp is None:
-                                ok = False
-                                break
-                            ct, _, pptr = pp
-                            rt_ = ffi_type(ct)
-                            if pptr == "const_ptr" and not rt_.startswith("*"):
-                                rt_ = f"*const {rt_}"
-                            elif pptr == "mut_ptr" and not rt_.startswith("*"):
-                                rt_ = f"*mut {rt_}"
-                            ftypes.append(rt_)
-                        if ok:
-                            fname_f = fm.group(2)
-                            if fname_f in RUST_KEYWORDS:
-                                fname_f += "_"
-                            ret_txt = "" if fm.group(1).strip() == "void" else " -> " + rust_ctype(fm.group(1))
-                            ffi.append(f"    pub {fname_f}: Option<unsafe extern \"C\" fn({', '.join(ftypes)}){ret_txt}>,")
-                            continue
-                    ffi.append(f"    // unparsed: {f}")
-                    continue
+                p = must_param(f, f"field of {tname}")
                 ctype, fname, ptr = p
+                if ptr == "fnptr":
+                    # `ret (*name)(params)` becomes a real Option<unsafe extern
+                    # "C" fn(..)> so the struct keeps C's layout
+                    ffi.append(f"    pub {rust_field_name(fname)}: {param_rust_type(p)},")
+                    continue
                 if fname == "_":
                     fname = "_pad"
                     ctype = "int"
-                if fname in ("in", "loop", "type", "fn", "match", "ref", "box", "move", "impl", "as", "use", "mod", "true", "false"):
-                    fname = fname + "_"
+                fname = rust_field_name(fname)
                 # array dims, innermost first: "char[10][24]" -> [[c_char; 24]; 10]
                 dims = re.findall(r"\[\s*(\w+)\s*\]", ctype)
                 arr = []
@@ -544,11 +624,9 @@ def main():
                     ctype = re.sub(r"(?:\[\s*\w+\s*\])+$", "", ctype).strip()
                     for d in reversed(dims):
                         arr.append(dim_of(d))
-                rt = ffi_type(ctype)
-                if ptr == "const_ptr":
-                    rt = f"*const {rt}" if not rt.startswith("*") else rt
-                elif ptr == "mut_ptr":
-                    rt = f"*mut {rt}" if not rt.startswith("*") else rt
+                    rt = ffi_type(ctype)  # arrays of values or of pointers
+                else:
+                    rt = param_rust_type(P(ctype, fname, ptr, ctext=p.ctext))
                 for d in arr:  # innermost dim first
                     rt = f"[{rt}; {d}]"
                 ffi.append(f"    pub {fname}: {rt},")
@@ -566,43 +644,36 @@ def main():
 
     # ---- enum constants ----
     ffi.append("// ---- enum constants ----")
-    for ename, (entries, _pos) in sorted(h.enums.items()):
+    for ename, members in sorted(h.enum_vals.items()):
         ffi.append(f"// {ename}")
-        v = 0
-        for mem, expr in entries:
-            if expr:
-                try:
-                    v = int(expr.strip().lstrip("=").strip(), 0)
-                except ValueError:
-                    pass
+        for mem, v in members:
             ffi.append(f"pub const {mem}: i32 = {v};")
-            v += 1
     ffi.append("")
 
     ffi.append('extern "C" {')
     for fn in new_fns:
         ret, params, pos = h.functions[fn]
-        doc = doc_before(h.comments, pos)
+        doc = doc_before(h.comments, pos, h.text)
         if doc:
             ffi.append("    // " + doc.splitlines()[0].strip()[:110])
         rust_params = []
         has_ctx = False
+        variadic = False
         for p in split_params(params):
-            parsed = parse_param(p)
-            if parsed is None:
+            if p.strip() == "void":
                 continue
+            if p.strip() == "...":
+                variadic = True
+                continue
+            parsed = must_param(p, f"parameter of {fn}")
             ctype, pname, ptr = parsed
-            if pname == "ui" and ctype == "cui_ctx":
+            if pname == "ui" and ctype == "cui_ctx" and ptr == "mut_ptr":
                 has_ctx = True
                 continue  # the context is the receiver
-            if pname in ("in", "loop", "type", "fn", "match", "ref", "box", "move", "impl"):
-                pname = pname + "_"
-            rt = ffi_type(ctype)
-            if ptr == "mut_ptr" and not rt.startswith("*"):
-                rt = f"*mut {rt}"
-            elif ptr == "const_ptr" and not rt.startswith("*"):
-                rt = f"*const {rt}"
-            rust_params.append(f"{pname}: {rt}")
+            pname = rust_field_name(pname)
+            rust_params.append(f"{pname}: {param_rust_type(parsed)}")
+        if variadic:
+            rust_params.append("...")
         ret_rust = "" if ret.strip() == "void" else " -> " + ffi_type(ret.strip())
         receiver = "ui: *mut cui_ctx, " if has_ctx else ""
         ffi.append(f"    pub fn {fn}({receiver}{', '.join(rust_params)}){ret_rust};")
@@ -649,6 +720,23 @@ def main():
 
     emitted_methods = set()
     used_fns = set()
+    not_auto_wrapped = []
+
+    def autowrap_ok(fn):
+        """A thin generated wrapper cannot make these sound: function
+        pointers, pointer-to-pointer params (out-pointers, string arrays) and
+        variadics need a hand-written method in ext.rs."""
+        for prm in split_params(h.functions[fn][1]):
+            if prm.strip() == "...":
+                break
+            if prm.strip() == "void":
+                continue
+            if must_param(prm, f"parameter of {fn}")[2] in ("fnptr", "multi"):
+                break
+        else:
+            return True
+        not_auto_wrapped.append(fn)
+        return False
 
     for entry in manifest:
         # find the functions behind this entry
@@ -673,6 +761,8 @@ def main():
                 continue
             if begin in hand_bound or end in hand_bound or entry in hand_bound:
                 continue
+            if not (autowrap_ok(begin) and autowrap_ok(end)):
+                continue
             mname = re.sub(r"^cui_", "", begin)
             mname = re.sub(r"_begin$", "", mname)
             if mname in hand_methods or mname in emitted_methods:
@@ -680,7 +770,7 @@ def main():
             emitted_methods.add(mname)
             used_fns.update([begin, end])
             ret, params, pos = h.functions[begin]
-            doc = doc_before(h.comments, pos)
+            doc = doc_before(h.comments, pos, h.text)
             safe.append("    /// " + (doc_first_line(doc) or entry))
             sig = []
             begin_args = []
@@ -760,6 +850,8 @@ def main():
         for entry_name, fn in fns:
             if fn in hand_bound or entry in hand_bound:
                 continue
+            if not autowrap_ok(fn):
+                continue
             mname = re.sub(r"_ex$", "", re.sub(r"^cui_", "", fn))
             if mname in hand_methods or mname in emitted_methods:
                 continue
@@ -770,7 +862,7 @@ def main():
             fp = parse_param(first)
             if not (fp and fp[0] == "cui_ctx" and fp[1] == "ui"):
                 continue  # context-free function: hand-bound or free
-            doc = doc_before(h.comments, pos)
+            doc = doc_before(h.comments, pos, h.text)
             safe.append("    /// " + (doc_first_line(doc) or fn))
             plist = [(parse_param(p) or (None, None, None)) for p in split_params(params)]
             buffer_at = None
@@ -946,16 +1038,26 @@ def main():
     gen_src = OUT_FFI.read_text()
     structs = {**rust_struct_fields(sys_src), **rust_struct_fields(gen_src)}
     decls = rust_extern_decls(sys_src) + rust_extern_decls(gen_src)
-    if len(decls) != 500:
-        print(f"warning: parsed {len(decls)} extern decls, expected 500", file=sys.stderr)
 
     probe = ["// Generated by scripts/gen_ffi.py: appended by vendor.sh runs.",
-             "// SZ/OFF for every struct the Rust FFI declares, hand-written",
-             "// and generated alike. layout_probe.c's base_probe has already",
-             "// moved to the [enum] section by the time this runs, so the",
-             "// section headers are re-selected here.",
+             "// EN() for every enum member in the header, SZ/OFF for every",
+             "// struct the Rust FFI declares, hand-written and generated alike.",
+             "// layout_probe.c's base_probe prints only the version line.",
              "void gen_probe_all(void) {",
-             '    puts("[size]");']
+             '    puts("[enum]");']
+    enum_checks = []
+    for _ename, members in sorted(h.enum_vals.items()):
+        for mem, _v in members:
+            probe.append(f"    EN({mem});")
+            enum_checks.append(f'    check(&t, "enum", "{mem}", {mem} as i64);')
+    # the hand-written #[repr] enums in cui-sys/src/lib.rs carry their own
+    # discriminants: pin every variant against the C value as well
+    masked_sys = mask_rust_noise(sys_src)
+    for em in re.finditer(r"pub enum (cui_\w+)\s*\{", masked_sys):
+        body_end = _match_delimiter(masked_sys, em.end() - 1)
+        for var in re.findall(r"\b(CUI_\w+)\b", masked_sys[em.end():body_end]):
+            enum_checks.append(f'    check(&t, "enum", "{var}", {em.group(1)}::{var} as i32 as i64);')
+    probe.append('    puts("[size]");')
     offsets = []
     checks = []
     for tname in sorted(structs):
@@ -965,14 +1067,13 @@ def main():
             print(f"warning: {tname} not probed (opaque or unparsed in the header)", file=sys.stderr)
             continue
         probe.append(f"    SZ({tname});")
-        checks.append(f'    check(&t, "size", "{tname}", size_of::<{tname}>() as u64);')
+        checks.append(f'    check(&t, "size", "{tname}", size_of::<{tname}>() as i64);')
         if len(cfields) != len(rfields):
-            print(f"warning: {tname}: {len(rfields)} Rust fields vs {len(cfields)} C fields; offsets skipped",
-                  file=sys.stderr)
-            continue
+            raise SystemExit(f"{tname}: {len(rfields)} Rust fields vs {len(cfields)} C fields "
+                             "(offsets would go unchecked)")
         for cf, rf in zip(cfields, rfields):
             offsets.append(f"    OFF({tname}, {cf});")
-            checks.append(f'    check(&t, "offset", "{tname}.{cf}", offset_of!({tname}, {rf}) as u64);')
+            checks.append(f'    check(&t, "offset", "{tname}.{cf}", offset_of!({tname}, {rf}) as i64);')
     probe.append('    puts("[offset]");')
     probe.extend(offsets)
     probe.append("}")
@@ -1006,6 +1107,101 @@ def main():
     (ROOT / "cui-sys/tests").mkdir(exist_ok=True)
     (ROOT / "cui-sys/tests/link.rs").write_text("\n".join(link) + "\n")
 
+    # ---- sigcheck.c: every Rust extern vs the header's own prototype ----
+    # The Rust declaration is mapped back to C independently of the code that
+    # produced it, then assigned to a function pointer of that type; the C
+    # compiler rejects a dropped parameter, a lost pointer level, a missing
+    # `...` or a changed qualifier (scripts/sigcheck.sh builds it with -Werror).
+    # The header is consulted only to NAME an enum or opaque struct where
+    # Rust spells it as an integer / `c_void`.
+    rust2c = {"c_char": "char", "c_int": "int", "i32": "int", "u32": "uint32_t",
+              "f32": "float", "f64": "double", "bool": "bool", "usize": "size_t",
+              "u8": "uint8_t", "i8": "int8_t", "i16": "int16_t", "u16": "uint16_t",
+              "i64": "int64_t", "u64": "uint64_t", "c_void": "void"}
+    subst_ok = set(h.enums) | {"cui_gl_renderer", "cui_sw_renderer"}
+
+    def hdr_info(prm):
+        prm = prm.strip()
+        if prm in ("", "void", "..."):
+            return None
+        p = parse_param(prm) or parse_param(prm + " _a")
+        if p is None:
+            raise SystemExit(f"sigcheck: cannot parse header parameter {prm!r}")
+        if p[2] == "fnptr":
+            return ("fn", p.ret, [a for a in split_params(p.args) if a.strip() != "void"])
+        return ("t", split_ctype(p.ctext or p[0])[0])
+
+    def match_paren(s, i):
+        depth = 0
+        for k in range(i, len(s)):
+            if s[k] == "(":
+                depth += 1
+            elif s[k] == ")":
+                depth -= 1
+                if depth == 0:
+                    return k
+        raise SystemExit(f"sigcheck: unbalanced parentheses in {s!r}")
+
+    def rust_to_c(rt, hi):
+        rt = rt.strip()
+        if rt.startswith("Option<"):
+            inner = rt[len("Option<"):].rstrip()
+            inner = inner[:-1].strip()  # the closing `>`
+            pm = re.match(r'(?:unsafe\s+)?extern "C" fn\(', inner)
+            if not pm:
+                raise SystemExit(f"sigcheck: unsupported Option payload {rt!r}")
+            op = pm.end() - 1
+            cl = match_paren(inner, op)
+            args = [re.sub(r"^\w+\s*:\s*", "", a.strip()) for a in split_params(inner[op + 1:cl]) if a.strip()]
+            rest = inner[cl + 1:].strip()
+            ret = rest[2:].strip() if rest.startswith("->") else None
+            hargs = [None] * len(args)
+            hret = None
+            if hi and hi[0] == "fn":
+                if len(hi[2]) == len(args):
+                    hargs = [hdr_info(a) for a in hi[2]]
+                if hi[1].strip() != "void":
+                    hret = ("t", split_ctype(hi[1])[0])
+            cret = "void" if ret is None else rust_to_c(ret, hret)
+            cargs = ", ".join(rust_to_c(a, ha) for a, ha in zip(args, hargs)) or "void"
+            return f"{cret} (*)({cargs})"
+        m = re.match(r"^\*(const|mut)\s+(.*)$", rt)
+        if m:
+            inner = rust_to_c(m.group(2), hi)
+            if m.group(1) == "const":
+                return inner + " const *" if inner.endswith("*") else f"const {inner} *"
+            return inner + " *"
+        if hi and hi[0] == "t" and hi[1] in subst_ok and rt in ("c_int", "i32", "u32", "c_void"):
+            return hi[1]
+        if rt in rust2c:
+            return rust2c[rt]
+        if rt.startswith("cui_"):
+            return rt
+        raise SystemExit(f"sigcheck: no C spelling for Rust type {rt!r}")
+
+    sig = ["/* Generated by scripts/gen_ffi.py - do not edit.",
+           " * Every Rust extern declaration, mapped back to C, assigned to a function",
+           " * pointer: scripts/sigcheck.sh compiles this with -Werror, so a parameter",
+           " * count, pointer level, qualifier or variadic mismatch against cui.h fails",
+           " * the build. */",
+           "#include <stddef.h>", "#include <stdint.h>", "#include <stdbool.h>",
+           '#include "cui.h"', ""]
+    for name, types, ret in decls:
+        if name not in h.functions:
+            raise SystemExit(f"sigcheck: {name} is declared in Rust but is not a CUI_API function in the header")
+        hret, hparams, _ = h.functions[name]
+        hps = [x for x in split_params(hparams) if x.strip() not in ("void", "...")]
+        variadic = any(t.strip() == "..." for t in types)
+        rtypes = [t for t in types if t.strip() != "..."]
+        his = [hdr_info(x) for x in hps] if len(hps) == len(rtypes) else [None] * len(rtypes)
+        cargs = [rust_to_c(t, hi) for t, hi in zip(rtypes, his)]
+        if variadic:
+            cargs.append("...")
+        hr = ("t", split_ctype(hret)[0]) if hret.strip() != "void" else None
+        cret = "void" if ret is None else rust_to_c(ret, hr)
+        sig.append(f"{cret} (*p_{name})({', '.join(cargs) or 'void'}) = {name};")
+    (ROOT / "cui-sys/probe/sigcheck.c").write_text("\n".join(sig) + "\n")
+
     layout = [
         "//! Generated by scripts/gen_ffi.py: checks every FFI struct's size",
         "//! and every field offset against the C ABI facts produced by the",
@@ -1016,12 +1212,12 @@ def main():
         "use core::mem::{offset_of, size_of};",
         "use cui_sys::*;",
         "",
-        "fn layout_table() -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>> {",
+        "fn layout_table() -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, i64>> {",
         "    use std::collections::BTreeMap;",
         "    let path = format!(\"{}/layout/{}.toml\", env!(\"CARGO_MANIFEST_DIR\"), CUI_VERSION_STRING);",
         "    let src = std::fs::read_to_string(&path)",
         "        .unwrap_or_else(|e| panic!(\"no layout probe table for CUI {CUI_VERSION_STRING} ({e}); run ./vendor.sh\"));",
-        "    let mut table: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();",
+        "    let mut table: BTreeMap<String, BTreeMap<String, i64>> = BTreeMap::new();",
         "    let mut section = String::new();",
         "    for line in src.lines() {",
         "        let line = line.trim();",
@@ -1039,7 +1235,7 @@ def main():
         "        if key == \"version\" {",
         "            continue; // recorded in the filename; not a number",
         "        }",
-        "        let value: u64 = value",
+        "        let value: i64 = value",
         "            .trim()",
         "            .parse()",
         "            .unwrap_or_else(|_| panic!(\"bad number in {path}: {line}\"));",
@@ -1048,8 +1244,8 @@ def main():
         "    table",
         "}",
         "",
-        "fn check(table: &std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>>,",
-        "         section: &str, key: &str, actual: u64) {",
+        "fn check(table: &std::collections::BTreeMap<String, std::collections::BTreeMap<String, i64>>,",
+        "         section: &str, key: &str, actual: i64) {",
         "    let expected = table",
         "        .get(section)",
         "        .and_then(|s| s.get(key))",
@@ -1062,6 +1258,9 @@ def main():
         "    let t = layout_table();",
     ]
     layout.extend(checks)
+    layout.append("}")
+    layout.extend(["", "#[test]", "fn enum_values_match_c() {", "    let t = layout_table();"])
+    layout.extend(enum_checks)
     layout.append("}")
     (ROOT / "cui-sys/tests/layout.rs").write_text("\n".join(layout) + "\n")
 

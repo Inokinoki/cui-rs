@@ -551,41 +551,33 @@ fn flag(key: &'static str, description: &'static str, on: [bool; 3], rollout: [i
     cui_sys::cui_feature_flag { key: str_ptr(key), description: str_ptr(description), on: o, rollout: r }
 }
 
+/// A leaked `const char *const *` (one NUL-terminated string per item), the
+/// shape C indexes as `options[i]`; lives as long as the process.
+fn leak_str_array(items: &[&'static str]) -> *const *const c_char {
+    let ptrs: Vec<*const c_char> = items.iter().map(|s| str_ptr(s) as *const c_char).collect();
+    Box::leak(ptrs.into_boxed_slice()).as_ptr()
+}
+
 fn filter_field(name: &'static str, icon: &'static str, options: &[&'static str]) -> cui_sys::cui_filter_field {
-    let mut packed = String::new();
-    for o in options {
-        packed.push_str(o);
-        packed.push('\0');
-    }
-    packed.push('\0');
-    let leaked: &'static mut [u8] = Box::leak(packed.into_bytes().into_boxed_slice());
     cui_sys::cui_filter_field {
         name: str_ptr(name),
         icon: s_icon(icon),
-        options: leaked.as_mut_ptr() as *mut c_char,
+        options: leak_str_array(options),
         option_count: options.len() as i32,
     }
 }
 
 fn field_choice(name: &'static str, ty: i32, choices: &[&'static str]) -> cui_sys::cui_query_field {
-    // a NUL-separated choice list, NUL-terminated (the C API's packed format)
-    let mut packed = String::new();
-    for c in choices {
-        packed.push_str(c);
-        packed.push('\0');
-    }
-    packed.push('\0');
-    let leaked: &'static mut [u8] = Box::leak(packed.into_bytes().into_boxed_slice());
     cui_sys::cui_query_field {
         name: str_ptr(name),
         type_: ty,
-        choices: leaked.as_mut_ptr() as *mut c_char,
+        choices: leak_str_array(choices),
         choice_count: choices.len() as i32,
     }
 }
 
 fn field_text(name: &'static str, ty: i32) -> cui_sys::cui_query_field {
-    cui_sys::cui_query_field { name: str_ptr(name), type_: ty, choices: core::ptr::null_mut(), choice_count: 0 }
+    cui_sys::cui_query_field { name: str_ptr(name), type_: ty, choices: core::ptr::null(), choice_count: 0 }
 }
 
 fn node_group(depth: i32, _enabled: bool, any: bool) -> cui_sys::cui_query_node {
@@ -2788,14 +2780,14 @@ fn stack_frame(function: &'static str, file: &'static str, line: i32, column: i3
         line,
         column,
         external,
-        source: core::ptr::null_mut(),
+        source: core::ptr::null(),
         source_count: 0,
         source_first: 0,
     };
     if let Some(lines) = source {
         // leak the source lines; they live as long as the process
         let leaked: &'static mut [*const c_char] = Box::leak(lines.iter().map(|l| str_ptr(l) as *const c_char).collect::<Vec<_>>().into_boxed_slice());
-        f.source = leaked.as_mut_ptr() as *mut c_char;
+        f.source = leaked.as_ptr();
         f.source_count = leaked.len() as i32;
         f.source_first = source_first;
     }

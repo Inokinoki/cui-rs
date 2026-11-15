@@ -7,3 +7,6 @@
 - `#![containers(..)]` header for custom scope widgets; opts types resolve in the caller's scope when `cui::view` has no match.
 - `src/generated.rs` (written by `scripts/gen_ffi.py`): the generated scope widgets and the leaf widgets that always go through `name_with`.
 - `|params|` before a scope body; options passed as `&mut` for the widgets in `MUT_OPTS`; widgets whose only form takes options.
+- A `{ .. }` body on a flags-returning widget names the flags type it returns
+  (`ComposerFlags` for `ChatComposer`, `ResponseActionsFlags` for
+  `ResponseActions`) instead of always saying `InputFlags`.

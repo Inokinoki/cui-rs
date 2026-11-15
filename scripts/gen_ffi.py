@@ -506,6 +506,9 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
             en = pascal(ctype[4:])
             if en in existing:
                 return (en, f"self.{n}.to_ffi() as c_int")
+            if en in taken:
+                raise SystemExit(f"gen_ffi: enum name {en} for {ctype} is taken by another "
+                                 "generated type; give the fields a hand-written twin")
             enums_needed[ctype] = en
             return (en, f"self.{n} as c_int")
         if ctype in PRIM:
@@ -658,7 +661,14 @@ def gen_views(h, needed, emitted_info, emitted_methods, hand_methods, safe):
     for ctype, en in sorted(enums_needed.items()):
         members = h.enum_vals[ctype]
         if not any(v == 0 for _m, v in members):
-            continue
+            # a planned field already names this enum; skipping it here would
+            # surface as a compile error in gen_opts.rs instead of this message
+            raise SystemExit(f"gen_ffi: C enum {ctype} has no zero-valued member, so the "
+                             f"generated {en} cannot derive Default; give the fields a "
+                             "hand-written twin or omit them (OMIT_FIELDS)")
+        if en in taken:
+            raise SystemExit(f"gen_ffi: enum name {en} for {ctype} is taken by another "
+                             "generated type; give the fields a hand-written twin")
         prefix = members[0][0]
         for m, _v in members:
             while not m.startswith(prefix):

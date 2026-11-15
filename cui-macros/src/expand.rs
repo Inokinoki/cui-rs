@@ -58,8 +58,16 @@ fn mut_opts(name: &str) -> bool {
     HAND_MUT.contains(&name) || crate::generated::MUT_OPTS.contains(&name)
 }
 
-/// Widgets that return `InputFlags`, not `bool`.
-const FLAG_WIDGETS: [&str; 4] = ["Input", "Textarea", "Search", "ChatComposer"];
+/// Widgets that return a flags type rather than `bool`, so a `{ ... }` body
+/// cannot run on their result. Returns the flags type, for the error message.
+fn flags_type(name: &str) -> Option<&'static str> {
+    match name {
+        "Input" | "Textarea" | "Search" => Some("InputFlags"),
+        "ChatComposer" => Some("ComposerFlags"),
+        "ResponseActions" => Some("ResponseActionsFlags"),
+        _ => None,
+    }
+}
 
 fn snake(name: &str) -> String {
     let mut out = String::new();
@@ -253,10 +261,10 @@ fn widget(cx: &mut Ctx, w: &Widget, as_value: bool) -> TokenStream {
                 cx.errs.push(Error::new(span, format!("`{name_s}` is not a container, so it takes no `{{ ... }}` body here")));
                 return quote!();
             }
-            if FLAG_WIDGETS.contains(&name_s.as_str()) {
+            if let Some(ty) = flags_type(&name_s) {
                 cx.errs.push(Error::new(
                     span,
-                    format!("`{name_s}` returns InputFlags, not bool: bind it with `let flags = {name_s}(..);` and test `flags.submitted()` / `flags.changed()`"),
+                    format!("`{name_s}` returns {ty}, not bool: bind it with `let flags = {name_s}(..);` and use {ty}'s methods"),
                 ));
                 return quote!();
             }

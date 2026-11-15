@@ -128,6 +128,21 @@ Not covered: `TreeTable`'s type-ahead callback (use the raw
 scope macros (`kanban`, `node_editor`, `reorder`, `card_stack`, `swipe_item`,
 `path_bar_menu`): call their `_begin` / `_end` methods from plain statements.
 
+# Sharp edges
+
+- A `Card` in statement position drops its clicked result; bind it with
+  `let clicked = Card(hoverable: true) { .. };` when it matters.
+- Options evaluate before the call's other arguments, the opposite of the
+  written order — visible only when both have side effects.
+- A call that begins with an uppercase name is a widget, so an everyday
+  `Foo(x);` statement is read as `ui.foo(x)`. Wrap it: `let v = { Foo(x) };`.
+- A hard syntax error hides the rest of its node list: fix it and the next
+  errors appear.
+- An `if` / `while` / `match` condition must not end in a struct literal
+  (`if x == Foo { 1 } { .. }` misbinds), and widget nodes take no `#[..]`
+  attributes.
+- The expansion names `::cui`, so the dependency must not be renamed.
+
 # Your own widgets
 
 `view!` asks very little of a widget, so anything you write fits: an

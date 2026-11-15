@@ -16,6 +16,13 @@ fn containers(ui: &mut Ui, open: &mut bool, ratio: &mut f32) {
         Dialog("Title" => *open) { DialogFooter() { Button("ok"); } }
         Dialog("Title" => *open, width: 300.) { Text("body"); }
         Split("sp", ratio) { Text("l"); }
+        Menu("File") { MenuItem("Open"); }
+        Menu("File", icon: Some(cui::ICON_FILE)) { MenuItem("X", shortcut: Some("Ctrl X")); }
+        UserMenu("Maya") { ui.muted("signed in"); }
+        UserMenu("Maya", detail: Some("maya@studio.dev"), compact: true) { ui.muted("avatar only"); }
+        Sheet("Export" => *open) { Text("sheet body"); }
+        Reasoning("r1") { Text("thinking"); }
+        Reasoning("r2", thinking: true, seconds: 12.) { Text("still going"); }
     }
 }
 

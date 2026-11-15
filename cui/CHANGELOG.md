@@ -124,3 +124,11 @@ Fixed:
 
 - First release: safe bindings for the 11 base examples, digest-checked
   vendored sources, per-version layout tables, CI on all three desktop OSes.
+
+Fixed (view!):
+
+- The `view!` module docs gained a "Sharp edges" section (dropped `Card`
+  click results, evaluation order, uppercase-call capture, error recovery,
+  struct-literal conditions, the `::cui` path). `gen_ffi.py` now fails loudly
+  on a C enum it cannot turn into a Rust enum, instead of emitting a struct
+  that would not compile.

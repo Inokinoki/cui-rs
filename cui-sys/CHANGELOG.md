@@ -11,6 +11,12 @@ the README's versioning exception (a signature that could not have had a
 working caller) these can ship in a patch release; every changed signature
 is listed.
 
+Fixed — struct fields:
+
+- **Arrays of `const char *` were `[*mut c_char; N]`**: `cui_strings`'
+  `month`, `month_short`, `weekday`, `weekday_short` and `weekday_min` are
+  `[*const c_char; N]` now, as C declares them (same layout).
+
 Fixed — extern signatures (each is what C declares in `cui.h`):
 
 - **Dropped function-pointer parameter** — C calls whatever sat in the

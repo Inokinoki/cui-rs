@@ -152,7 +152,7 @@ def parse_param(p):
     if m:
         ptype, name, arr = m.group(1).strip(), m.group(2), re.sub(r"\s", "", m.group(3))
         core = re.sub(r"\bconst\b", "", ptype).strip()
-        return P(f"{core}{arr}", name, "value")
+        return P(f"{core}{arr}", name, "value", ctext=ptype)
     m = re.match(r"(.+?)\b(\w+)$", p)
     if not m:
         return None
@@ -243,7 +243,8 @@ class Header:
 
     def eval_const(self, expr, where):
         e = re.sub(r"\b(0[xX][0-9a-fA-F]+|\d+)[uUlL]+\b", r"\1", expr)
-        if not re.fullmatch(r"[\w\s()<>|&+\-*~^]+", e):
+        # `**` is Python's power operator, not C: it would evaluate, wrongly
+        if not re.fullmatch(r"[\w\s()<>|&+\-*~^]+", e) or "**" in e:
             raise SystemExit(f"enum {where}: unsupported initializer {expr!r}")
 
         def sub(m):
@@ -256,8 +257,8 @@ class Header:
 
         try:
             return int(eval(re.sub(r"\b\w+\b", sub, e), {"__builtins__": {}}, {}))
-        except SyntaxError:
-            raise SystemExit(f"enum {where}: cannot evaluate {expr!r}")
+        except Exception as err:  # a bad shift, a division by zero, ...
+            raise SystemExit(f"enum {where}: cannot evaluate {expr!r} ({err})")
 
     def _add(self, kind, body, name, pos):
         if kind == "enum":
@@ -624,7 +625,9 @@ def main():
                     ctype = re.sub(r"(?:\[\s*\w+\s*\])+$", "", ctype).strip()
                     for d in reversed(dims):
                         arr.append(dim_of(d))
-                    rt = ffi_type(ctype)  # arrays of values or of pointers
+                    # arrays of values or of pointers; `ctext` still has the
+                    # qualifiers ("const char *names[4]" is [*const c_char; 4])
+                    rt = ffi_type(p.ctext if "*" in ctype else ctype)
                 else:
                     rt = param_rust_type(P(ctype, fname, ptr, ctext=p.ctext))
                 for d in arr:  # innermost dim first

@@ -344,16 +344,48 @@ impl App {
         (w > 0 && h > 0 && w <= 1 << 15 && h <= 1 << 15).then_some((w as u32, h as u32))
     }
 
-    /// Renders the current UI into an RGBA8 buffer of
-    /// [`framebuffer_size`](App::framebuffer_size) pixels, rows top to
-    /// bottom with no padding (any backend). Handy for screenshots and tests.
-    /// Returns `None` when the window size is unknown or CUI cannot render.
+    /// Renders the current UI into an RGBA8 buffer, rows top to bottom with
+    /// no padding (any backend), and returns `(width, height, pixels)` in
+    /// physical pixels. The size is the one CUI rendered at, read back from
+    /// CUI itself, so the buffer always matches it. `None` when the window
+    /// size is unknown or CUI cannot render.
+    pub fn screenshot(&mut self) -> Option<(u32, u32, Vec<u8>)> {
+        let (mut w, mut h) = self.framebuffer_size()?;
+        // CUI checks the buffer against the size of the last frame it
+        // finished, then renders the current one and writes at that size.
+        // Normally all three agree with `framebuffer_size`. When they do not
+        // (a resize between frames, a rounding difference), the first call
+        // has finished the frame, so its size is now exact: go again with it.
+        for _ in 0..2 {
+            let len = (w as usize).checked_mul(h as usize)?.checked_mul(4)?;
+            let mut buf = vec![0u8; len];
+            let ok = unsafe { ffi::cui_app_screenshot(self.ptr, buf.as_mut_ptr() as *mut c_void, w as i32, h as i32) };
+            let (rw, rh) = self.rendered_size()?;
+            if ok && (rw, rh) == (w, h) {
+                return Some((w, h, buf));
+            }
+            (w, h) = (rw, rh);
+        }
+        None
+    }
+
+    /// The pixel size of the last frame CUI finished (its draw data).
+    fn rendered_size(&mut self) -> Option<(u32, u32)> {
+        let dd = unsafe { ffi::cui_get_draw_data(ffi::cui_app_ui(self.ptr)) };
+        if dd.is_null() {
+            return None;
+        }
+        let (w, h) = unsafe { ((*dd).width_px, (*dd).height_px) };
+        (w > 0 && h > 0 && w <= 1 << 15 && h <= 1 << 15).then_some((w as u32, h as u32))
+    }
+
+    /// [`screenshot`](App::screenshot) without the size: the pixels only,
+    /// and only when they are [`framebuffer_size`](App::framebuffer_size)
+    /// pixels (`None` otherwise, rather than a buffer of another shape).
     pub fn screenshot_rgba(&mut self) -> Option<Vec<u8>> {
-        let (w, h) = self.framebuffer_size()?;
-        let len = (w as usize).checked_mul(h as usize)?.checked_mul(4)?;
-        let mut buf = vec![0u8; len];
-        let ok = unsafe { ffi::cui_app_screenshot(self.ptr, buf.as_mut_ptr() as *mut c_void, w as i32, h as i32) };
-        ok.then_some(buf)
+        let size = self.framebuffer_size()?;
+        let (w, h, buf) = self.screenshot()?;
+        ((w, h) == size).then_some(buf)
     }
 }
 

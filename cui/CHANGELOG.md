@@ -42,6 +42,19 @@ Fixed:
   writes the nodes until `tree_table_end`.
 - **`terminal_init`** is `unsafe` (**API change**): the terminal buffer
   keeps pointers into `text` and `lines` for as long as it is used.
+- **`Ui::state` ids are its own.** The id went to C as given, into the
+  table CUI's widgets use, so an id equal to a widget's (the same name
+  hashed, a small integer) named the widget's memory, and a widget whose
+  state was all zeroes looked like fresh storage and was overwritten. Ids
+  are remapped one-to-one before they reach C.
+- **`App::screenshot`** (new) returns `(width, height, pixels)` with the
+  size CUI rendered at, read back from CUI, retrying once when that differs
+  from `framebuffer_size` (a resize between frames, a rounding difference).
+  `screenshot_rgba` is built on it and returns `None` rather than a buffer
+  whose shape is not `framebuffer_size`.
+- **`Arena` settles on one chunk.** A frame that needed several chunks kept
+  only the largest, so it freed and reallocated the rest every frame; the
+  reset now leaves a single chunk big enough for the whole frame.
 - **`TableSort`** is `#[repr(C)]` (C writes `column`/`descending` through a
   pointer cast from it) with compile-time layout assertions.
 - **`textf` / `table_cell_textf`** passed their text as a printf format, so

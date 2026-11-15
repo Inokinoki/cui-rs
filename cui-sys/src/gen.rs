@@ -2114,11 +2114,11 @@ pub struct cui_status_progress_opts {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct cui_strings {
-    pub month: [*mut c_char; 12],
-    pub month_short: [*mut c_char; 12],
-    pub weekday: [*mut c_char; 7],
-    pub weekday_short: [*mut c_char; 7],
-    pub weekday_min: [*mut c_char; 7],
+    pub month: [*const c_char; 12],
+    pub month_short: [*const c_char; 12],
+    pub weekday: [*const c_char; 7],
+    pub weekday_short: [*const c_char; 7],
+    pub weekday_min: [*const c_char; 7],
     pub today: *const c_char,
 }
 impl Default for cui_strings {

@@ -43,6 +43,8 @@ def check(path: str) -> None:
             raise SystemExit(f"{path}: first chunk is {tag}, not IHDR")
         tags.append(tag)
         if tag == b"IHDR":
+            if ln != 13:
+                raise SystemExit(f"{path}: IHDR is {ln} bytes, not 13")
             ihdr = struct.unpack(">IIBBBBB", data)  # w, h, depth, color, comp, filter, interlace
         if tag == b"IDAT":
             idat += data

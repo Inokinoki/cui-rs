@@ -316,14 +316,21 @@ impl<'a> crate::Ui<'a> {
     /// # Panics
     ///
     /// When `id` already holds a value of a different type `T`, or `T` is
-    /// over-aligned for C's allocator. (The id space is shared with CUI's
-    /// own widgets: use hashes of your own names, not small integers.)
+    /// over-aligned for C's allocator.
+    ///
+    /// `id` is yours alone: it is remapped before it reaches C, so the id of
+    /// a widget (even one made from the same name) does not name the same
+    /// storage. C keeps one 32-bit id space, so a remapped id can still meet
+    /// an unrelated widget's by chance (about one in four billion per pair);
+    /// that cannot be told apart from fresh storage when the widget's state
+    /// is all zeroes.
     pub fn state<T: Copy + Default + 'static>(&mut self, id: u32) -> &mut T {
         assert!(
             core::mem::align_of::<StateSlot<T>>() <= 16,
             "Ui::state: the type is over-aligned for C's allocator"
         );
-        let slot = unsafe { ffi::cui_state(self.ctx, id, core::mem::size_of::<StateSlot<T>>()) } as *mut StateSlot<T>;
+        let slot = unsafe { ffi::cui_state(self.ctx, state_id(id), core::mem::size_of::<StateSlot<T>>()) }
+            as *mut StateSlot<T>;
         assert!(!slot.is_null() && slot.is_aligned());
         let tag = type_tag::<T>();
         // SAFETY: `slot` is C-owned memory of at least `size_of::<StateSlot<T>>()`
@@ -349,6 +356,15 @@ impl<'a> crate::Ui<'a> {
 struct StateSlot<T> {
     tag: u64,
     value: T,
+}
+
+/// Where `Ui::state` keeps the value for a caller's `id`. CUI's widgets keep
+/// their own state under `cui_make_id` hashes in the same table, and callers
+/// naturally pick those very hashes (or small integers), which would hand
+/// `Ui::state` a widget's memory. An xor and an odd multiply are a bijection
+/// on u32: distinct ids stay distinct, and none maps to itself by design.
+fn state_id(id: u32) -> u32 {
+    (id ^ 0x5374_6174).wrapping_mul(0x9E37_79B1)
 }
 
 fn type_tag<T: 'static>() -> u64 {
@@ -396,6 +412,27 @@ mod state_tests {
             let p = *ui.state::<Pair>(3);
             assert_eq!(p, Pair { label: "", n: 0 });
         });
+    }
+
+    #[test]
+    fn a_widget_state_under_the_same_id_is_left_alone() {
+        with_ui(|ui| {
+            // what a CUI widget does with its own id: zeroed state at first
+            let widget = unsafe { ffi::cui_state(ui.ctx, 11, 4) } as *mut f32;
+            assert_eq!(unsafe { *widget }, 0.0);
+            *ui.state::<u32>(11) = 0xdead_beef;
+            let widget = unsafe { ffi::cui_state(ui.ctx, 11, 4) } as *mut f32;
+            assert_eq!(unsafe { *widget }, 0.0, "Ui::state wrote into the widget's state");
+            assert_eq!(*ui.state::<u32>(11), 0xdead_beef);
+        });
+    }
+
+    #[test]
+    fn state_ids_stay_distinct() {
+        let mut seen = std::collections::HashSet::new();
+        for id in (0..100_000u32).chain(u32::MAX - 100_000..=u32::MAX) {
+            assert!(seen.insert(super::state_id(id)));
+        }
     }
 
     #[test]

@@ -39,7 +39,11 @@ Fixed:
   `order` are copied into the frame arena (`order` is copied back, as C
   only writes it during the call). **API change**: `tree_table_begin` is
   `unsafe` and takes `nodes: *mut [cui_tree_node]`, since C reads and
-  writes the nodes until `tree_table_end`.
+  writes the nodes until `tree_table_end`. C keeps the pointers inside
+  `opts` as well (`selected`, `sort`, `cursor`, `anchor`; the tree table's
+  `cursor`, `sort` and `label`/`user`) and reads and writes them up to the
+  matching `*_end` — their docs say so now, and so must the columns'
+  `title` strings outlive the call.
 - **`terminal_init`** is `unsafe` (**API change**): the terminal buffer
   keeps pointers into `text` and `lines` for as long as it is used.
 - **`Ui::state` ids are its own.** The id went to C as given, into the

@@ -502,7 +502,18 @@ impl<'a> Ui<'a> {
 
     /// Begins a virtualized data grid (C's `cui_data_grid_begin_ex`); pair
     /// with `data_grid_end`. `columns` is copied for the frame: C reads it
-    /// again in every `data_grid_cell`.
+    /// again in every `data_grid_cell`. The `title` strings inside the
+    /// columns are copied as they stand and read during this call, so they
+    /// must outlive it ([`Ui::cstr`](crate::Ui::cstr) hands out frame-lived
+    /// ones).
+    ///
+    /// The pointers inside `opts` are not copied: C keeps them and reads
+    /// and writes through them in calls up to `data_grid_end` — `selected`
+    /// on a click (Shift and Ctrl ranges too), `cursor` and `anchor` as
+    /// the keyboard moves, `sort` when a sortable header is clicked. Each
+    /// must point at memory that stays alive and in place until then (do
+    /// not drop or grow what holds it); C's writes land there for you to
+    /// read.
     pub fn data_grid_begin(
         &self,
         id: impl AsRef<str>,
@@ -535,7 +546,9 @@ impl<'a> Ui<'a> {
     }
 
     /// Begins a tree table (C's `cui_tree_table_begin_ex`); pair with
-    /// `tree_table_end`. `columns` is copied for the frame.
+    /// `tree_table_end`. `columns` is copied for the frame; the `title`
+    /// strings inside it are read during this call, so they must outlive it
+    /// ([`Ui::cstr`](crate::Ui::cstr) hands out frame-lived ones).
     ///
     /// # Safety
     ///
@@ -543,6 +556,12 @@ impl<'a> Ui<'a> {
     /// open and selected flags) in every tree-table call up to and including
     /// `tree_table_end`. Until then `nodes` must stay alive, must not move,
     /// and must not be read or written through any other reference.
+    ///
+    /// The pointers inside `opts` are kept the same way: C writes
+    /// `opts.cursor` as the keyboard moves, reads and writes `opts.sort`
+    /// (the headers), and calls `opts.label(opts.user, node)` while typing
+    /// to jump by name. They too must stay alive and in place until
+    /// `tree_table_end`.
     pub unsafe fn tree_table_begin(
         &self,
         id: impl AsRef<str>,

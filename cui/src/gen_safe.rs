@@ -113,11 +113,6 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_card_stack_item_end(self.ctx) }
     }
 
-    /// cui_carousel_begin
-    pub fn carousel_begin(&self, id: impl AsRef<str>, count: i32, index: &mut i32, opts: &ffi::cui_carousel_opts) -> bool {
-        unsafe { ffi::cui_carousel_begin(self.ctx, self.arena.cstr(id.as_ref()), count, index, opts) }
-    }
-
     /// cui_carousel_end
     pub fn carousel_end(&self) {
         unsafe { ffi::cui_carousel_end(self.ctx) }
@@ -892,11 +887,6 @@ impl<'a> Ui<'a> {
     /// cui_set_renderer
     pub fn set_renderer(&self, renderer: &ffi::cui_renderer_iface) {
         unsafe { ffi::cui_set_renderer(self.ctx, renderer) }
-    }
-
-    /// cui_set_strings
-    pub fn set_strings(&self, strings: &ffi::cui_strings) {
-        unsafe { ffi::cui_set_strings(self.ctx, strings) }
     }
 
     /// Text with a highlight sweeping across it, for "Thinking..." states.

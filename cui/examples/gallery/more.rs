@@ -1469,7 +1469,9 @@ fn page_social(ui: &mut Ui, g: &mut Gallery) {
     ui.ticker("tick", &tick, &cui_sys::cui_ticker_opts::default());
 
     section(ui, "Carousel", Some("Drag, flick, scroll sideways or use the arrows and dots."));
-    if ui.carousel_begin("tour", 4, &mut m.slide, &cui_sys::cui_carousel_opts { height: 200., auto_advance: 6., ..Default::default() }) {
+    // SAFETY: `m.slide` lives in the gallery's state for the whole run, past
+    // the `carousel_end` a few lines below.
+    if unsafe { ui.carousel_begin("tour", 4, &mut m.slide, &cui_sys::cui_carousel_opts { height: 200., auto_advance: 6., ..Default::default() }) } {
         let titles = ["Faster exports", "ARM64 runners", "Shortcuts everywhere", "Smaller downloads"];
         let descs = [
             "A 900 file project now exports in 40 seconds, down from four minutes.",

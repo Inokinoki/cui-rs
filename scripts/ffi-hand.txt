@@ -42,3 +42,5 @@ cui_otp_input
 cui_data_grid_begin_ex
 cui_reorder_begin
 cui_tree_table_begin_ex
+cui_set_strings
+cui_carousel_begin

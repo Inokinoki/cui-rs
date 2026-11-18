@@ -59,6 +59,18 @@ Fixed:
 - **`Arena` settles on one chunk.** A frame that needed several chunks kept
   only the largest, so it freed and reallocated the rest every frame; the
   reset now leaves a single chunk big enough for the whole frame.
+- **`set_strings`** is `unsafe` (**API change**): C keeps the table pointer
+  — and every string pointer inside it — until a later `set_strings` or the
+  context dies, reading them whenever a calendar renders. The old safe
+  signature accepted a borrow that ends when the call returns.
+- **`carousel_begin`** is `unsafe` (**API change**): C keeps the `index`
+  pointer and reads and writes it in the matching `carousel_end` (the
+  arrows and dots write the picked slide there), after the borrow has
+  ended.
+- The crate docs now say that strings inside the raw `cui_*` item structs
+  passed by slice (`bar_list`'s `label`, `scatter_chart`'s `name`, …) are
+  kept as they stand and read at draw time, after your code returns:
+  make them `'static` or pass them through `Ui::cstr`.
 - **`TableSort`** is `#[repr(C)]` (C writes `column`/`descending` through a
   pointer cast from it) with compile-time layout assertions.
 - **`textf` / `table_cell_textf`** passed their text as a printf format, so

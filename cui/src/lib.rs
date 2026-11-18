@@ -40,10 +40,15 @@
 //! ```
 //!
 //! Strings passed to widgets may be temporaries: they are copied into a
-//! per-frame arena that lives exactly as long as CUI needs them. State owned
-//! by CUI (scroll positions, focus, hover fades) is keyed by each widget's id
-//! — see the "Identity" notes in the C header: `"Label##key"` and
-//! `"Label###key"` work exactly as in C.
+//! per-frame arena that lives exactly as long as CUI needs them. The
+//! exception is strings inside the raw `cui_*` item structs some widgets
+//! take by slice (`bar_list`'s `label`, `scatter_chart`'s `name`, …): those
+//! are kept as they stand and read again when the frame is *drawn*, after
+//! your code has returned — make them `'static` literals or hand them
+//! through [`Ui::cstr`](crate::Ui::cstr), whose arena outlives the draw.
+//! State owned by CUI (scroll positions, focus, hover fades) is keyed by
+//! each widget's id — see the "Identity" notes in the C header:
+//! `"Label##key"` and `"Label###key"` work exactly as in C.
 //!
 //! A `cui::App` can be moved between threads but used from only one (as in
 //! C: one `cui_ctx` per thread). This crate binds CUI's own window layer

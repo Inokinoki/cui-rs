@@ -964,6 +964,43 @@ impl<'a> Ui<'a> {
         let fo = o.flatten(self.arena);
         unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids, words.len() as i32, interval, &fo) }
     }
+
+    /// A horizontally scrolling page carousel (C's `cui_carousel_begin`);
+    /// pair with `carousel_end`, and `carousel_slide_begin` /
+    /// `carousel_slide_end` around each page. This call clamps `index` into
+    /// range and may advance it (auto-advance); the arrows and dots in
+    /// `carousel_end` write the slide the user picked into it.
+    ///
+    /// # Safety
+    ///
+    /// C keeps the `index` pointer and reads and writes it in the matching
+    /// [`carousel_end`](crate::Ui::carousel_end). Until that returns, `index`
+    /// must stay alive, must not move, and must not be read or written
+    /// through any other reference.
+    pub unsafe fn carousel_begin(
+        &self,
+        id: impl AsRef<str>,
+        count: i32,
+        index: &mut i32,
+        opts: &ffi::cui_carousel_opts,
+    ) -> bool {
+        unsafe { ffi::cui_carousel_begin(self.ctx, self.cs(&id), count, index, opts) }
+    }
+
+    /// The app's month and weekday names (C's `cui_set_strings`): what
+    /// calendars, date pickers and the like show. Fields left null fall
+    /// back to CUI's English.
+    ///
+    /// # Safety
+    ///
+    /// C keeps the pointer, and every pointer inside it, until a later
+    /// `set_strings` or the context is destroyed: the names are read
+    /// whenever a calendar renders, frame after frame. `strings` and every
+    /// string in it must stay alive and in place for that long — a `static`
+    /// table, or one you keep alive on purpose, is the simple answer.
+    pub unsafe fn set_strings(&self, strings: &ffi::cui_strings) {
+        unsafe { ffi::cui_set_strings(self.ctx, strings) }
+    }
 }
 
 /// The date `days` days after the epoch CUI uses (C's `cui_date_from_days`).
@@ -1121,6 +1158,43 @@ mod retained_pointer_tests {
                 }
                 ui.data_grid_end();
             }
+        });
+    }
+
+    #[test]
+    fn carousel_end_reads_the_callers_index() {
+        frame(|ui| {
+            let mut index = 99;
+            // SAFETY: `index` is a local that outlives the `carousel_end` below.
+            unsafe { ui.carousel_begin("tour", 4, &mut index, &Default::default()) };
+            assert_eq!(index, 3, "begin clamps the index into range");
+            for _ in 0..4 {
+                ui.carousel_slide_begin();
+                ui.text("slide");
+                ui.carousel_slide_end();
+            }
+            ui.carousel_end(); // reads (and on a click writes) `index`
+        });
+    }
+
+    #[test]
+    fn set_strings_keeps_the_table_cui_reads_from() {
+        let table = ffi::cui_strings {
+            month: [c"Januar".as_ptr(); 12],
+            month_short: [c"Jan".as_ptr(); 12],
+            weekday: [c"Montag".as_ptr(); 7],
+            weekday_short: [c"Mo".as_ptr(); 7],
+            weekday_min: [c"Mo".as_ptr(); 7],
+            today: c"Heute".as_ptr(),
+        };
+        frame(|ui| {
+            // SAFETY: `table` outlives the context, which this frame helper
+            // creates and destroys around the closure.
+            unsafe { ui.set_strings(&table) };
+            let kept = unsafe { ffi::cui_get_strings(ui.ctx) };
+            assert_eq!(kept, &table as *const ffi::cui_strings);
+            // a calendar reads the table while it renders
+            ui.month_calendar("cal", &mut ffi::cui_date::default(), &[], &Default::default());
         });
     }
 }

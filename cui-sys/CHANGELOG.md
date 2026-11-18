@@ -15,7 +15,10 @@ Fixed — struct fields:
 
 - **Arrays of `const char *` were `[*mut c_char; N]`**: `cui_strings`'
   `month`, `month_short`, `weekday`, `weekday_short` and `weekday_min` are
-  `[*const c_char; N]` now, as C declares them (same layout).
+  `[*const c_char; N]` now, as C declares them (same layout). This one is
+  declaration correctness, not the exception above — a `*mut` array built
+  from `CString::into_raw` did work — so code filling those fields swaps
+  its `*mut` for `*const` (`CString::as_ptr` gives one directly).
 
 Fixed — extern signatures (each is what C declares in `cui.h`):
 

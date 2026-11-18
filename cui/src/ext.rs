@@ -502,10 +502,10 @@ impl<'a> Ui<'a> {
 
     /// Begins a virtualized data grid (C's `cui_data_grid_begin_ex`); pair
     /// with `data_grid_end`. `columns` is copied for the frame: C reads it
-    /// again in every `data_grid_cell`. The `title` strings inside the
-    /// columns are copied as they stand and read during this call, so they
-    /// must outlive it ([`Ui::cstr`](crate::Ui::cstr) hands out frame-lived
-    /// ones).
+    /// again in every `data_grid_cell`. The `title` pointers inside it are
+    /// copied as they stand: C reads the strings — and copies them into its
+    /// own frame storage — during this call, so they must be alive for it
+    /// ([`Ui::cstr`](crate::Ui::cstr) hands out frame-lived ones).
     ///
     /// The pointers inside `opts` are not copied: C keeps them and reads
     /// and writes through them in calls up to `data_grid_end` — `selected`
@@ -523,6 +523,7 @@ impl<'a> Ui<'a> {
         last: &mut i32,
         opts: &ffi::cui_grid_opts,
     ) -> bool {
+        assert!(!columns.is_empty());
         let cols = frame_copy(self.arena, columns);
         unsafe {
             ffi::cui_data_grid_begin_ex(self.ctx, self.cs(&id), cols, columns.len() as i32, row_count, first, last, opts)
@@ -569,6 +570,7 @@ impl<'a> Ui<'a> {
         nodes: *mut [ffi::cui_tree_node],
         opts: &ffi::cui_tree_table_opts,
     ) {
+        assert!(!columns.is_empty());
         let cols = frame_copy(self.arena, columns);
         unsafe {
             ffi::cui_tree_table_begin_ex(

@@ -55,6 +55,7 @@
 //!   `calendar_heatmap`'s `unit`) of the small charts — `heatmap`,
 //!   `calendar_heatmap`, `treemap`, `radar`, `funnel`, `split_bar`,
 //!   `activity_rings`, `scatter_chart`.
+//!
 //! State owned by CUI (scroll positions, focus, hover fades) is keyed by
 //! each widget's id — see the "Identity" notes in the C header:
 //! `"Label##key"` and `"Label###key"` work exactly as in C.

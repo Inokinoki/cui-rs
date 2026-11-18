@@ -500,6 +500,91 @@ impl<'a> Ui<'a> {
         }
     }
 
+    /// Begins a virtualized data grid (C's `cui_data_grid_begin_ex`); pair
+    /// with `data_grid_end`. `columns` is copied for the frame: C reads it
+    /// again in every `data_grid_cell`. The `title` pointers inside it are
+    /// copied as they stand: C reads the strings — and copies them into its
+    /// own frame storage — during this call, so they must be alive for it
+    /// ([`Ui::cstr`](crate::Ui::cstr) hands out frame-lived ones).
+    ///
+    /// The pointers inside `opts` are not copied: C keeps them and reads
+    /// and writes through them in calls up to `data_grid_end` — `selected`
+    /// on a click (Shift and Ctrl ranges too), `cursor` and `anchor` as
+    /// the keyboard moves, `sort` when a sortable header is clicked. Each
+    /// must point at memory that stays alive and in place until then (do
+    /// not drop or grow what holds it); C's writes land there for you to
+    /// read.
+    pub fn data_grid_begin(
+        &self,
+        id: impl AsRef<str>,
+        columns: &[ffi::cui_grid_column],
+        row_count: i32,
+        first: &mut i32,
+        last: &mut i32,
+        opts: &ffi::cui_grid_opts,
+    ) -> bool {
+        assert!(!columns.is_empty());
+        let cols = frame_copy(self.arena, columns);
+        unsafe {
+            ffi::cui_data_grid_begin_ex(self.ctx, self.cs(&id), cols, columns.len() as i32, row_count, first, last, opts)
+        }
+    }
+
+    /// Reorderable list: drag rows to reorder (C's `cui_reorder_begin`).
+    /// `order` holds your item indices in display order and is updated here
+    /// when a drag finished; pair with `reorder_end`.
+    pub fn reorder_begin(&self, id: impl AsRef<str>, order: &mut [i32]) {
+        // C keeps the pointer and reads it in every `reorder_item_begin`, but
+        // only writes it during this call: hand it a frame-lived copy and
+        // copy the result back.
+        let copy = frame_copy(self.arena, order) as *mut i32;
+        unsafe {
+            ffi::cui_reorder_begin(self.ctx, self.cs(&id), copy, order.len() as i32);
+            if !copy.is_null() {
+                core::ptr::copy_nonoverlapping(copy, order.as_mut_ptr(), order.len());
+            }
+        }
+    }
+
+    /// Begins a tree table (C's `cui_tree_table_begin_ex`); pair with
+    /// `tree_table_end`. `columns` is copied for the frame; the `title`
+    /// strings inside it are read during this call, so they must outlive it
+    /// ([`Ui::cstr`](crate::Ui::cstr) hands out frame-lived ones).
+    ///
+    /// # Safety
+    ///
+    /// C keeps the `nodes` pointer and reads and writes the nodes (their
+    /// open and selected flags) in every tree-table call up to and including
+    /// `tree_table_end`. Until then `nodes` must stay alive, must not move,
+    /// and must not be read or written through any other reference.
+    ///
+    /// The pointers inside `opts` are kept the same way: C writes
+    /// `opts.cursor` as the keyboard moves, reads and writes `opts.sort`
+    /// (the headers), and calls `opts.label(opts.user, node)` while typing
+    /// to jump by name. They too must stay alive and in place until
+    /// `tree_table_end`.
+    pub unsafe fn tree_table_begin(
+        &self,
+        id: impl AsRef<str>,
+        columns: &[ffi::cui_grid_column],
+        nodes: *mut [ffi::cui_tree_node],
+        opts: &ffi::cui_tree_table_opts,
+    ) {
+        assert!(!columns.is_empty());
+        let cols = frame_copy(self.arena, columns);
+        unsafe {
+            ffi::cui_tree_table_begin_ex(
+                self.ctx,
+                self.cs(&id),
+                cols,
+                columns.len() as i32,
+                nodes as *mut ffi::cui_tree_node,
+                nodes.len() as i32,
+                opts,
+            )
+        }
+    }
+
     /// Inline data-grid edit box (C's `cui_data_grid_edit`). Edits `value`.
     pub fn data_grid_edit(&mut self, value: &mut String) -> bool {
         begin_c_string(value, 127);
@@ -778,7 +863,15 @@ impl<'a> Ui<'a> {
 
     /// Terminal emulator state (C's `cui_terminal_init`). `text` is the
     /// scrollback buffer, `lines` the row cache.
-    pub fn terminal_init(
+    ///
+    /// # Safety
+    ///
+    /// `t` keeps pointers to `text`'s buffer (all of its capacity) and to
+    /// `lines`, and every later use of `t` (`Ui::terminal`, the
+    /// `cui_terminal_*` functions) reads and writes through them. For as long
+    /// as `t` is used, `text` and `lines` must stay alive and must not be
+    /// moved, grown, shrunk or otherwise touched.
+    pub unsafe fn terminal_init(
         &mut self,
         t: &mut ffi::cui_terminal_buffer,
         text: &mut String,
@@ -873,6 +966,43 @@ impl<'a> Ui<'a> {
         let fo = o.flatten(self.arena);
         unsafe { ffi::cui_word_rotate_ex(self.ctx, self.cs(&id), ids, words.len() as i32, interval, &fo) }
     }
+
+    /// A horizontally scrolling page carousel (C's `cui_carousel_begin`);
+    /// pair with `carousel_end`, and `carousel_slide_begin` /
+    /// `carousel_slide_end` around each page. This call clamps `index` into
+    /// range and may advance it (auto-advance); the arrows and dots in
+    /// `carousel_end` write the slide the user picked into it.
+    ///
+    /// # Safety
+    ///
+    /// C keeps the `index` pointer and reads and writes it in the matching
+    /// [`carousel_end`](crate::Ui::carousel_end). Until that returns, `index`
+    /// must stay alive, must not move, and must not be read or written
+    /// through any other reference.
+    pub unsafe fn carousel_begin(
+        &self,
+        id: impl AsRef<str>,
+        count: i32,
+        index: &mut i32,
+        opts: &ffi::cui_carousel_opts,
+    ) -> bool {
+        unsafe { ffi::cui_carousel_begin(self.ctx, self.cs(&id), count, index, opts) }
+    }
+
+    /// The app's month and weekday names (C's `cui_set_strings`): what
+    /// calendars, date pickers and the like show. Fields left null fall
+    /// back to CUI's English.
+    ///
+    /// # Safety
+    ///
+    /// C keeps the pointer, and every pointer inside it, until a later
+    /// `set_strings` or the context is destroyed: the names are read
+    /// whenever a calendar renders, frame after frame. `strings` and every
+    /// string in it must stay alive and in place for that long — a `static`
+    /// table, or one you keep alive on purpose, is the simple answer.
+    pub unsafe fn set_strings(&self, strings: &ffi::cui_strings) {
+        unsafe { ffi::cui_set_strings(self.ctx, strings) }
+    }
 }
 
 /// The date `days` days after the epoch CUI uses (C's `cui_date_from_days`).
@@ -946,4 +1076,127 @@ pub(crate) fn sync_buffer(value: &mut String) {
         return; // the caller never sized a buffer for CUI to write into
     }
     crate::sync_c_string(value)
+}
+
+/// A frame-lived copy of `items` in the arena, for arrays C keeps a pointer
+/// to after the call returns; null for an empty slice.
+fn frame_copy<T: Copy>(arena: &Arena, items: &[T]) -> *const T {
+    if items.is_empty() {
+        core::ptr::null()
+    } else {
+        arena.struct_array(items)
+    }
+}
+
+#[cfg(test)]
+mod retained_pointer_tests {
+    use crate::arena::Arena;
+    use crate::{Table, TableColumn, Ui};
+    use cui_sys as ffi;
+
+    /// One headless frame around `f`.
+    fn frame(f: impl FnOnce(&mut Ui)) {
+        let ctx = unsafe { ffi::cui_create(&ffi::cui_ctx_desc::default()) };
+        assert!(!ctx.is_null());
+        let arena = Arena::new();
+        unsafe {
+            ffi::cui_set_viewport(ctx, 800., 600., 1.);
+            ffi::cui_begin_frame(ctx, 1. / 60.);
+        }
+        f(&mut Ui { ctx, arena: &arena });
+        unsafe {
+            ffi::cui_end_frame(ctx);
+            ffi::cui_destroy(ctx);
+        }
+    }
+
+    #[test]
+    fn frame_copies_live_in_the_arena() {
+        let arena = Arena::new();
+        let items = vec![3i32, 1, 2];
+        let p = super::frame_copy(&arena, &items);
+        drop(items); // the copy must not depend on the caller's slice
+        assert_eq!(unsafe { core::slice::from_raw_parts(p, 3) }, &[3, 1, 2]);
+        assert!(super::frame_copy::<i32>(&arena, &[]).is_null());
+    }
+
+    #[test]
+    fn table_cells_after_begin_read_live_columns() {
+        frame(|ui| {
+            let cols = [TableColumn { title: "Name", ..Default::default() }, TableColumn { title: "Qty", ..Default::default() }];
+            if ui.table_begin("t", &cols, &mut Table::default()) {
+                for _ in 0..50 {
+                    ui.table_row(false);
+                    ui.table_cell_text("a");
+                    ui.table_cell_text(format!("{}", 1)); // heap churn between cells
+                }
+                ui.table_end();
+            }
+        });
+    }
+
+    #[test]
+    fn reorder_and_data_grid_take_temporaries() {
+        frame(|ui| {
+            let mut order = vec![2, 0, 1];
+            ui.reorder_begin("r", &mut order);
+            assert_eq!(order, [2, 0, 1], "no drag: the order comes back unchanged");
+            for i in 0..3 {
+                ui.reorder_item_begin(i);
+                ui.text("row");
+                ui.reorder_item_end();
+            }
+            assert!(!ui.reorder_end());
+            ui.reorder_begin("empty", &mut []);
+            ui.reorder_end();
+
+            let (mut first, mut last) = (0, 0);
+            let title = ui.cstr("Name");
+            // the column array is a temporary: gone when begin returns
+            if ui.data_grid_begin("g", &[ffi::cui_grid_column { title, ..Default::default() }], 3, &mut first, &mut last, &Default::default()) {
+                for row in first..last {
+                    ui.data_grid_row(row);
+                    ui.data_grid_cell_text("x");
+                }
+                ui.data_grid_end();
+            }
+        });
+    }
+
+    #[test]
+    fn carousel_end_reads_the_callers_index() {
+        frame(|ui| {
+            let mut index = 99;
+            // SAFETY: `index` is a local that outlives the `carousel_end` below.
+            unsafe { ui.carousel_begin("tour", 4, &mut index, &Default::default()) };
+            assert_eq!(index, 3, "begin clamps the index into range");
+            for _ in 0..4 {
+                ui.carousel_slide_begin();
+                ui.text("slide");
+                ui.carousel_slide_end();
+            }
+            ui.carousel_end(); // reads (and on a click writes) `index`
+        });
+    }
+
+    #[test]
+    fn set_strings_keeps_the_table_cui_reads_from() {
+        let table = ffi::cui_strings {
+            month: [c"Januar".as_ptr(); 12],
+            month_short: [c"Jan".as_ptr(); 12],
+            weekday: [c"Montag".as_ptr(); 7],
+            weekday_short: [c"Mo".as_ptr(); 7],
+            weekday_min: [c"Mo".as_ptr(); 7],
+            today: c"Heute".as_ptr(),
+        };
+        frame(|ui| {
+            // SAFETY: `table` outlives the context, which this frame helper
+            // creates and destroys around the closure.
+            unsafe { ui.set_strings(&table) };
+            let kept = unsafe { ffi::cui_get_strings(ui.ctx) };
+            assert_eq!(kept, &table as *const ffi::cui_strings);
+            // a calendar reads the table while it renders
+            ui.month_calendar("cal", &mut ffi::cui_date::default(), &[], &Default::default());
+        });
+    }
 }

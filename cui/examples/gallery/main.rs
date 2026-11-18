@@ -511,7 +511,7 @@ fn main() {
         if let Some((path, _)) = &shot {
             frames += 1;
             if frames == 30 {
-                if let (Some((w, h)), Some(rgba)) = (app.framebuffer_size(), app.screenshot_rgba()) {
+                if let Some((w, h, rgba)) = app.screenshot() {
                     // physical pixels: the buffer is w x h, not the logical size
                     save_png(path, &rgba, w, h);
                     println!("saved {path}");

@@ -28,6 +28,52 @@ Fixed:
   C writes (a short buffer was a heap overflow). `begin_c_string` leaves
   room for the NUL when a `String` is exactly full (C's `strlen` ran off
   the end).
+- **`table_begin`** freed its column array on return, while C keeps the
+  pointer and reads it in every `table_cell` / `table_cell_text` (a
+  use-after-free in every table). The columns live in the frame arena now.
+- **`Ui::canvas`** took any `T: Copy`, so `T` could borrow data that is
+  gone when C calls the painter (at render time, in the next `App::frame`).
+  **API change**: `T` must be `'static`; an over-aligned `T` panics.
+- **`data_grid_begin`**, **`tree_table_begin`** and **`reorder_begin`** are
+  hand-written: C keeps their arrays past the call. The column arrays and
+  `order` are copied into the frame arena (`order` is copied back, as C
+  only writes it during the call). **API change**: `tree_table_begin` is
+  `unsafe` and takes `nodes: *mut [cui_tree_node]`, since C reads and
+  writes the nodes until `tree_table_end`. C keeps the pointers inside
+  `opts` as well (`selected`, `sort`, `cursor`, `anchor`; the tree table's
+  `cursor`, `sort` and `label`/`user`) and reads and writes them up to the
+  matching `*_end` — their docs say so now, and so must the columns'
+  `title` strings outlive the call.
+- **`terminal_init`** is `unsafe` (**API change**): the terminal buffer
+  keeps pointers into `text` and `lines` for as long as it is used.
+- **`Ui::state` ids are its own.** The id went to C as given, into the
+  table CUI's widgets use, so an id equal to a widget's (the same name
+  hashed, a small integer) named the widget's memory, and a widget whose
+  state was all zeroes looked like fresh storage and was overwritten. Ids
+  are remapped one-to-one before they reach C.
+- **`App::screenshot`** (new) returns `(width, height, pixels)` with the
+  size CUI rendered at, read back from CUI, retrying once when that differs
+  from `framebuffer_size` (a resize between frames, a rounding difference).
+  `screenshot_rgba` is built on it and returns `None` rather than a buffer
+  whose shape is not `framebuffer_size`.
+- **`Arena` settles on one chunk.** A frame that needed several chunks kept
+  only the largest, so it freed and reallocated the rest every frame; the
+  reset now leaves a single chunk big enough for the whole frame.
+- **`set_strings`** is `unsafe` (**API change**): C keeps the table pointer
+  — and every string pointer inside it — until a later `set_strings` or the
+  context dies, reading them whenever a calendar renders. The old safe
+  signature accepted a borrow that ends when the call returns.
+- **`carousel_begin`** is `unsafe` (**API change**): C keeps the `index`
+  pointer and reads and writes it in the matching `carousel_end` (the
+  arrows and dots write the picked slide there), after the borrow has
+  ended.
+- The crate docs now say that strings inside the raw `cui_*` item structs
+  passed by slice (`bar_list`'s `label`, `scatter_chart`'s `name`, …) —
+  and the string fields inside some widgets' raw `opts`, which C's paint
+  data reads at draw time (`heatmap`'s `row_labels`/`col_labels`, the
+  small charts' `format`) — are kept as they stand and read at draw time,
+  after your code returns: make them `'static` or pass them through
+  `Ui::cstr` (the arena's `cstr_array` for label arrays).
 - **`TableSort`** is `#[repr(C)]` (C writes `column`/`descending` through a
   pointer cast from it) with compile-time layout assertions.
 - **`textf` / `table_cell_textf`** passed their text as a printf format, so

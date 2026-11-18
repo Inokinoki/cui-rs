@@ -40,10 +40,25 @@
 //! ```
 //!
 //! Strings passed to widgets may be temporaries: they are copied into a
-//! per-frame arena that lives exactly as long as CUI needs them. State owned
-//! by CUI (scroll positions, focus, hover fades) is keyed by each widget's id
-//! — see the "Identity" notes in the C header: `"Label##key"` and
-//! `"Label###key"` work exactly as in C.
+//! per-frame arena that lives exactly as long as CUI needs them. The
+//! exceptions are strings C keeps as they stand and reads again when the
+//! frame is *drawn*, after your code has returned — make them `'static`
+//! literals or hand them through [`Ui::cstr`](crate::Ui::cstr) (or
+//! [`Ui::arena`](crate::Ui::arena)'s `cstr_array`, for label arrays),
+//! whose arena outlives the draw:
+//!
+//! - strings inside the raw `cui_*` item structs some widgets take by
+//!   slice (`bar_list`'s `label`, `scatter_chart`'s `name`, …);
+//! - string fields inside some widgets' raw `opts`, which C copies into
+//!   its paint data and dereferences at draw time: `heatmap`'s
+//!   `row_labels` and `col_labels`, and the `format` (with
+//!   `calendar_heatmap`'s `unit`) of the small charts — `heatmap`,
+//!   `calendar_heatmap`, `treemap`, `radar`, `funnel`, `split_bar`,
+//!   `activity_rings`, `scatter_chart`.
+//!
+//! State owned by CUI (scroll positions, focus, hover fades) is keyed by
+//! each widget's id — see the "Identity" notes in the C header:
+//! `"Label##key"` and `"Label###key"` work exactly as in C.
 //!
 //! A `cui::App` can be moved between threads but used from only one (as in
 //! C: one `cui_ctx` per thread). This crate binds CUI's own window layer
@@ -344,16 +359,48 @@ impl App {
         (w > 0 && h > 0 && w <= 1 << 15 && h <= 1 << 15).then_some((w as u32, h as u32))
     }
 
-    /// Renders the current UI into an RGBA8 buffer of
-    /// [`framebuffer_size`](App::framebuffer_size) pixels, rows top to
-    /// bottom with no padding (any backend). Handy for screenshots and tests.
-    /// Returns `None` when the window size is unknown or CUI cannot render.
+    /// Renders the current UI into an RGBA8 buffer, rows top to bottom with
+    /// no padding (any backend), and returns `(width, height, pixels)` in
+    /// physical pixels. The size is the one CUI rendered at, read back from
+    /// CUI itself, so the buffer always matches it. `None` when the window
+    /// size is unknown or CUI cannot render.
+    pub fn screenshot(&mut self) -> Option<(u32, u32, Vec<u8>)> {
+        let (mut w, mut h) = self.framebuffer_size()?;
+        // CUI checks the buffer against the size of the last frame it
+        // finished, then renders the current one and writes at that size.
+        // Normally all three agree with `framebuffer_size`. When they do not
+        // (a resize between frames, a rounding difference), the first call
+        // has finished the frame, so its size is now exact: go again with it.
+        for _ in 0..2 {
+            let len = (w as usize).checked_mul(h as usize)?.checked_mul(4)?;
+            let mut buf = vec![0u8; len];
+            let ok = unsafe { ffi::cui_app_screenshot(self.ptr, buf.as_mut_ptr() as *mut c_void, w as i32, h as i32) };
+            let (rw, rh) = self.rendered_size()?;
+            if ok && (rw, rh) == (w, h) {
+                return Some((w, h, buf));
+            }
+            (w, h) = (rw, rh);
+        }
+        None
+    }
+
+    /// The pixel size of the last frame CUI finished (its draw data).
+    fn rendered_size(&mut self) -> Option<(u32, u32)> {
+        let dd = unsafe { ffi::cui_get_draw_data(ffi::cui_app_ui(self.ptr)) };
+        if dd.is_null() {
+            return None;
+        }
+        let (w, h) = unsafe { ((*dd).width_px, (*dd).height_px) };
+        (w > 0 && h > 0 && w <= 1 << 15 && h <= 1 << 15).then_some((w as u32, h as u32))
+    }
+
+    /// [`screenshot`](App::screenshot) without the size: the pixels only,
+    /// and only when they are [`framebuffer_size`](App::framebuffer_size)
+    /// pixels (`None` otherwise, rather than a buffer of another shape).
     pub fn screenshot_rgba(&mut self) -> Option<Vec<u8>> {
-        let (w, h) = self.framebuffer_size()?;
-        let len = (w as usize).checked_mul(h as usize)?.checked_mul(4)?;
-        let mut buf = vec![0u8; len];
-        let ok = unsafe { ffi::cui_app_screenshot(self.ptr, buf.as_mut_ptr() as *mut c_void, w as i32, h as i32) };
-        ok.then_some(buf)
+        let size = self.framebuffer_size()?;
+        let (w, h, buf) = self.screenshot()?;
+        ((w, h) == size).then_some(buf)
     }
 }
 
@@ -906,7 +953,10 @@ impl<'a> Ui<'a> {
         assert!(!columns.is_empty());
         let flat: Vec<ffi::cui_table_column> = columns.iter().map(|c| c.flatten(self.arena)).collect();
         let fo = o.flatten(self.arena);
-        unsafe { ffi::cui_table_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), flat.as_ptr(), flat.len() as i32, &fo) }
+        // C keeps the column pointer and reads it in every later
+        // `cui_table_cell`, so the array must live as long as the frame.
+        let cols = self.arena.struct_array(&flat);
+        unsafe { ffi::cui_table_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), cols, flat.len() as i32, &fo) }
     }
 
     /// Begins a row. Returns true when the row is clicked.

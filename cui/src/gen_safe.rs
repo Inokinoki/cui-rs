@@ -113,11 +113,6 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_card_stack_item_end(self.ctx) }
     }
 
-    /// cui_carousel_begin
-    pub fn carousel_begin(&self, id: impl AsRef<str>, count: i32, index: &mut i32, opts: &ffi::cui_carousel_opts) -> bool {
-        unsafe { ffi::cui_carousel_begin(self.ctx, self.arena.cstr(id.as_ref()), count, index, opts) }
-    }
-
     /// cui_carousel_end
     pub fn carousel_end(&self) {
         unsafe { ffi::cui_carousel_end(self.ctx) }
@@ -216,11 +211,6 @@ impl<'a> Ui<'a> {
     /// Returns true when the crop changed.
     pub fn cropper(&self, id: impl AsRef<str>, tex: usize, image_w: i32, image_h: i32, crop: &mut ffi::cui_rect, opts: &ffi::cui_cropper_opts) -> bool {
         unsafe { ffi::cui_cropper_ex(self.ctx, self.arena.cstr(id.as_ref()), tex, image_w, image_h, crop, opts) }
-    }
-
-    /// cui_data_grid_begin_ex
-    pub fn data_grid_begin(&self, id: impl AsRef<str>, columns: &[ffi::cui_grid_column], row_count: i32, first: &mut i32, last: &mut i32, opts: &ffi::cui_grid_opts) -> bool {
-        unsafe { ffi::cui_data_grid_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), columns.as_ptr(), columns.len() as c_int, row_count, first, last, opts) }
     }
 
     /// true when the row was clicked
@@ -849,11 +839,6 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_reactions(self.ctx, self.arena.cstr(id.as_ref()), items.as_mut_ptr(), items.len() as c_int) }
     }
 
-    /// Reorderable list: drag rows to reorder. `order` holds your item indices in
-    pub fn reorder_begin(&self, id: impl AsRef<str>, order: &mut [i32]) {
-        unsafe { ffi::cui_reorder_begin(self.ctx, self.arena.cstr(id.as_ref()), order.as_mut_ptr(), order.len() as c_int) }
-    }
-
     /// cui_reorder_end
     pub fn reorder_end(&self) -> bool {
         unsafe { ffi::cui_reorder_end(self.ctx) }
@@ -902,11 +887,6 @@ impl<'a> Ui<'a> {
     /// cui_set_renderer
     pub fn set_renderer(&self, renderer: &ffi::cui_renderer_iface) {
         unsafe { ffi::cui_set_renderer(self.ctx, renderer) }
-    }
-
-    /// cui_set_strings
-    pub fn set_strings(&self, strings: &ffi::cui_strings) {
-        unsafe { ffi::cui_set_strings(self.ctx, strings) }
     }
 
     /// Text with a highlight sweeping across it, for "Thinking..." states.
@@ -1132,11 +1112,6 @@ impl<'a> Ui<'a> {
     /// cui_treemap_ex
     pub fn treemap(&self, id: impl AsRef<str>, items: &[ffi::cui_viz_item], opts: &ffi::cui_treemap_opts) -> i32 {
         unsafe { ffi::cui_treemap_ex(self.ctx, self.arena.cstr(id.as_ref()), items.as_ptr(), items.len() as c_int, opts) }
-    }
-
-    /// cui_tree_table_begin_ex
-    pub fn tree_table_begin(&self, id: impl AsRef<str>, columns: &[ffi::cui_grid_column], nodes: &mut [ffi::cui_tree_node], opts: &ffi::cui_tree_table_opts) {
-        unsafe { ffi::cui_tree_table_begin_ex(self.ctx, self.arena.cstr(id.as_ref()), columns.as_ptr(), columns.len() as c_int, nodes.as_mut_ptr(), nodes.len() as c_int, opts) }
     }
 
     /// cui_tree_table_depth

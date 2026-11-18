@@ -76,15 +76,19 @@ impl Arena {
     }
 
     /// Called after `cui_app_frame` returns: the previous frame has been
-    /// presented, so nothing reads this frame's strings anymore. Keeps the
-    /// largest chunk for the next frame and frees the rest.
+    /// presented, so nothing reads this frame's strings anymore. A frame
+    /// that fit in one chunk keeps it; one that spilled into several gets a
+    /// single chunk as large as all of them, so the next frame of the same
+    /// size allocates nothing (keeping only the largest would free and
+    /// reallocate the overflow every frame).
     pub(crate) fn reset(&mut self) {
         let chunks = self.chunks.get_mut();
-        if let Some(biggest) = (0..chunks.len()).max_by_key(|&i| chunks[i].cap) {
-            let mut keep = chunks.swap_remove(biggest);
-            chunks.clear();
-            keep.used = 0;
-            chunks.push(keep);
+        if chunks.len() > 1 {
+            let total = chunks.iter().fold(0usize, |n, c| n.saturating_add(c.cap));
+            chunks.clear(); // free first: never hold both generations at once
+            chunks.push(Chunk::new(total));
+        } else if let Some(only) = chunks.first_mut() {
+            only.used = 0;
         }
     }
 
@@ -230,7 +234,37 @@ mod tests {
     }
 
     #[test]
-    fn reset_reuses_the_largest_chunk() {
+    fn a_steady_multi_chunk_frame_stops_allocating() {
+        let mut a = Arena::new();
+        let frame = |a: &Arena| {
+            for _ in 0..300 {
+                a.cstr(&"s".repeat(1000)); // ~300 KiB: several regular chunks
+            }
+        };
+        frame(&a);
+        assert!(unsafe { &*a.chunks.get() }.len() > 1);
+        a.reset();
+        let base = unsafe { &*a.chunks.get() }[0].ptr;
+        for _ in 0..3 {
+            frame(&a);
+            assert_eq!(unsafe { &*a.chunks.get() }.len(), 1, "the frame should fit the chunk kept by reset");
+            a.reset();
+            assert_eq!(unsafe { &*a.chunks.get() }[0].ptr, base, "reset must keep the same chunk");
+        }
+    }
+
+    #[test]
+    fn a_single_chunk_frame_keeps_its_chunk() {
+        let mut a = Arena::new();
+        let base = unsafe { &*a.chunks.get() }[0].ptr;
+        a.cstr("small");
+        a.reset();
+        let chunks = unsafe { &*a.chunks.get() };
+        assert_eq!((chunks.len(), chunks[0].used, chunks[0].ptr), (1, 0, base));
+    }
+
+    #[test]
+    fn reset_leaves_one_chunk_that_holds_the_whole_frame() {
         let mut a = Arena::new();
         a.cstr(&"a".repeat(CHUNK * 2));
         a.cstr("frame 1");

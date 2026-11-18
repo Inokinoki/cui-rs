@@ -68,9 +68,12 @@ Fixed:
   arrows and dots write the picked slide there), after the borrow has
   ended.
 - The crate docs now say that strings inside the raw `cui_*` item structs
-  passed by slice (`bar_list`'s `label`, `scatter_chart`'s `name`, …) are
-  kept as they stand and read at draw time, after your code returns:
-  make them `'static` or pass them through `Ui::cstr`.
+  passed by slice (`bar_list`'s `label`, `scatter_chart`'s `name`, …) —
+  and the string fields inside some widgets' raw `opts`, which C's paint
+  data reads at draw time (`heatmap`'s `row_labels`/`col_labels`, the
+  small charts' `format`) — are kept as they stand and read at draw time,
+  after your code returns: make them `'static` or pass them through
+  `Ui::cstr` (the arena's `cstr_array` for label arrays).
 - **`TableSort`** is `#[repr(C)]` (C writes `column`/`descending` through a
   pointer cast from it) with compile-time layout assertions.
 - **`textf` / `table_cell_textf`** passed their text as a printf format, so

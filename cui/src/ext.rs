@@ -3,7 +3,7 @@
 //! surface. Doc comments carry the C name, so the upstream docs translate.
 
 use crate::arena::Arena;
-use crate::opts::{cstr, Series, Sheet};
+use crate::opts::{cstr, fmt_cstr, Series, Sheet};
 use crate::opts2::*;
 use crate::types::*;
 use crate::{begin_c_string, sync_c_string, Ui};
@@ -398,7 +398,7 @@ impl<'a> crate::Ui<'a> {
             width: size_to_ffi(o.width),
             step: o.step,
             units: o.units.to_ffi(),
-            format: o.format.map_or(core::ptr::null(), |f| self.arena.cstr(f)),
+            format: fmt_cstr(self.arena, o.format),
             label_step: o.label_step,
             selected: o.selected.as_deref_mut().map_or(core::ptr::null_mut(), |s| s as *mut i32 as *mut core::ffi::c_int),
             no_add: o.no_add,
@@ -959,6 +959,15 @@ impl<'a> Ui<'a> {
         unsafe { ffi::cui_image_create(self.ctx, w, h, rgba.as_ptr().cast()) }
     }
 
+    /// Loads a color emoji font from memory (C's `cui_emoji_font_load_memory`).
+    /// CUI takes a copy, so `data` only needs to live for the call. Returns
+    /// false for a font under 12 bytes or one CUI cannot open. To lend CUI
+    /// the buffer instead (no copy, but it must then outlive the context),
+    /// call the raw `cui_sys` function.
+    pub fn emoji_font_load_memory(&self, data: &[u8]) -> bool {
+        unsafe { ffi::cui_emoji_font_load_memory(self.ctx, data.as_ptr().cast(), data.len(), true) }
+    }
+
     /// Words fade and rise into place one after another (C's `cui_word_rotate`).
     pub fn word_rotate(&mut self, id: impl AsRef<str>, words: &[&str], interval: f32, o: &crate::TextFx) {
         assert!(!words.is_empty());
@@ -1091,24 +1100,9 @@ fn frame_copy<T: Copy>(arena: &Arena, items: &[T]) -> *const T {
 #[cfg(test)]
 mod retained_pointer_tests {
     use crate::arena::Arena;
-    use crate::{Table, TableColumn, Ui};
+    use crate::test_support::frame;
+    use crate::{Table, TableColumn};
     use cui_sys as ffi;
-
-    /// One headless frame around `f`.
-    fn frame(f: impl FnOnce(&mut Ui)) {
-        let ctx = unsafe { ffi::cui_create(&ffi::cui_ctx_desc::default()) };
-        assert!(!ctx.is_null());
-        let arena = Arena::new();
-        unsafe {
-            ffi::cui_set_viewport(ctx, 800., 600., 1.);
-            ffi::cui_begin_frame(ctx, 1. / 60.);
-        }
-        f(&mut Ui { ctx, arena: &arena });
-        unsafe {
-            ffi::cui_end_frame(ctx);
-            ffi::cui_destroy(ctx);
-        }
-    }
 
     #[test]
     fn frame_copies_live_in_the_arena() {

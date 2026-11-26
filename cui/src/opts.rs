@@ -19,6 +19,25 @@ use core::ptr;
 pub(crate) fn cstr(a: &Arena, s: Option<&str>) -> *const c_char {
     s.map_or(ptr::null(), |s| a.cstr(s))
 }
+/// A printf format for one value (C passes a single `double`): checked
+/// first, since C hands it to `vsnprintf` as it stands.
+pub(crate) fn fmt_cstr(a: &Arena, s: Option<&str>) -> *const c_char {
+    s.map_or(ptr::null(), |s| {
+        crate::assert_value_format(s);
+        a.cstr(s)
+    })
+}
+/// The icons of a widget that reads `icons[k]` for every item `k` (CUI
+/// indexes them with the item count): one per item, or none.
+pub(crate) fn icon_array(a: &Arena, icons: &[&str], items: usize, what: &str) -> *const *const c_char {
+    assert!(
+        icons.is_empty() || icons.len() == items,
+        "{what}: one icon per item, or none ({} icons for {} items)",
+        icons.len(),
+        items
+    );
+    cstr_array(a, icons)
+}
 pub(crate) fn cstr_array(a: &Arena, s: &[&str]) -> *const *const c_char {
     if s.is_empty() { ptr::null() } else { a.cstr_array(s) }
 }
@@ -355,17 +374,18 @@ pub struct Segmented<'a> {
     pub size: ControlSize,
     /// Stretch to the parent width.
     pub full_width: bool,
-    /// One icon per item.
+    /// One icon per item; empty for none.
     pub icons: &'a [&'a str],
 }
 
 impl Segmented<'_> {
-    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_segmented_opts {
+    /// `items`: how many items the control has — CUI reads that many icons.
+    pub(crate) fn flatten(&self, a: &Arena, items: usize) -> ffi::cui_segmented_opts {
         ffi::cui_segmented_opts {
             _pad: 0,
             size: self.size.to_ffi(),
             full_width: self.full_width,
-            icons: cstr_array(a, self.icons),
+            icons: icon_array(a, self.icons, items, "segmented control"),
         }
     }
 }
@@ -401,7 +421,8 @@ pub struct Slider<'a> {
     pub step: f32,
     /// Show the value at the end of the row.
     pub show_value: bool,
-    /// printf format for the value, default "%.0f".
+    /// printf format for the value, default "%.0f"; one float conversion
+    /// (`"%.1f"`), or the call panics.
     pub format: Option<&'a str>,
     /// Drawn dimmed and ignores clicks.
     pub disabled: bool,
@@ -415,7 +436,7 @@ impl Slider<'_> {
             _pad: 0,
             step: self.step,
             show_value: self.show_value,
-            format: cstr(a, self.format),
+            format: fmt_cstr(a, self.format),
             disabled: self.disabled,
             width: sz(self.width),
         }
@@ -535,7 +556,7 @@ pub struct Select<'a> {
     pub label: Option<&'a str>,
     /// Shown when no item is chosen.
     pub placeholder: Option<&'a str>,
-    /// One icon per item.
+    /// One icon per item; empty for none.
     pub icons: &'a [&'a str],
     /// Combobox: filter options by typing.
     pub searchable: bool,
@@ -546,12 +567,13 @@ pub struct Select<'a> {
 }
 
 impl Select<'_> {
-    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_select_opts {
+    /// `items`: how many options there are — CUI reads that many icons.
+    pub(crate) fn flatten(&self, a: &Arena, items: usize) -> ffi::cui_select_opts {
         ffi::cui_select_opts {
             _pad: 0,
             label: cstr(a, self.label),
             placeholder: cstr(a, self.placeholder),
-            icons: cstr_array(a, self.icons),
+            icons: icon_array(a, self.icons, items, "select"),
             searchable: self.searchable,
             disabled: self.disabled,
             width: sz(self.width),
@@ -566,18 +588,19 @@ impl Select<'_> {
 pub struct Tabs<'a> {
     /// Visual style; default underline.
     pub variant: TabsVariant,
-    /// One icon per item.
+    /// One icon per tab; empty for none.
     pub icons: &'a [&'a str],
     /// Stretch to the parent width.
     pub full_width: bool,
 }
 
 impl Tabs<'_> {
-    pub(crate) fn flatten(&self, a: &Arena) -> ffi::cui_tabs_opts {
+    /// `items`: how many tabs there are — CUI reads that many icons.
+    pub(crate) fn flatten(&self, a: &Arena, items: usize) -> ffi::cui_tabs_opts {
         ffi::cui_tabs_opts {
             _pad: 0,
             variant: self.variant.to_ffi(),
-            icons: cstr_array(a, self.icons),
+            icons: icon_array(a, self.icons, items, "tab bar"),
             full_width: self.full_width,
         }
     }
@@ -973,7 +996,8 @@ pub struct Chart<'a> {
     pub stacked: bool,
     /// Curved lines.
     pub smooth: bool,
-    /// Value format for axis and tooltip, default "%.0f".
+    /// Value format for axis and tooltip, default "%.0f"; one float
+    /// conversion (`"%.1f"`), or the call panics.
     pub format: Option<&'a str>,
     /// Fixed y range when min != max.
     pub min: f32,
@@ -1001,7 +1025,7 @@ impl Chart<'_> {
             no_legend: self.no_legend,
             stacked: self.stacked,
             smooth: self.smooth,
-            format: cstr(a, self.format),
+            format: fmt_cstr(a, self.format),
             min: self.min,
             max: self.max,
             annotations,

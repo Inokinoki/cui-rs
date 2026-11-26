@@ -86,6 +86,13 @@ Changed:
   the `app` feature, the only code that uses them.
 - `build.rs` error messages no longer send crates.io users to `./vendor.sh`
   (it is not in the package) when it is absent.
+- `vendor.sh --pin` rewrote `UPSTREAM.toml` without its `supported` line, so
+  `build.rs` then refused the pinned version (`declares support for CUI
+  []`). It updates the pin keys in place now, and says when `supported`
+  does not list the new version.
+- The license texts of the embedded fonts and icons (Inter and Geist: SIL
+  OFL 1.1; Lucide: ISC) ship in the package as `licenses/`, copied from the
+  pinned release's `assets/fonts/` by `vendor.sh --pin`.
 
 ## 0.1.3+cui1.4.0
 

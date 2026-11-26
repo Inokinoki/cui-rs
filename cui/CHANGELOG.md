@@ -8,6 +8,42 @@ corrected `cui-sys` signatures (see its changelog).
 
 Fixed:
 
+- **Value formats are checked.** `Slider::format`, `Chart::format`,
+  `DotChart::format` / `x_format` and `EventTrack::format` went to C's
+  `vsnprintf` as they stood: `Some("%s")` made printf read a pointer that
+  was never passed (a crash from safe code). They accept `%%` and one float
+  conversion, and panic on anything else.
+- **An icon array shorter than the items is refused.** `Segmented::icons`,
+  `Tabs::icons` and `Select::icons` are indexed by CUI with the *item*
+  count, so one icon for three items read past the slice (a crash). They
+  hold one entry per item now, or none.
+- **`measure_text`, `draw_emoji` and `emoji_supported` take no `len`**
+  (**API change**): C read exactly `len` bytes of the string's copy, so a
+  larger `len` read past it. The string's own byte length is passed.
+- **`emoji_font_load_memory` is hand-written** (**API change**). It was
+  `(&self, data: &c_void, size: usize, copy: bool)`: `size` was unchecked
+  against `data`, and with `copy = false` CUI kept the pointer past the
+  call while the signature borrowed it for the call. It is
+  `(&self, data: &[u8])` and always copies; the zero-copy form is the raw
+  `cui_sys` function.
+- **`App` is not `Send`** (**API change**): a window and its GL context
+  cannot move between threads on Win32 or Cocoa — `cui_app_destroy` would
+  run on a thread that did not create them. Create it on the thread that
+  runs its loop, as upstream documents.
+- `scripts/gen_ffi.py` leaves a function to a hand-written method when a
+  thin wrapper cannot vouch for its pointers (a `const void *` that no
+  count turns into a slice, a text buffer with an `int` capacity), and its
+  `&mut String` wrappers pass the capacity again (the argument was
+  missing).
+- The crate docs say what a raw `opts` `format` may hold, and that `App`
+  stays on its thread.
+
+Also: the headless `frame` helper is shared (`test_support`) and destroys
+its context on a panic; `soundness_regressions` covers the four fixes above
+(each crashed or read out of bounds before); CI runs the tests under
+AddressSanitizer on Linux; the license text of the Lucide icons ships in
+the package (`licenses/`).
+
 - **`Arena` is chunked.** It was one growable `Vec`, so any growth moved
   every pointer already handed out in the frame: `cstr_array` wrote through
   its own freed base pointer, and every `*_with` method that combines

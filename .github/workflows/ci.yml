@@ -97,9 +97,8 @@ jobs:
   # spelled out so build scripts and proc macros are not sanitized too, and
   # the C side uses clang so both halves share one sanitizer runtime. Leaks
   # are not reported: this job is after memory errors, not what CUI caches.
+  # Green on its first run, so it blocks from here on.
   asan:
-    # informational until it has been green once: remove the line then
-    continue-on-error: true
     runs-on: ubuntu-24.04
     env:
       RUSTFLAGS: -Zsanitizer=address

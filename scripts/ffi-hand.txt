@@ -25,6 +25,7 @@ cui_word_rotate_ex
 cui_code_editor_ex
 cui_data_grid_cell_edit
 cui_dock_save
+cui_emoji_font_load_memory
 cui_input_file_drop
 cui_path_bar_ex
 cui_prop_enum_ex

@@ -3,7 +3,7 @@
 //! [`crate::opts`].
 
 use crate::arena::Arena;
-use crate::opts::{cstr, cstr_array, col, sz, Annotation};
+use crate::opts::{cstr, cstr_array, col, fmt_cstr, sz, Annotation};
 use crate::types::*;
 use cui_sys as ffi;
 
@@ -756,7 +756,8 @@ pub struct DotChart<'a> {
     pub x_max: f64,
     /// How x labels are shown.
     pub x_units: Axis,
-    /// X labels with [`Axis::Number`]; default "%g".
+    /// X labels with [`Axis::Number`]; default "%g". One float conversion, or
+    /// the call panics.
     pub x_format: Option<&'a str>,
     /// Spacing of the x labels in x units; 0 picks one that fits.
     pub x_step: f64,
@@ -764,7 +765,8 @@ pub struct DotChart<'a> {
     pub min: f32,
     /// Value range when min != max.
     pub max: f32,
-    /// Values in the readout; default "%.0f".
+    /// Values in the readout; default "%.0f". One float conversion, or the
+    /// call panics.
     pub format: Option<&'a str>,
     /// After values in the readout, e.g. "MG".
     pub unit: Option<&'a str>,
@@ -796,11 +798,11 @@ impl DotChart<'_> {
             x_min: self.x_min,
             x_max: self.x_max,
             x_units: self.x_units.to_ffi(),
-            x_format: cstr(a, self.x_format),
+            x_format: fmt_cstr(a, self.x_format),
             x_step: self.x_step,
             min: self.min,
             max: self.max,
-            format: cstr(a, self.format),
+            format: fmt_cstr(a, self.format),
             unit: cstr(a, self.unit),
             pitch: self.pitch,
             no_grid: self.no_grid,
@@ -834,7 +836,8 @@ pub struct EventTrack<'a> {
     pub step: f64,
     /// How labels are shown.
     pub units: Axis,
-    /// Labels with [`Axis::Number`]; default "%g".
+    /// Labels with [`Axis::Number`]; default "%g". One float conversion, or
+    /// the call panics.
     pub format: Option<&'a str>,
     /// Spacing of the axis labels; 0 picks one that fits.
     pub label_step: f64,

@@ -56,14 +56,21 @@
 //!   `calendar_heatmap`, `treemap`, `radar`, `funnel`, `split_bar`,
 //!   `activity_rings`, `scatter_chart`.
 //!
+//! A `format` field of a raw `opts` struct is a printf format, which C
+//! hands to `vsnprintf` with one `double`: `%%` and one float conversion
+//! (`"%.1f"`) are all it may hold — anything else makes printf read an
+//! argument that was never passed. The option structs of this crate check
+//! theirs and panic on the rest.
+//!
 //! State owned by CUI (scroll positions, focus, hover fades) is keyed by
 //! each widget's id — see the "Identity" notes in the C header:
 //! `"Label##key"` and `"Label###key"` work exactly as in C.
 //!
-//! A `cui::App` can be moved between threads but used from only one (as in
-//! C: one `cui_ctx` per thread). This crate binds CUI's own window layer
-//! (`cui_app_*`); see `cui-sys` for the raw FFI, including the renderer SPI
-//! for bringing your own window.
+//! An `App` stays on the thread that created it and is used from that one
+//! thread (as in C: a `cui_ctx` is not thread safe; several apps may each
+//! live on their own thread), so it is neither `Send` nor `Sync`. This crate
+//! binds CUI's own window layer (`cui_app_*`); see `cui-sys` for the raw
+//! FFI, including the renderer SPI for bringing your own window.
 
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -78,6 +85,8 @@ mod gen_safe;
 mod icons;
 mod opts;
 mod opts2;
+#[cfg(test)]
+mod test_support;
 
 pub use arena::Arena;
 pub use draw::*;
@@ -210,6 +219,72 @@ fn cstring(s: &str) -> Vec<u8> {
     v
 }
 
+/// Checks a printf format for one value: what CUI's `format` options are.
+/// C formats the value with `cui__frame_printf(ui, fmt, (double)v)`, so the
+/// format must ask for one `double` and nothing else: a `%s`, `%n` or `%d`
+/// makes printf read an argument that was never passed. Panics on anything
+/// else, and on widths over 99 (the text is built in frame memory).
+pub(crate) fn assert_value_format(s: &str) {
+    if let Err(bad) = check_value_format(s) {
+        panic!("CUI value format {s:?}: {bad}");
+    }
+}
+
+/// What is wrong with `s` as a one-value printf format.
+fn check_value_format(s: &str) -> Result<(), &'static str> {
+    let b = s.as_bytes();
+    let mut i = 0;
+    let mut conversions = 0;
+    while i < b.len() {
+        if b[i] != b'%' {
+            i += 1;
+            continue;
+        }
+        i += 1;
+        if b.get(i) == Some(&b'%') {
+            i += 1; // a literal percent sign
+            continue;
+        }
+        while matches!(b.get(i), Some(b'-' | b'+' | b' ' | b'#' | b'0')) {
+            i += 1;
+        }
+        i = digits_at_most(b, i)?;
+        if b.get(i) == Some(&b'.') {
+            i = digits_at_most(b, i + 1)?;
+        }
+        // `l` changes nothing for printf's float conversions (`%lf`); every
+        // other length modifier changes what printf reads
+        if b.get(i) == Some(&b'l') {
+            i += 1;
+        }
+        match b.get(i) {
+            Some(c) if b"fFeEgGaA".contains(c) => i += 1,
+            _ => return Err("only a float conversion is allowed (%f, %e, %g, ... with the flags -+ #0, a width and a precision): CUI passes one double"),
+        }
+        conversions += 1;
+        if conversions > 1 {
+            return Err("more than one conversion: CUI passes one double");
+        }
+    }
+    Ok(())
+}
+
+/// `i` moved past a run of digits standing for at most 99; `*` is refused.
+fn digits_at_most(b: &[u8], mut i: usize) -> Result<usize, &'static str> {
+    if b.get(i) == Some(&b'*') {
+        return Err("`*` takes its value from an argument CUI does not pass");
+    }
+    let mut n = 0u32;
+    while let Some(&d) = b.get(i).filter(|d| d.is_ascii_digit()) {
+        n = n.saturating_mul(10).saturating_add(u32::from(d - b'0'));
+        i += 1;
+    }
+    if n > 99 {
+        return Err("a width or precision over 99");
+    }
+    Ok(i)
+}
+
 /// A native window with an event loop and a renderer (C's `cui_app`).
 ///
 /// The classic loop, matching C:
@@ -221,6 +296,16 @@ fn cstring(s: &str) -> Vec<u8> {
 ///     let mut ui = app.ui();
 ///     // ... describe the screen ...
 /// }
+/// ```
+///
+/// The app belongs to the thread that created it: a window and its GL
+/// context do not move between threads on Win32 or Cocoa. Create it on the
+/// thread that runs its loop (several apps may each have their own).
+///
+/// ```compile_fail
+/// # use cui::App;
+/// fn moves_between_threads<T: Send>(_: T) {}
+/// fn f(app: App) { moves_between_threads(app) }
 /// ```
 pub struct App {
     ptr: *mut ffi::cui_app,
@@ -236,9 +321,8 @@ impl Drop for App {
     }
 }
 
-// A cui_app is used from one thread; several apps may live on several threads,
-// exactly like C's cui_app (see docs/integration.md, "Threads").
-unsafe impl Send for App {}
+// No `Send` for App: the raw pointer already keeps it on its thread, and a
+// window cannot be destroyed from the thread that did not create it.
 
 impl App {
     /// Creates the window. Returns `None` when CUI could not (no display, no
@@ -656,7 +740,7 @@ impl<'a> Ui<'a> {
 
     /// A segmented control with options ([`Segmented`]). Returns true when changed.
     pub fn segmented_with(&mut self, id: impl AsRef<str>, items: &[&str], index: &mut i32, o: &Segmented) -> bool {
-        let fo = o.flatten(self.arena);
+        let fo = o.flatten(self.arena, items.len());
         unsafe { ffi::cui_segmented_ex(self.ctx, self.cs(&id), self.arena.cstr_array(items), items.len() as i32, index, &fo) }
     }
 
@@ -734,7 +818,7 @@ impl<'a> Ui<'a> {
 
     /// A select with options ([`Select`]). Returns true when changed.
     pub fn select_with(&mut self, id: impl AsRef<str>, items: &[&str], index: &mut i32, o: &Select) -> bool {
-        let fo = o.flatten(self.arena);
+        let fo = o.flatten(self.arena, items.len());
         unsafe { ffi::cui_select_ex(self.ctx, self.cs(&id), self.arena.cstr_array(items), items.len() as i32, index, &fo) }
     }
 
@@ -748,7 +832,7 @@ impl<'a> Ui<'a> {
 
     /// A tab bar with options ([`Tabs`]). Returns true when changed.
     pub fn tabs_with(&mut self, id: impl AsRef<str>, items: &[&str], index: &mut i32, o: &Tabs) -> bool {
-        let fo = o.flatten(self.arena);
+        let fo = o.flatten(self.arena, items.len());
         unsafe { ffi::cui_tabs_ex(self.ctx, self.cs(&id), self.arena.cstr_array(items), items.len() as i32, index, &fo) }
     }
 
@@ -1276,5 +1360,117 @@ mod c_string_tests {
         assert_eq!(bytes.len(), 64);
         assert_eq!(bytes[3], 0);
         assert!(bytes[4..].iter().all(|&b| b == 0));
+    }
+}
+
+/// Inputs a safe caller could hand the layer and CUI then read past: each
+/// one reached C once; they panic before the call now.
+#[cfg(test)]
+mod soundness_regressions {
+    use super::*;
+    use crate::test_support::frame;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    /// `f` panics before any widget call gets its arguments.
+    fn panics_before_cui(f: impl FnOnce(&mut Ui)) -> bool {
+        catch_unwind(AssertUnwindSafe(|| frame(f))).is_err()
+    }
+
+    #[test]
+    fn value_formats_cui_can_print() {
+        for ok in ["%.0f", "%.1f", "%g", "%5.2f", "%-8.3e", "%+.1f", "% lf", "%.f", "%%", "%.1f%%", "$%.2f", "%lf", "%a"] {
+            check_value_format(ok).unwrap_or_else(|e| panic!("{ok:?}: {e}"));
+        }
+    }
+
+    #[test]
+    fn value_formats_that_reach_other_arguments() {
+        // read one (%s, %d, %*f), write through one (%n), or build a huge string
+        for bad in ["%s", "%d", "%i", "%n", "%c", "%p", "%Lf", "%hhd", "%*f", "%.*f", "%1$f", "%.1f %.1f", "%", "%.1f%", "%200f", "%.100f", "abc%"] {
+            assert!(check_value_format(bad).is_err(), "{bad:?} must be refused");
+        }
+    }
+
+    #[test]
+    fn a_value_format_reaches_cui_checked() {
+        assert_value_format("%.1f");
+        assert!(std::panic::catch_unwind(|| assert_value_format("%s")).is_err());
+    }
+
+    #[test]
+    fn every_value_format_option_refuses_other_conversions() {
+        let values = [1.0f32, 2.0];
+        let mut times = [1.0f64];
+        for bad in ["%s", "%n", "%d", "%*f"] {
+            let mut v = 0.5f32;
+            assert!(panics_before_cui(|ui| {
+                let _ = ui.slider_with("a", &mut v, 0., 1., &Slider { format: Some(bad), show_value: true, ..Default::default() });
+            }), "slider: {bad}");
+            assert!(panics_before_cui(|ui| {
+                ui.line_chart_with("b", &[Series { values: &values, ..Default::default() }], &Chart { format: Some(bad), ..Default::default() });
+            }), "chart: {bad}");
+            let series = [DotSeries { values: &values, name: None, accent: false }];
+            assert!(panics_before_cui(|ui| {
+                let _ = ui.dot_chart("c", &series, 2, &DotChart { format: Some(bad), ..Default::default() });
+            }), "dot chart format: {bad}");
+            assert!(panics_before_cui(|ui| {
+                let _ = ui.dot_chart("d", &series, 2, &DotChart { x_format: Some(bad), ..Default::default() });
+            }), "dot chart x_format: {bad}");
+            assert!(panics_before_cui(|ui| {
+                let _ = ui.event_track("e", &mut times, &mut 1, 0., 10., &mut EventTrack { format: Some(bad), ..Default::default() });
+            }), "event track: {bad}");
+        }
+    }
+
+    #[test]
+    fn one_icon_per_item_or_none() {
+        let mut index = 0;
+        frame(|ui| {
+            ui.segmented_with("a", &["On", "Off"], &mut index, &Segmented { icons: &["+", "-"], ..Default::default() });
+            ui.segmented_with("b", &["On", "Off"], &mut index, &Segmented::default());
+            ui.tabs_with("c", &["On", "Off"], &mut index, &Tabs { icons: &["+", "-"], ..Default::default() });
+            ui.tabs_with("d", &["On", "Off"], &mut index, &Tabs::default());
+            ui.select_with("e", &["On", "Off"], &mut index, &Select { icons: &["+", "-"], ..Default::default() });
+            ui.select_with("f", &["On", "Off"], &mut index, &Select::default());
+        });
+    }
+
+    #[test]
+    fn a_short_icon_array_panics_before_cui_reads_past_it() {
+        // C indexes the icons with the item count: this read past the slice
+        let mut index = 0;
+        assert!(panics_before_cui(|ui| {
+            let _ = ui.segmented_with("a", &["A", "B", "C"], &mut index, &Segmented { icons: &["+"], ..Default::default() });
+        }));
+        assert!(panics_before_cui(|ui| {
+            let _ = ui.tabs_with("b", &["A", "B", "C"], &mut index, &Tabs { icons: &["+"], ..Default::default() });
+        }));
+        assert!(panics_before_cui(|ui| {
+            let _ = ui.select_with("c", &["A", "B", "C"], &mut index, &Select { icons: &["+"], ..Default::default() });
+        }));
+    }
+
+    #[test]
+    fn measure_text_measures_exactly_the_string() {
+        frame(|ui| {
+            for s in ["i", "iii", "W", "é", "日本"] {
+                let got = ui.measure_text(0, 12., s);
+                // SAFETY: the arena string is `s.len()` bytes and NUL-terminated
+                let exact = unsafe { ffi::cui_measure_text(ui.ctx, 0, 12., ui.cstr(s), s.len() as i32) };
+                assert_eq!(got.width, exact.width, "{s:?}");
+            }
+        });
+    }
+
+    #[test]
+    fn an_emoji_font_from_memory_is_copied_or_refused() {
+        // Refusal only: empty and garbage data must not load and must not
+        // crash. `emoji_supported` is not asserted here — on Windows CUI
+        // loads a system emoji font on first query, so the answer differs
+        // by platform.
+        frame(|ui| {
+            assert!(!ui.emoji_font_load_memory(&[]));
+            assert!(!ui.emoji_font_load_memory(&[0u8; 16]));
+        });
     }
 }

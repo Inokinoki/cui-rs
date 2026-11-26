@@ -126,7 +126,7 @@ which has no portable Rust spelling (use `cui_log_append` or
   discipline C's `char buf[96]` gives; container scopes are closures with
   panic-safe begin/end guards.
 - **Generated layer** (`cui-sys/src/gen.rs` + `cui/src/gen_safe.rs`, 319
-  extern functions + 235 structs, 237 safe methods): the full second-wave
+  extern functions + 235 structs, 230 thin methods): the full second-wave
   gallery surface — kanban, dock, terminal, data grid (with editing),
   carousel, card stacks, code blocks, JSON viewer, blame, coverage, API
   explorer, feature flags, test explorer, stack traces, trace viewer,
@@ -150,10 +150,16 @@ The generated methods are "thin safe": `impl AsRef<str>` for strings (via
 the frame arena), `&mut String` for editable buffers (UTF-8 re-validated
 after the call), slices for pointer+count pairs, and raw `ffi::*_opts`
 structs for options — construct them with `..Default::default()` and the
-public [`Arena`](cui/src/arena.rs) for any string pointers. The renderer SPI
-(bring your own window) is declared in the FFI. Adding a component is
-mechanical — extend `scripts/ffi-manifest.txt`, re-run `scripts/gen_ffi.py`
-— see the git history for the pattern.
+public [`Arena`](cui/src/arena.rs) for any string pointers. Two things
+stay yours to get right there: the pointers C keeps past the call (above),
+and their `format` fields, which go to printf with one `double` — `%%` and
+a float conversion only. (The hand-written options check theirs; a `%s`
+there panics.) A function whose pointers a thin wrapper cannot vouch for —
+a bare `const void *`, a text buffer with an `int` capacity — is not
+wrapped: `scripts/gen_ffi.py` leaves it for a hand-written method. The
+renderer SPI (bring your own window) is declared in the FFI. Adding a
+component is mechanical — extend `scripts/ffi-manifest.txt`, re-run
+`scripts/gen_ffi.py` — see the git history for the pattern.
 
 ## Platform notes
 
@@ -199,6 +205,7 @@ cui-sys/           raw FFI + the vendored C amalgamation (cui.h, cui.c), built b
                    (header members and hand-written #[repr] variants) against
                    the C probe
   layout/          the C ABI facts per pinned release (written by vendor.sh)
+  licenses/        the license texts of the embedded fonts and icons
   probe/           the C probe that prints them, and sigcheck.c (generated):
                    every Rust extern assigned to a C function pointer, so the
                    C compiler checks parameter counts, pointer levels, consts
@@ -230,10 +237,16 @@ belonged to an unrelated, yanked 2017 crate since before this binding
 existed. The library name stays `cui`, so `use cui::…` reads the same as
 the C API.
 
-**The support window.** Binding 0.1.x targets CUI 1.4 only (declared in
-`UPSTREAM.toml` and enforced by `build.rs`). The plumbing for multi-version
-support is in place: capability cfgs (`cui_ge_1_5` etc.), a C ABI probe per
-pinned release, and per-version layout tables that the tests check against.
+**The support window.** Binding 0.1.x supports CUI **1.4** only — declared in
+`UPSTREAM.toml` (`supported = [...]`) and enforced by `build.rs`. 0.2.0 will
+widen the window to recent releases, and the plumbing is already in place:
+`cui-sys` reports the compiled version through Cargo's `links` metadata
+channel, `cui/build.rs` turns it into `cui_ge_*` capability cfgs (so
+version-specific APIs can be `#[cfg(cui_ge_1_5)]`-gated), and every pinned
+release carries a generated C ABI probe (struct sizes, field offsets, enum
+values) in `cui-sys/layout/` that the layout tests check the Rust FFI
+against. The same probe verifies upstream's field-append discipline, which
+is what makes a moving support window safe.
 
 **The bound upstream release rides in the build metadata.** Both crates are
 versioned `0.1.3+cui1.4.0`: the `+cui…` suffix — the same convention as
@@ -259,27 +272,20 @@ If you amalgamate a local upstream checkout instead (`./vendor.sh
 <checkout>`, for hacking on upstream), `build.rs` compiles it with a
 digest-mismatch warning as long as the version matches the pin.
 
-**Support window.** Binding 0.1.x supports CUI **1.4** only — declared in
-`UPSTREAM.toml` (`supported = [...]`) and enforced by `build.rs`. 0.2.0 will
-widen the window to recent releases, and the plumbing is already in place:
-`cui-sys` reports the compiled version through Cargo's `links` metadata
-channel, `cui/build.rs` turns it into `cui_ge_*` capability cfgs (so
-version-specific APIs can be `#[cfg(cui_ge_1_5)]`-gated), and every pinned
-release carries a generated C ABI probe (struct sizes, field offsets, enum
-values) in `cui-sys/layout/` that the layout tests check the Rust FFI
-against. The same probe verifies upstream's field-append discipline, which
-is what makes a moving support window safe.
-
 **At runtime**, `cui::CUI_VERSION` (re-exported from `cui-sys`, where
 `build.rs` extracts it from `c/cui.h` at compile time) always tells you which
 CUI is inside your binary — e.g. for a diagnostic line or an `about` box.
 
 To move to a new upstream release: run `./vendor.sh --pin v1.5.0` (it
 downloads that release's assets, checks the embedded version, computes the
-digests and rewrites `UPSTREAM.toml`), then commit the updated pin. When the
-upstream major/minor version moved, mention it in both crates' changelogs
-and review the upstream changelog for API changes to port into the safe
-layer — the layout tests in `cui-sys` fail loudly if the C ABI moved.
+digests, updates the pin in UPSTREAM.toml and refreshes the license texts),
+then `python3 scripts/gen_ffi.py` and `./vendor.sh --fetch`, so the bindings
+and the probe table follow the new header, and commit. When the upstream
+major/minor version moved, mention it in both crates' changelogs and review
+the upstream changelog for API changes to port into the safe layer — the
+layout tests in `cui-sys` fail loudly if the C ABI moved. `supported` in
+UPSTREAM.toml is yours to widen: `--pin` leaves it alone and says when the
+new version is not in it (`build.rs` refuses to compile until it is).
 
 ## Building and testing
 
@@ -294,6 +300,8 @@ Updating the pinned upstream release: `./vendor.sh --pin <tag>`.
 
 ## License
 
-MIT, like CUI. The vendored C sources keep upstream's license notes; the
-bundled fonts, stb libraries and Lucide icons keep their own licenses (see
-`LICENSE` and the notes at the end of `cui-sys/c/cui.h`).
+MIT, like CUI. The vendored C sources keep upstream's license notes. The
+work they embed keeps its own licenses: the Inter and Geist fonts (SIL Open
+Font License 1.1) and the Lucide icons (ISC) in `cui-sys/licenses/` — the
+icon constants in `cui/licenses/` too — and the stb libraries (public
+domain or MIT) inline in `cui-sys/c/cui.c`.

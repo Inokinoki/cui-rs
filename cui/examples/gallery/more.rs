@@ -1591,12 +1591,9 @@ const KB_CARDS: [KbCard; 8] = [
 
 fn kb_apply(m: &mut More, mv: &cui_sys::cui_kanban_move) {
     let (from, to) = (mv.from_column as usize, mv.to_column as usize);
-    let mut at = None;
-    for k in 0..m.kb_len[from] as usize {
-        if m.kb_cols[from][k] == mv.card {
-            at = Some(k);
-        }
-    }
+    let at = m.kb_cols[from][..m.kb_len[from] as usize]
+        .iter()
+        .rposition(|&id| id == mv.card);
     let Some(at) = at else { return };
     if mv.to_column != mv.from_column && m.kb_len[to] >= 8 {
         return;
@@ -1629,8 +1626,7 @@ fn page_planning(ui: &mut Ui, g: &mut Gallery) {
         if ui.kanban_column_begin(col_names[c], m.kb_len[c], &o) {
             ui.toast_with("New card", &Toast { description: Some(col_names[c]), ..Default::default() });
         }
-        for k in 0..m.kb_len[c] as usize {
-            let id = m.kb_cols[c][k];
+        for &id in &m.kb_cols[c][..m.kb_len[c] as usize] {
             let Some(cd) = KB_CARDS.iter().find(|x| x.id == id) else { continue };
             if ui.kanban_card_begin(cd.id) {
                 ui.toast(cd.title);
@@ -2985,8 +2981,8 @@ fn page_instruments(ui: &mut Ui, g: &mut Gallery) {
             peak_at = at;
         }
     }
-    for c in 0..m.cup_count as usize {
-        bed += dose(23. - m.cups[c]) as f64;
+    for &cup in &m.cups[..m.cup_count as usize] {
+        bed += dose(23. - cup) as f64;
     }
     let peak_text = format!("PEAK {peak:.0} MG");
     let peak_mg = format!("{peak:.0}");

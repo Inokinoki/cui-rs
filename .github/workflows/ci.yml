@@ -91,3 +91,25 @@ jobs:
       - run: cargo test
       - run: cargo build --release --examples
 
+  # The test suite under AddressSanitizer, with Rust and the C amalgamation
+  # both instrumented: a read CUI makes past a short slice, a stale pointer or
+  # an unchecked length fails here instead of passing silently. `--target` is
+  # spelled out so build scripts and proc macros are not sanitized too, and
+  # the C side uses clang so both halves share one sanitizer runtime. Leaks
+  # are not reported: this job is after memory errors, not what CUI caches.
+  # Green on its first run, so it blocks from here on.
+  asan:
+    runs-on: ubuntu-24.04
+    env:
+      RUSTFLAGS: -Zsanitizer=address
+      CFLAGS_x86_64-unknown-linux-gnu: -fsanitize=address -g
+      CC_x86_64-unknown-linux-gnu: clang
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal
+      - run: sudo apt-get update && sudo apt-get install -y libx11-dev
+      - run: cargo +nightly test --target x86_64-unknown-linux-gnu
+      - run: cargo +nightly build --examples --target x86_64-unknown-linux-gnu
+
+

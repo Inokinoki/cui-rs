@@ -1464,10 +1464,13 @@ mod soundness_regressions {
 
     #[test]
     fn an_emoji_font_from_memory_is_copied_or_refused() {
+        // Refusal only: empty and garbage data must not load and must not
+        // crash. `emoji_supported` is not asserted here — on Windows CUI
+        // loads a system emoji font on first query, so the answer differs
+        // by platform.
         frame(|ui| {
             assert!(!ui.emoji_font_load_memory(&[]));
             assert!(!ui.emoji_font_load_memory(&[0u8; 16]));
-            assert!(!ui.emoji_supported("x"));
         });
     }
 }
